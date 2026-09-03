@@ -225,10 +225,10 @@ public class PreferencesDialog extends Stage {
         }
     }
 
-    /** 下拉初始显示：settings 未指定时对齐默认优先级（Vineflower）。 */
+    /** 下拉初始显示：当前实际生效的引擎（所选缺失回退后亦如实显示）。 */
     private String currentDecompilerDisplayName() {
-        DecompilerType t = DecompilerType.fromKey(app.settings().getString("decompiler_type"));
-        return (t == null ? DecompilerType.VINEFLOWER : t).displayName();
+        DecompilerManager.Selection sel = DecompilerManager.currentDecompiler(app.settings());
+        return (sel == null ? DecompilerType.VINEFLOWER : sel.type()).displayName();
     }
 
     /** 用户切换反编译器：持久化设置，并清空本会话旧引擎的源码缓存。 */
