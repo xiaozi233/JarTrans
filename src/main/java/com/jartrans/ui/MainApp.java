@@ -71,8 +71,9 @@ public class MainApp extends javafx.application.Application {
     private String javaVersionCache;
     private boolean decompiling;
     private volatile boolean decompileCancelled;
-    private long decompileStartedAt;
     private Map<String, Path> indexCache;
+    /** 已按单类反编译过的类 → 产出的 .java 文件（本会话内复用）。 */
+    private final Map<String, List<Path>> singleClassFiles = new HashMap<>();
     private boolean javaPrompted;
 
     // ---------- FXML 控件 ----------
@@ -427,6 +428,7 @@ public class MainApp extends javafx.application.Application {
     public void onClearDecompileCache(ActionEvent e) {
         DecompilerManager.clearAllCache();
         indexCache = null;
+        singleClassFiles.clear();
         setStatus("反编译缓存已清理。");
     }
 
@@ -856,6 +858,7 @@ public class MainApp extends javafx.application.Application {
             }
             rebuildTree();
             editor.showClass(null);
+            singleClassFiles.clear();
             updateStats();
             String msg = "已打开 " + project.jarName() + "：共 "
                     + project.classOrder().size() + " 个类";
@@ -1049,6 +1052,7 @@ public class MainApp extends javafx.application.Application {
 
     public void invalidateDecompilerState() {
         indexCache = null;
+        singleClassFiles.clear();
         sourcePanel.refreshTheme();
     }
 
@@ -1110,15 +1114,29 @@ public class MainApp extends javafx.application.Application {
         editor.selectRow(literal);
     }
 
-    public void ensureSourceReady(String cls, java.util.function.BiConsumer<String, Object> then) {
+    /** 取当前反编译器（内置 Vineflower 自动兜底）。 */
+    private Object[] currentTool() {
         Object[] dec = DecompilerManager.currentDecompiler(settings);
         if (dec == null) {
-            // 内置 Vineflower 兜底：tools/ 缺失时自动释放，无需联网/手动配置
             DecompilerManager.ensureBundledDecompiler();
             dec = DecompilerManager.currentDecompiler(settings);
         }
-        if (dec == null) {
-            maybePromptSetup();
+        return dec;
+    }
+
+    /** class 内部名（UI 里类键带 .class 后缀，反编译器需要去掉）。 */
+    private static String internalName(String cls) {
+        return cls.endsWith(".class")
+                ? cls.substring(0, cls.length() - ".class".length()) : cls;
+    }
+
+    /**
+     * 按需准备某个类的反编译源码（不再整 jar 反编译）：
+     * 已有整 jar 缓存 → "whole"(Path 缓存根)；已单类反编译过 → "single"(List&lt;Path&gt;)；
+     * 正在反编译 → "loading"；不具备条件 → "bytecode"。结果均在 FX 线程回调。
+     */
+    public void ensureClassSources(String cls, java.util.function.BiConsumer<String, Object> then) {
+        if (!project.hasJar()) {
             then.accept("bytecode", null);
             return;
         }
@@ -1129,39 +1147,52 @@ public class MainApp extends javafx.application.Application {
             then.accept("bytecode", null);
             return;
         }
-        Path cache = DecompilerManager.findCache(sha);
-        if (cache != null) {
-            then.accept("java", cache);
+        Path whole = DecompilerManager.findCache(sha);
+        if (whole != null) {
+            then.accept("whole", whole);
+            return;
+        }
+        List<Path> cached = singleClassFiles.get(cls);
+        if (cached != null) {
+            then.accept("single", cached);
+            return;
+        }
+        Object[] dec = currentTool();
+        if (dec == null || getJavaQuick() == null) {
+            maybePromptSetup();
+            then.accept("bytecode", null);
             return;
         }
         if (decompiling) {
             then.accept("loading", null);
             return;
         }
-        if (getJavaQuick() == null) {
-            maybePromptSetup();
-            then.accept("bytecode", null);
-            return;
-        }
-        String jarPath = project.jarPath().toString();
         com.jartrans.core.java.DecompilerType type =
                 (com.jartrans.core.java.DecompilerType) dec[0];
         String decPath = (String) dec[1];
-        Path outDir = DecompilerManager.cacheDir(sha);
+        String inner = internalName(cls);
+        // 目标类 + 内部类（如 Foo 与 Foo$Inner），整组一次喂给反编译器
+        List<String> names = new ArrayList<>();
+        for (String c : project.classOrder()) {
+            String n = internalName(c);
+            if (n.equals(inner) || n.startsWith(inner + "$")) {
+                names.add(n);
+            }
+        }
         decompiling = true;
-        decompileStartedAt = System.currentTimeMillis();
         decompileCancelled = false;
-
-        Task<Path> task = new Task<>() {
+        setStatus("正在反编译 " + inner + " …");
+        Task<List<java.nio.file.Path>> task = new Task<>() {
             @Override
-            protected Path call() throws Exception {
+            protected List<java.nio.file.Path> call() throws Exception {
                 JavaEnv.JavaResult java = JavaEnv.findJava(settings);
                 if (java.path() == null) {
                     throw new DecompilerManager.DecompileException(
                             "未找到可用的 java，请通过菜单「源码 → 反编译管理器」手动指定。");
                 }
                 setJavaInfo(java.path(), java.version());
-                return DecompilerManager.decompile(jarPath, outDir, java.path(), decPath, type,
+                return DecompilerManager.decompileClasses(project.jarPath().toString(), sha,
+                        names, java.path(), decPath, type,
                         line -> {
                             if (line != null && !line.isBlank()) {
                                 System.out.println("[decomp] " + line);
@@ -1172,19 +1203,26 @@ public class MainApp extends javafx.application.Application {
         };
         task.setOnSucceeded(ev -> {
             decompiling = false;
-            indexCache = null;
-            then.accept("java", task.getValue());
+            List<java.nio.file.Path> files = task.getValue();
+            if (files.isEmpty()) {
+                setStatus("反编译未生成源码（可能类被混淆/无法解析），已回退字节码视图");
+                then.accept("bytecode", null);
+                return;
+            }
+            singleClassFiles.put(cls, files);
+            setStatus("已完成「" + inner + "」反编译");
+            then.accept("single", files);
         });
         task.setOnFailed(ev -> {
             decompiling = false;
-            indexCache = null;
             String msg = task.getException() == null ? "" : task.getException().getMessage();
+            setStatus("反编译失败：" + msg);
             if (!String.valueOf(msg).contains("已取消")) {
                 Dialogs.error("反编译失败", String.valueOf(msg));
             }
             then.accept("bytecode", null);
         });
-        new Thread(task, "decompile").start();
+        new Thread(task, "decompile-class").start();
         then.accept("loading", null);
     }
 

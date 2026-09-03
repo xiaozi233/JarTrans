@@ -2,6 +2,7 @@ package com.jartrans.core.java;
 
 import com.jartrans.core.AppDirs;
 import com.jartrans.core.Settings;
+import com.jartrans.core.jar.JarReader;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -186,6 +187,129 @@ public final class DecompilerManager {
         if (proc != null && proc.isAlive()) {
             proc.destroyForcibly();
         }
+    }
+
+    /**
+     * 反编译 jar 中的若干类（classNames 为不带 .class 的内部名，可含内部类）到缓存目录，
+     * 返回本次产出的 .java 绝对路径。只把选中的类字节复制到临时输入目录喂给反编译器，
+     * 避免整 jar 反编译的等待。输出累积在 cacheDir(sha)/classes 下（不带 .ok 标记）。
+     */
+    public static List<Path> decompileClasses(String jarPath, String sha256,
+                                              java.util.Collection<String> classNames,
+                                              String javaPath, String decompilerPath,
+                                              DecompilerType type, LogSink log,
+                                              CancelCheck cancelCheck)
+            throws DecompileException {
+        Path base = cacheDir(sha256);
+        Path out = base.resolve("classes");
+        try {
+            Files.createDirectories(out);
+        } catch (IOException exc) {
+            throw new DecompileException("无法创建输出目录：" + exc.getMessage());
+        }
+        // 输入：只放目标类与它们的内部类（保持包路径），其余引用缺失由引擎尽力而为
+        Path inRoot;
+        try {
+            inRoot = Files.createTempDirectory(CACHE_ROOT.getParent(), "jartrans_in_");
+        } catch (IOException exc) {
+            throw new DecompileException("无法创建临时输入目录：" + exc.getMessage());
+        }
+        try {
+            JarReader jr = new JarReader(Paths.get(jarPath));
+            for (String name : classNames) {
+                byte[] bytes = jr.readEntry(name + ".class");
+                if (bytes == null) {
+                    continue;
+                }
+                Path dest = inRoot.resolve(name + ".class");
+                Files.createDirectories(dest.getParent());
+                Files.write(dest, bytes);
+            }
+        } catch (JarReader.JarFileException exc) {
+            throw new DecompileException("读取 jar 类失败：" + exc.getMessage());
+        } catch (IOException exc) {
+            throw new DecompileException("复制类字节失败：" + exc.getMessage());
+        }
+
+        List<String> cmd = type.buildCommand(javaPath, decompilerPath,
+                inRoot.toString(), out.toString());
+        int code;
+        try {
+            ProcessBuilder pb = new ProcessBuilder(cmd);
+            pb.redirectErrorStream(true);
+            Process proc = pb.start();
+            ACTIVE_PROCESS.set(proc);
+            try (InputStream in = proc.getInputStream()) {
+                byte[] buf = new byte[4096];
+                var baos = new java.io.ByteArrayOutputStream();
+                int n;
+                while ((n = in.read(buf)) > 0) {
+                    if (cancelCheck != null && cancelCheck.isCancelled()) {
+                        proc.destroyForcibly();
+                        throw new DecompileException("已取消");
+                    }
+                    baos.write(buf, 0, n);
+                    byte[] all = baos.toByteArray();
+                    int lineStart = 0;
+                    for (int i = 0; i < all.length; i++) {
+                        if (all[i] == '\n') {
+                            emitLine(log, all, lineStart, i);
+                            lineStart = i + 1;
+                        }
+                    }
+                    baos.reset();
+                    baos.write(all, lineStart, all.length - lineStart);
+                }
+                if (baos.size() > 0) {
+                    emitLine(log, baos.toByteArray(), 0, baos.size());
+                }
+            }
+            code = proc.waitFor();
+        } catch (IOException exc) {
+            throw new DecompileException("无法启动反编译器：" + exc.getMessage());
+        } catch (InterruptedException exc) {
+            Thread.currentThread().interrupt();
+            throw new DecompileException("已取消");
+        } finally {
+            ACTIVE_PROCESS.set(null);
+            try {
+                Files.walk(inRoot).sorted(Comparator.reverseOrder())
+                        .forEach(p -> {
+                            try {
+                                Files.deleteIfExists(p);
+                            } catch (IOException ignored) {
+                                // 忽略
+                            }
+                        });
+            } catch (IOException ignored) {
+                // 清理失败忽略
+            }
+        }
+
+        if (code != 0) {
+            throw new DecompileException("反编译器退出码 " + code + "，详见输出日志");
+        }
+        // 只返回与本次请求类相关的产物（其它类累积产物不在此列）
+        List<String> relOf = classNames.stream().map(n -> n + ".java").toList();
+        List<Path> produced = new ArrayList<>();
+        try (Stream<Path> walk = Files.walk(out)) {
+            walk.filter(p -> p.getFileName().toString().endsWith(".java"))
+                    .forEach(p -> {
+                        String rel = out.relativize(p).toString().replace('\\', '/');
+                        for (String r : relOf) {
+                            if (rel.equals(r)
+                                    || (rel.startsWith(r) && rel.length() > r.length()
+                                    && "$./".indexOf(rel.charAt(r.length())) >= 0)) {
+                                produced.add(p);
+                                break;
+                            }
+                        }
+                    });
+        } catch (IOException ignored) {
+            // 忽略
+        }
+        produced.sort(Comparator.comparing(Path::toString));
+        return produced;
     }
 
     /**

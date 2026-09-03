@@ -150,9 +150,10 @@ public class SourcePanel extends BorderPane {
     public void display(String cls, String jumpOrig) {
         currentClass = cls;
         pendingJump = jumpOrig;
-        app.ensureSourceReady(cls, (modeFlag, payload) -> Platform.runLater(() -> {
+        app.ensureClassSources(cls, (modeFlag, payload) -> Platform.runLater(() -> {
             switch (modeFlag) {
-                case "java" -> showJava((Path) payload);
+                case "whole" -> showWhole((Path) payload);
+                case "single" -> showSingle((List<Path>) payload);
                 case "loading" -> showLoading();
                 default -> showBytecode();
             }
@@ -311,20 +312,38 @@ public class SourcePanel extends BorderPane {
 
     // ---------- 反编译模式 ----------
 
-    private void showJava(Path cacheDir) {
+    /** 已有整 jar 反编译缓存（老版本/外部产物）时按旧路径展示。 */
+    private void showWhole(Path cacheDir) {
         mode = Mode.JAVA;
-        loadingBar.setVisible(false);
-        loadingBar.setManaged(false);
+        hideLoading();
         Map<String, Path> index = app.decompiledIndex();
         DecompilerManager.SourceFiles sf =
                 DecompilerManager.sourceFilesFor(index, currentClass);
-        files.clear();
+        List<Map.Entry<String, Path>> entries = new ArrayList<>();
         if (sf.external() != null) {
-            files.add(Map.entry(sf.external(), cacheDir.resolve(sf.external())));
+            entries.add(Map.entry(sf.external(), cacheDir.resolve(sf.external())));
         }
         for (String rel : sf.inners()) {
-            files.add(Map.entry(rel, cacheDir.resolve(rel)));
+            entries.add(Map.entry(rel, cacheDir.resolve(rel)));
         }
+        populate(entries);
+    }
+
+    /** 按需单类反编译结果（本次产出的 .java 列表）。 */
+    private void showSingle(List<Path> produced) {
+        mode = Mode.JAVA;
+        hideLoading();
+        List<Map.Entry<String, Path>> entries = new ArrayList<>();
+        for (Path p : produced) {
+            entries.add(Map.entry("", p));
+        }
+        populate(entries);
+    }
+
+    /** 统一填充文件下拉框并加载第一个文件。 */
+    private void populate(List<Map.Entry<String, Path>> entries) {
+        files.clear();
+        files.addAll(entries);
         if (files.isEmpty()) {
             fileBox.getItems().setAll("");
             fileBox.getSelectionModel().selectFirst();
@@ -333,7 +352,8 @@ public class SourcePanel extends BorderPane {
         }
         List<String> display = new ArrayList<>();
         for (var e : files) {
-            display.add(e.getValue().getFileName() + "   (" + e.getKey() + ")");
+            String suffix = e.getKey().isEmpty() ? "" : "   (" + e.getKey() + ")";
+            display.add(e.getValue().getFileName() + suffix);
         }
         fileBox.getItems().setAll(display);
         fileBox.getSelectionModel().selectFirst();
@@ -393,6 +413,11 @@ public class SourcePanel extends BorderPane {
         info.setText("");
     }
 
+    private void hideLoading() {
+        loadingBar.setVisible(false);
+        loadingBar.setManaged(false);
+    }
+
     private void showLoading() {
         mode = Mode.LOADING;
         resetText();
@@ -415,7 +440,7 @@ public class SourcePanel extends BorderPane {
             return;
         }
         long elapsed = (System.currentTimeMillis() - loadingStartedAt) / 1000;
-        loadingLabel.setText("正在反编译整个 jar（已用时 " + elapsed + " 秒），完成后自动显示源码…");
+        loadingLabel.setText("正在反编译该类（已用时 " + elapsed + " 秒）…");
     }
 
     // ---------- 跳转与搜索 ----------
