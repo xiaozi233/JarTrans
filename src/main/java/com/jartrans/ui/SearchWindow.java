@@ -44,6 +44,9 @@ public class SearchWindow extends Stage {
         setHeight(560);
         initModality(Modality.NONE);
         initOwner(app.stage());
+        setResizable(true);
+        setMinWidth(720);
+        setMinHeight(420);
 
         BorderPane root = new BorderPane();
         root.setPadding(new Insets(10));
@@ -90,7 +93,7 @@ public class SearchWindow extends Stage {
         });
         //noinspection unchecked
         table.getColumns().addAll(colCls, colOrig, colTrans, colStatus);
-        table.setColumnResizePolicy(javafx.scene.control.TableView.UNCONSTRAINED_RESIZE_POLICY);
+        table.setColumnResizePolicy(javafx.scene.control.TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
         table.setRowFactory(tv -> new javafx.scene.control.TableRow<>() {
             @Override
             protected void updateItem(Project2Row item, boolean empty) {

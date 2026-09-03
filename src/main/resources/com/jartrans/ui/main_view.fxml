@@ -13,6 +13,7 @@
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.SeparatorMenuItem?>
+<?import javafx.scene.control.SplitPane?>
 <?import javafx.scene.control.Tab?>
 <?import javafx.scene.control.TabPane?>
 <?import javafx.scene.control.TextField?>
@@ -112,32 +113,34 @@
     </top>
 
     <center>
-        <HBox>
-            <padding>
-                <Insets top="6" right="8" bottom="6" left="8"/>
-            </padding>
-            <TitledPane text="类列表" collapsible="false" HBox.hgrow="ALWAYS" maxWidth="460">
-                <VBox spacing="6">
-                    <padding>
-                        <Insets top="4" right="6" bottom="6" left="6"/>
-                    </padding>
-                    <HBox spacing="6" alignment="CENTER_LEFT">
-                        <Label text="过滤："/>
-                        <TextField fx:id="filterField" HBox.hgrow="ALWAYS"
-                                   onAction="#onFilterChanged"/>
-                        <Button text="清除" onAction="#onClearFilter"/>
-                    </HBox>
-                    <HBox spacing="8" alignment="CENTER_LEFT">
-                        <CheckBox fx:id="hideEmptyCheck" text="隐藏无字符串的类"
-                                  onAction="#onFilterChanged"/>
-                        <Label text="状态："/>
-                        <ComboBox fx:id="statusBox" prefWidth="116"/>
-                    </HBox>
-                    <HBox fx:id="legendBox" spacing="10"/>
-                    <TreeView fx:id="classTree" VBox.vgrow="ALWAYS"/>
-                </VBox>
-            </TitledPane>
-            <TabPane fx:id="tabPane" tabClosingPolicy="UNAVAILABLE" HBox.hgrow="ALWAYS">
+        <SplitPane dividerPositions="0.32" style="-fx-padding: 6 8 6 8;">
+            <BorderPane minWidth="260">
+                <top>
+                    <Label text="类列表" styleClass="pane-header" maxWidth="Infinity"/>
+                </top>
+                <center>
+                    <VBox spacing="6">
+                        <padding>
+                            <Insets top="6" right="8" bottom="8" left="8"/>
+                        </padding>
+                        <HBox spacing="6" alignment="CENTER_LEFT">
+                            <Label text="过滤："/>
+                            <TextField fx:id="filterField" HBox.hgrow="ALWAYS"
+                                       onAction="#onFilterChanged"/>
+                            <Button text="清除" onAction="#onClearFilter"/>
+                        </HBox>
+                        <HBox spacing="8" alignment="CENTER_LEFT">
+                            <CheckBox fx:id="hideEmptyCheck" text="隐藏无字符串的类"
+                                      onAction="#onFilterChanged"/>
+                            <Label text="状态："/>
+                            <ComboBox fx:id="statusBox" prefWidth="116"/>
+                        </HBox>
+                        <HBox fx:id="legendBox" spacing="10"/>
+                        <TreeView fx:id="classTree" VBox.vgrow="ALWAYS"/>
+                    </VBox>
+                </center>
+            </BorderPane>
+            <TabPane fx:id="tabPane" tabClosingPolicy="UNAVAILABLE">
                 <Tab text="  翻译  " fx:id="editorTab">
                     <ScrollPane fitToWidth="true" fitToHeight="true">
                         <EditorPane fx:id="editor"/>
@@ -147,7 +150,7 @@
                     <SourcePanel fx:id="sourcePanel"/>
                 </Tab>
             </TabPane>
-        </HBox>
+        </SplitPane>
     </center>
 
     <bottom>

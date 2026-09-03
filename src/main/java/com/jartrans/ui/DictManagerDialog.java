@@ -39,6 +39,9 @@ public class DictManagerDialog extends Stage {
         setHeight(470);
         initModality(Modality.NONE);
         initOwner(app.stage());
+        setResizable(true);
+        setMinWidth(620);
+        setMinHeight(400);
 
         BorderPane root = new BorderPane();
         root.setPadding(new Insets(10));

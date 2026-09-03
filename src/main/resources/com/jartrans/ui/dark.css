@@ -311,6 +311,17 @@
     -fx-background-color: -jr-select-bg;
 }
 
+
+/* ---------- 面板头（替代 TitledPane 作分栏标题，内容不受高度限制） ---------- */
+.pane-header {
+    -fx-background-color: -jr-surface-alt;
+    -fx-padding: 7 12 7 12;
+    -fx-text-fill: -jr-muted;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-border-color: transparent transparent -jr-border transparent;
+}
+
 /* ---------- 页签 ---------- */
 .tab-pane > .tab-header-area {
     -fx-padding: 4 8 0 8;
@@ -582,3 +593,26 @@
 .tree-cell.cell-state-ignore:filled:selected { -fx-text-fill: -jr-state-ignore; }
 .tree-cell.cell-state-empty:filled,
 .tree-cell.cell-state-empty:filled:selected { -fx-text-fill: -jr-state-empty; }
+
+/* ---------- 可拖动分栏 ---------- */
+.split-pane {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+.split-pane > .split-pane-divider {
+    -fx-background-color: transparent;
+    -fx-padding: 0 3 0 3;
+}
+.split-pane > .split-pane-divider:hover,
+.split-pane > .split-pane-divider:pressed {
+    -fx-background-color: -jr-border-strong;
+}
+.split-pane .split-pane-divider .horizontal-grabber,
+.split-pane .split-pane-divider .vertical-grabber {
+    -fx-background-color: -jr-muted;
+    -fx-pref-width: 1;
+    -fx-pref-height: 1;
+}
+.split-pane > .split-pane-divider > .vertical-grabber {
+    -fx-background-radius: 1;
+}

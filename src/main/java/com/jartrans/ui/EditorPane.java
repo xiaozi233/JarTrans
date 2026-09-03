@@ -121,7 +121,8 @@ public class EditorPane extends BorderPane {
 
         //noinspection unchecked
         table.getColumns().addAll(colOrig, colTrans, colStatus, colCount, colMethods);
-        table.setColumnResizePolicy(javafx.scene.control.TableView.UNCONSTRAINED_RESIZE_POLICY);
+        // 列宽随窗口自适应伸缩（保持初始比例）
+        table.setColumnResizePolicy(javafx.scene.control.TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
         table.setRowFactory(tv -> new javafx.scene.control.TableRow<>() {
             @Override
             protected void updateItem(Row item, boolean empty) {

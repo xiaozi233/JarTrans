@@ -921,6 +921,9 @@ public class MainApp extends javafx.application.Application {
         win.setWidth(880);
         win.setHeight(460);
         win.initOwner(stage);
+        win.setResizable(true);
+        win.setMinWidth(640);
+        win.setMinHeight(360);
         win.initModality(javafx.stage.Modality.NONE);
         javafx.scene.layout.VBox vbox = new javafx.scene.layout.VBox(6);
         vbox.setPadding(new Insets(6));

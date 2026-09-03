@@ -69,6 +69,9 @@ public class DecompilerManagerDialog extends Stage {
         setHeight(560);
         initModality(Modality.NONE);
         initOwner(app.stage());
+        setResizable(true);
+        setMinWidth(720);
+        setMinHeight(460);
 
         BorderPane root = new BorderPane();
         root.setPadding(new Insets(10));

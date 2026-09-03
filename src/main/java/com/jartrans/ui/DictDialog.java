@@ -38,6 +38,9 @@ public class DictDialog extends Stage {
         setHeight(560);
         initModality(Modality.NONE);
         initOwner(app.stage());
+        setResizable(true);
+        setMinWidth(620);
+        setMinHeight(420);
 
         BorderPane root = new BorderPane();
         root.setPadding(new Insets(10));
@@ -83,7 +86,7 @@ public class DictDialog extends Stage {
         colTrans.setPrefWidth(380);
         //noinspection unchecked
         table.getColumns().addAll(colOrig, colTrans);
-        table.setColumnResizePolicy(javafx.scene.control.TableView.UNCONSTRAINED_RESIZE_POLICY);
+        table.setColumnResizePolicy(javafx.scene.control.TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
         table.getSelectionModel().selectedItemProperty().addListener((o, ov, nv) -> {
             if (nv != null) {
                 origField.setText(nv.getKey());
