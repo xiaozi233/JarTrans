@@ -1296,22 +1296,35 @@ public class MainApp extends javafx.application.Application {
         pushHist(new Hist("mark", cls, null, b, a));
     }
 
+    private String histLabel(String kind) {
+        return switch (kind) {
+            case "trans" -> "译文修改";
+            case "skip" -> "「不翻译」标记";
+            case "mark" -> "类状态标记";
+            default -> kind;
+        };
+    }
+
     private void undoAction() {
         if (undoStack.isEmpty()) {
+            setStatus("没有可撤销的操作");
             return;
         }
         Hist h = undoStack.removeFirst();
         applyHist(h, h.before());
         redoStack.addFirst(h);
+        setStatus("已撤销：" + histLabel(h.kind()));
     }
 
     private void redoAction() {
         if (redoStack.isEmpty()) {
+            setStatus("没有可重做的操作");
             return;
         }
         Hist h = redoStack.removeFirst();
         applyHist(h, h.after());
         undoStack.addFirst(h);
+        setStatus("已重做：" + histLabel(h.kind()));
     }
 
     private void applyHist(Hist h, String target) {
