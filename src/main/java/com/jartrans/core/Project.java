@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -66,6 +67,8 @@ public final class Project {
     private List<LangPack.MissingEntry> lastMissing = new ArrayList<>();
     private final Map<String, Map<String, List<String>>> methodUsage = new LinkedHashMap<>();
     private final Map<String, String> classStatus = new LinkedHashMap<>();
+    /** 「不翻译」的原字符串集合：这些文本不写入导出的 jar、不套用词典/语言包译文。 */
+    private final Set<String> skipTexts = new LinkedHashSet<>();
     private String sha256;
 
     public Project() {
@@ -187,6 +190,7 @@ public final class Project {
         edits.clear();
         auto.clear();
         lastMissing = new ArrayList<>();
+        skipTexts.clear();
         loadProgress();
     }
 
@@ -246,6 +250,37 @@ public final class Project {
         return usage == null ? List.of() : usage;
     }
 
+    // ---------- 不翻译名单 ----------
+
+    /** 当前被标记为「不翻译」的原字符串集合（跨类生效）。 */
+    public Set<String> skipTexts() {
+        return skipTexts;
+    }
+
+    public boolean isSkipped(String orig) {
+        return skipTexts.contains(orig);
+    }
+
+    /** 标记某条原字符串为「不翻译」（skip=true）或恢复翻译（skip=false）。 */
+    public void setTextSkipped(String orig, boolean skip) throws IOException {
+        boolean changed = skip ? skipTexts.add(orig) : skipTexts.remove(orig);
+        if (changed) {
+            saveProgress();
+        }
+    }
+
+    /** 按「不翻译」名单过滤后的生效译文表（这些文本在导出/填充/导入时不参与）。 */
+    public Map<String, String> effectiveForExport(String cls) {
+        Map<String, String> eff = effective(cls);
+        eff.keySet().removeIf(skipTexts::contains);
+        return eff;
+    }
+
+    /** 该类是否被标记为「已忽略 = 整类不翻译」。 */
+    public boolean isIgnored(String cls) {
+        return "ignore".equals(classStatus.get(cls));
+    }
+
     // ---------- 编辑 ----------
 
     /** 该类当前生效的译文表（用户编辑覆盖自动填充，空译文视为未翻译）。 */
@@ -301,8 +336,11 @@ public final class Project {
         int count = 0;
         Iterable<String> scope = onlyClasses != null ? onlyClasses : classOrder;
         for (String cls : scope) {
+            if (isIgnored(cls)) {
+                continue; // 已忽略 = 整类不翻译
+            }
             for (TextCount tc : texts.getOrDefault(cls, List.of())) {
-                if (status(cls, tc.text()) != Status.UNTRANSLATED) {
+                if (skipTexts.contains(tc.text()) || status(cls, tc.text()) != Status.UNTRANSLATED) {
                     continue;
                 }
                 String trans = dictionary.get(tc.text());
@@ -317,12 +355,19 @@ public final class Project {
 
     // ---------- 语言包 ----------
 
-    /** 应用语言包，不覆盖用户已手动编辑的条目。返回 (成功条数, 失效条目)。 */
+    /** 应用语言包，不覆盖用户已手动编辑的条目。返回 (成功条数, 失效条目)。
+        语言包内 skip_texts 名单与 class_status=ignore 的类会一起被尊重（不套用译文）。 */
     public long applyLanguagePack(Map<String, Object> pack) {
         LangPack.MatchResult result = LangPack.matchPack(pack, textSets);
         for (Map.Entry<String, Map<String, String>> e : result.applied().entrySet()) {
+            if (isIgnored(e.getKey())) {
+                continue;
+            }
             Map<String, String> user = edits.get(e.getKey());
             for (Map.Entry<String, String> p : e.getValue().entrySet()) {
+                if (skipTexts.contains(p.getKey())) {
+                    continue;
+                }
                 if (user == null || !user.containsKey(p.getKey())) {
                     auto.computeIfAbsent(e.getKey(), k -> new LinkedHashMap<>())
                             .put(p.getKey(), p.getValue());
@@ -332,13 +377,27 @@ public final class Project {
         lastMissing = result.missing();
         Object statusObj = pack.get("class_status");
         Map<String, Object> status = com.jartrans.core.json.Json.object(statusObj);
+        boolean changed = false;
         if (status != null && !status.isEmpty()) {
             for (Map.Entry<String, Object> e : status.entrySet()) {
                 String st = String.valueOf(e.getValue());
                 if (MANUAL_STATES.contains(st) && textSets.containsKey(e.getKey())) {
                     classStatus.put(e.getKey(), st);
+                    changed = true;
                 }
             }
+        }
+        // 语言包里声明的「不翻译」原字符串 → 记入本工程名单
+        Object skips = pack.get("skip_texts");
+        if (skips instanceof List<?> list) {
+            for (Object o : list) {
+                String s = String.valueOf(o);
+                if (!s.isEmpty() && skipTexts.add(s)) {
+                    changed = true;
+                }
+            }
+        }
+        if (changed) {
             saveProgress();
         }
         long total = 0;
@@ -351,23 +410,34 @@ public final class Project {
     public void exportPack(Path path, String language, String author) throws IOException {
         Map<String, Map<String, String>> entries = new LinkedHashMap<>();
         for (String cls : classOrder) {
-            Map<String, String> eff = effective(cls);
+            if (isIgnored(cls)) {
+                continue; // 已忽略的类整类不导出译文
+            }
+            Map<String, String> eff = effectiveForExport(cls);
             if (!eff.isEmpty()) {
                 entries.put(cls, eff);
             }
         }
         Map<String, Object> pack = LangPack.buildPack(jarName(), jarSha256(), language,
                 author, entries, classStatus);
+        if (!skipTexts.isEmpty()) {
+            List<String> sorted = new ArrayList<>(skipTexts);
+            sorted.sort(String::compareTo);
+            pack.put("skip_texts", sorted);
+        }
         LangPack.writePack(path, pack);
     }
 
     // ---------- 导出 jar ----------
 
-    /** 写回全部已翻译的类并导出。rewrite 内部会做写回校验。 */
+    /** 写回全部已翻译的类并导出（已忽略类与「不翻译」文本不写入）。rewrite 内部会做写回校验。 */
     public int exportJar(Path outPath, boolean stripSignature) throws IOException {
         Map<String, byte[]> modified = new LinkedHashMap<>();
         for (String cls : classOrder) {
-            Map<String, String> eff = effective(cls);
+            if (isIgnored(cls)) {
+                continue; // 已忽略 = 整类保留原文
+            }
+            Map<String, String> eff = effectiveForExport(cls);
             if (eff.isEmpty()) {
                 continue;
             }
@@ -503,6 +573,7 @@ public final class Project {
 
     private void loadProgress() {
         classStatus.clear();
+        skipTexts.clear();
         String key = progressKey();
         if (key == null) {
             return;
@@ -516,6 +587,10 @@ public final class Project {
             String v = String.valueOf(e.getValue());
             if (MANUAL_STATES.contains(v)) {
                 classStatus.put(e.getKey(), v);
+            } else if ("__skip_texts".equals(e.getKey()) && e.getValue() instanceof List<?> list) {
+                for (Object o : list) {
+                    skipTexts.add(String.valueOf(o));
+                }
             }
         }
     }
@@ -526,8 +601,14 @@ public final class Project {
             return;
         }
         Map<String, Object> data = readProgressFile();
-        if (!classStatus.isEmpty()) {
-            data.put(key, new LinkedHashMap<>(classStatus));
+        if (!classStatus.isEmpty() || !skipTexts.isEmpty()) {
+            Map<String, Object> block = new LinkedHashMap<>(classStatus);
+            if (!skipTexts.isEmpty()) {
+                List<String> sorted = new ArrayList<>(skipTexts);
+                sorted.sort(String::compareTo);
+                block.put("__skip_texts", sorted);
+            }
+            data.put(key, block);
         } else {
             data.remove(key);
         }

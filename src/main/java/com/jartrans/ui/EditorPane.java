@@ -53,7 +53,8 @@ public class EditorPane extends BorderPane {
             "untranslated", "未翻译",
             "translated", "已翻译",
             "auto", "自动填充",
-            "internal", "内部·只读");
+            "internal", "内部·只读",
+            "skipped", "不翻译");
 
     private MainApp app;
     private String currentClass;
@@ -133,7 +134,10 @@ public class EditorPane extends BorderPane {
                 super.updateItem(item, empty);
                 setTextFill(null);
                 if (item != null && !empty && app != null) {
-                    setTextFill(javafx.scene.paint.Color.web(app.theme().statusColor(item.statusKey)));
+                    String color = "skipped".equals(item.statusKey)
+                            ? app.theme().color("fg_muted")
+                            : app.theme().statusColor(item.statusKey);
+                    setTextFill(javafx.scene.paint.Color.web(color));
                 }
             }
         });
@@ -144,28 +148,37 @@ public class EditorPane extends BorderPane {
             }
         });
 
-        // ---- 右键显示/隐藏列 ----
+        // ---- 右键菜单：表头=显示/隐藏列；数据行=不翻译/翻译 ----
         javafx.scene.control.ContextMenu colMenu = new javafx.scene.control.ContextMenu();
+        javafx.scene.control.ContextMenu rowMenu = new javafx.scene.control.ContextMenu();
         table.setOnContextMenuRequested(e -> {
-            long visible = allCols.stream().filter(TableColumn::isVisible).count();
-            colMenu.getItems().clear();
-            for (TableColumn<Row, String> c : allCols) {
-                javafx.scene.control.CheckMenuItem mi =
-                        new javafx.scene.control.CheckMenuItem(c.getText());
-                mi.setSelected(c.isVisible());
-                mi.setDisable(c.isVisible() && visible == 1); // 至少保留一列
-                mi.setOnAction(ev -> {
-                    if (mi.isSelected()) {
-                        c.setVisible(true);
-                    } else if (visible > 1) {
-                        c.setVisible(false);
-                    } else {
-                        mi.setSelected(true);
-                    }
-                });
-                colMenu.getItems().add(mi);
+            javafx.scene.Node t = e.getPickResult().getIntersectedNode();
+            if (t == null) {
+                t = e.getTarget() instanceof javafx.scene.Node n ? n : null;
             }
-            colMenu.show(table, e.getScreenX(), e.getScreenY());
+            if (t != null && isInsideHeader(t)) {
+                long visible = allCols.stream().filter(TableColumn::isVisible).count();
+                colMenu.getItems().clear();
+                for (TableColumn<Row, String> c : allCols) {
+                    javafx.scene.control.CheckMenuItem mi =
+                            new javafx.scene.control.CheckMenuItem(c.getText());
+                    mi.setSelected(c.isVisible());
+                    mi.setDisable(c.isVisible() && visible == 1); // 至少保留一列
+                    mi.setOnAction(ev -> {
+                        if (mi.isSelected()) {
+                            c.setVisible(true);
+                        } else if (visible > 1) {
+                            c.setVisible(false);
+                        } else {
+                            mi.setSelected(true);
+                        }
+                    });
+                    colMenu.getItems().add(mi);
+                }
+                colMenu.show(table, e.getScreenX(), e.getScreenY());
+            } else {
+                showRowMenu(rowMenu, e.getScreenX(), e.getScreenY());
+            }
         });
 
         // ---- 表格(上) 与 编辑区(下) 之间的可拖动分栏 ----
@@ -321,8 +334,14 @@ public class EditorPane extends BorderPane {
     }
 
     private void appendRow(String orig, int cnt, String trans, boolean internal) {
-        String status = internal ? "internal"
-                : app.project().status(currentClass, orig).key;
+        String status;
+        if (internal) {
+            status = "internal";
+        } else if (app.project().isSkipped(orig)) {
+            status = "skipped";
+        } else {
+            status = app.project().status(currentClass, orig).key;
+        }
         String methods = internal ? "" : String.join(", ", app.project().methodNames(currentClass, orig));
         rows.add(new Row(orig, trans, status, internal ? "" : String.valueOf(cnt),
                 methods, internal));
@@ -371,6 +390,12 @@ public class EditorPane extends BorderPane {
             return;
         }
         Project p = app.project();
+        if (p.isSkipped(orig)) {
+            editor.setText(orig);
+            editor.setEditable(false);
+            hint.setText("该文本已被标记「不翻译」：导出/导入/词典填充都会保留原文。右键可恢复。");
+            return;
+        }
         editor.setText(p.effective(currentClass).getOrDefault(orig, ""));
         String suggestion = p.dictionary().get(orig);
         hint.setText(suggestion != null ? "词典建议：" + Texts.displayText(suggestion) : "");
@@ -380,8 +405,7 @@ public class EditorPane extends BorderPane {
         if (currentClass == null || editingOrig == null || app == null) {
             return;
         }
-        if (editingInternal) {
-            com.jartrans.ui.Dialogs.info("提示", "内部 UTF8 条目不可修改。");
+        if (editingLocked()) {
             return;
         }
         String orig = editingOrig;
@@ -402,7 +426,7 @@ public class EditorPane extends BorderPane {
     }
 
     private void clearTranslation() {
-        if (currentClass == null || editingOrig == null || editingInternal || app == null) {
+        if (currentClass == null || editingOrig == null || editingLocked() || app == null) {
             return;
         }
         app.project().setTranslation(currentClass, editingOrig, "");
@@ -412,7 +436,7 @@ public class EditorPane extends BorderPane {
     }
 
     private void useDictionary() {
-        if (currentClass == null || editingOrig == null || editingInternal || app == null) {
+        if (currentClass == null || editingOrig == null || editingLocked() || app == null) {
             return;
         }
         String trans = app.project().dictionary().get(editingOrig);
@@ -429,6 +453,53 @@ public class EditorPane extends BorderPane {
             return;
         }
         app.showSourceFor(currentClass, editingOrig);
+    }
+
+    /** 内部只读条目或「不翻译」文本均禁止改写。 */
+    private boolean editingLocked() {
+        return editingInternal
+                || (editingOrig != null && app != null && app.project().isSkipped(editingOrig));
+    }
+
+    // ---------- 右键：不翻译/恢复 ----------
+
+    private boolean isInsideHeader(javafx.scene.Node node) {
+        for (javafx.scene.Node n = node; n != null; n = n.getParent()) {
+            if (n.getStyleClass().contains("column-header-background")
+                    || n.getStyleClass().contains("column-header")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void showRowMenu(javafx.scene.control.ContextMenu menu, double x, double y) {
+        Row row = table.getSelectionModel().getSelectedItem();
+        if (row == null || row.internal || currentClass == null || app == null) {
+            return;
+        }
+        boolean skipped = app.project().isSkipped(row.orig);
+        menu.getItems().clear();
+        javafx.scene.control.MenuItem toggle = new javafx.scene.control.MenuItem(
+                skipped ? "恢复翻译此文本" : "此文本不翻译（保留原文）");
+        toggle.setOnAction(e -> toggleSkip(row.orig));
+        javafx.scene.control.MenuItem copy = new javafx.scene.control.MenuItem("复制原字符串");
+        copy.setOnAction(e -> javafx.scene.input.Clipboard.getSystemClipboard().setContent(
+                Map.of(javafx.scene.input.DataFormat.PLAIN_TEXT, row.orig)));
+        menu.getItems().addAll(toggle, copy);
+        menu.show(table, x, y);
+    }
+
+    private void toggleSkip(String orig) {
+        try {
+            app.project().setTextSkipped(orig, !app.project().isSkipped(orig));
+        } catch (Exception ignored) {
+            // 写盘失败不阻断
+        }
+        refreshRows();
+        app.refreshClassNodes();
+        app.updateStats();
+        selectRow(orig);
     }
 
     public String currentClass() {
