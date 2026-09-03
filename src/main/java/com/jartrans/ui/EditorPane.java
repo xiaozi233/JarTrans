@@ -1,29 +1,45 @@
 package com.jartrans.ui;
 
 import com.jartrans.core.Project;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import javafx.animation.PauseTransition;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
+import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.SelectionMode;
 import javafx.scene.control.Separator;
+import javafx.scene.control.SplitPane;
 import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ContextMenuEvent;
+import javafx.scene.input.DataFormat;
 import javafx.scene.input.KeyCode;
+import javafx.scene.input.MouseButton;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
+import javafx.util.Duration;
 
 /** 中间的字符串表格 + 底部多行编辑区（对应 gui/editor.py）。 */
 public class EditorPane extends BorderPane {
@@ -64,10 +80,10 @@ public class EditorPane extends BorderPane {
     private final ObservableList<Row> rows = FXCollections.observableArrayList();
     private final TableView<Row> table = new TableView<>(rows);
     private final TextArea editor = new TextArea();
-    private final javafx.scene.control.ContextMenu colMenu = new javafx.scene.control.ContextMenu();
-    private final javafx.scene.control.ContextMenu rowMenu = new javafx.scene.control.ContextMenu();
+    private final ContextMenu colMenu = new ContextMenu();
+    private final ContextMenu rowMenu = new ContextMenu();
     private final Label hint = new Label("");
-    private final javafx.scene.shape.Circle stateDot = new javafx.scene.shape.Circle(4);
+    private final Circle stateDot = new Circle(4);
     private final ComboBox<String> classStateBox = new ComboBox<>();
     private final CheckBox onlyUntranslated = new CheckBox("只看未翻译");
     private final CheckBox saveDict = new CheckBox("保存时记入词典");
@@ -84,8 +100,8 @@ public class EditorPane extends BorderPane {
     private String findScope = "both"; // orig / trans / both
 
     // ---------- 译文自动保存（输入停顿或切换行/类时落库） ----------
-    private final javafx.animation.PauseTransition autoSave =
-            new javafx.animation.PauseTransition(javafx.util.Duration.millis(700));
+    private final PauseTransition autoSave =
+            new PauseTransition(Duration.millis(700));
     /** 编辑区文本是否已被用户改过（尚未落库）。 */
     private boolean editDirty;
     /** 程序化加载文本（setEditor/回显）时抑制“视为用户修改”。 */
@@ -103,7 +119,13 @@ public class EditorPane extends BorderPane {
 
     private void buildUi() {
         setPadding(new Insets(4));
+        buildHeadBar();
+        buildTableArea();
+        buildEditorArea();
+    }
 
+    /** 顶部：类状态行 + （可隐藏的）查找/替换栏。 */
+    private void buildHeadBar() {
         // ---- 顶部：类状态 + 只看未翻译 ----
         HBox head = new HBox(8);
         head.setPadding(new Insets(2, 2, 6, 2));
@@ -129,7 +151,10 @@ public class EditorPane extends BorderPane {
 
         // ---- 类内查找 / 替换栏（默认隐藏，Ctrl+F / Ctrl+R 呼出） ----
         buildFindBar();
+    }
 
+    /** 中央翻译表格：列定义、行着色、选择联动与右键菜单。 */
+    private void buildTableArea() {
         // ---- 表格 ----
         TableColumn<Row, String> colOrig = new TableColumn<>("原字符串");
         colOrig.setCellValueFactory(d -> new SimpleStringProperty(Texts.displayText(d.getValue().orig)));
@@ -155,8 +180,8 @@ public class EditorPane extends BorderPane {
         table.getColumns().addAll(allCols);
         // 拖列宽只动相邻右列（不影响左侧栏目的宽度，总宽不变）
         table.setColumnResizePolicy(
-                javafx.scene.control.TableView.CONSTRAINED_RESIZE_POLICY_NEXT_COLUMN);
-        table.setRowFactory(tv -> new javafx.scene.control.TableRow<>() {
+                TableView.CONSTRAINED_RESIZE_POLICY_NEXT_COLUMN);
+        table.setRowFactory(tv -> new TableRow<>() {
             @Override
             protected void updateItem(Row item, boolean empty) {
                 super.updateItem(item, empty);
@@ -165,17 +190,17 @@ public class EditorPane extends BorderPane {
                     String color = "skipped".equals(item.statusKey)
                             ? app.theme().color("fg_muted")
                             : app.theme().statusColor(item.statusKey);
-                    setTextFill(javafx.scene.paint.Color.web(color));
+                    setTextFill(Color.web(color));
                 }
             }
         });
         table.getSelectionModel().selectedItemProperty().addListener((o, ov, nv) -> onSelect());
         // 支持 Shift/Ctrl 多选，配合右键批量操作
         table.getSelectionModel().setSelectionMode(
-                javafx.scene.control.SelectionMode.MULTIPLE);
+                SelectionMode.MULTIPLE);
         // 左键点表格任意处都收起上下文菜单（修复右键后再左键不关闭的问题）
-        table.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_PRESSED, e -> {
-            if (e.getButton() == javafx.scene.input.MouseButton.PRIMARY) {
+        table.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
+            if (e.getButton() == MouseButton.PRIMARY) {
                 if (colMenu.isShowing()) {
                     colMenu.hide();
                 }
@@ -195,16 +220,16 @@ public class EditorPane extends BorderPane {
         table.setOnContextMenuRequested(e -> {
             rowMenu.hide();
             colMenu.hide();
-            javafx.scene.Node t = e.getPickResult().getIntersectedNode();
+            Node t = e.getPickResult().getIntersectedNode();
             if (t == null) {
-                t = e.getTarget() instanceof javafx.scene.Node n ? n : null;
+                t = e.getTarget() instanceof Node n ? n : null;
             }
             if (t != null && isInsideHeader(t)) {
                 long visible = allCols.stream().filter(TableColumn::isVisible).count();
                 colMenu.getItems().clear();
                 for (TableColumn<Row, String> c : allCols) {
-                    javafx.scene.control.CheckMenuItem mi =
-                            new javafx.scene.control.CheckMenuItem(c.getText());
+                    CheckMenuItem mi =
+                            new CheckMenuItem(c.getText());
                     mi.setSelected(c.isVisible());
                     mi.setDisable(c.isVisible() && visible == 1); // 至少保留一列
                     mi.setOnAction(ev -> {
@@ -224,10 +249,12 @@ public class EditorPane extends BorderPane {
                 showRowMenu(e.getScreenX(), e.getScreenY());
             }
         });
+    }
 
-        // ---- 表格(上) 与 编辑区(下) 之间的可拖动分栏 ----
-        javafx.scene.control.SplitPane vSplit = new javafx.scene.control.SplitPane();
-        vSplit.setOrientation(javafx.geometry.Orientation.VERTICAL);
+    /** 表格(上) 与 编辑区(下) 之间的可拖动分栏、工具行与多行编辑区。 */
+    private void buildEditorArea() {
+        SplitPane vSplit = new SplitPane();
+        vSplit.setOrientation(Orientation.VERTICAL);
         vSplit.setDividerPositions(0.62);
         vSplit.getItems().add(table);
 
@@ -304,7 +331,7 @@ public class EditorPane extends BorderPane {
         nextBtn.setOnAction(e -> findNext());
         findCount.setStyle("-fx-text-fill: -jr-muted;");
         Button replaceModeBtn = new Button("替换…");
-        replaceModeBtn.setOnAction(e -> replaceMode());
+        replaceModeBtn.setOnAction(e -> beginReplace());
         Button closeBtn = new Button("✕");
         closeBtn.getStyleClass().add("flat");
         closeBtn.setOnAction(e -> closeFindBar());
@@ -396,16 +423,12 @@ public class EditorPane extends BorderPane {
     }
 
     private void row2Visible(boolean v) {
-        for (javafx.scene.Node n : findBar.getChildren()) {
+        for (Node n : findBar.getChildren()) {
             if (n instanceof HBox h && "replace-row".equals(h.getId())) {
                 h.setVisible(v);
                 h.setManaged(v);
             }
         }
-    }
-
-    private void replaceMode() {
-        beginReplace();
     }
 
     private void closeFindBar() {
@@ -593,13 +616,7 @@ public class EditorPane extends BorderPane {
             return;
         }
         String label = classStateBox.getValue();
-        String state = switch (label) {
-            case "未开始" -> "todo";
-            case "翻译中" -> "doing";
-            case "已完成" -> "done";
-            case "已忽略" -> "ignore";
-            default -> null;
-        };
+        String state = labelToStateKey(label);
         app.recordClassMark(currentClass, app.project().classStatus().get(currentClass), state);
         try {
             app.project().setClassStatus(currentClass, state);
@@ -609,6 +626,16 @@ public class EditorPane extends BorderPane {
         app.refreshClassNodes();
         app.updateStats();
         refreshClassStateUi();
+    }
+
+    /** 下拉显示名 → 状态键；「自动」等下拉里不可手动选择项返回 null。 */
+    private static String labelToStateKey(String label) {
+        for (Map.Entry<String, String> e : MainApp.STATE_LABEL.entrySet()) {
+            if (e.getValue().equals(label)) {
+                return e.getKey();
+            }
+        }
+        return null;
     }
 
     private String currentStateKey() {
@@ -630,10 +657,8 @@ public class EditorPane extends BorderPane {
             return;
         }
         String key = currentStateKey();
-        Map<String, String> mapping = Map.of(
-                "todo", "未开始", "doing", "翻译中", "done", "已完成",
-                "ignore", "已忽略", "empty", "无字符串");
-        String label = mapping.get(key);
+        // 中文名与 MainApp.STATE_LABEL 同一来源，避免本地再抄一份映射
+        String label = MainApp.STATE_LABEL.get(key);
         // 「无字符串」不是可选手动状态：下拉保持「自动」，仅状态点标灰
         if (label == null || !classStateBox.getItems().contains(label)) {
             label = "自动";
@@ -852,8 +877,8 @@ public class EditorPane extends BorderPane {
 
     // ---------- 右键：不翻译/恢复 ----------
 
-    private boolean isInsideHeader(javafx.scene.Node node) {
-        for (javafx.scene.Node n = node; n != null; n = n.getParent()) {
+    private boolean isInsideHeader(Node node) {
+        for (Node n = node; n != null; n = n.getParent()) {
             if (n.getStyleClass().contains("column-header-background")
                     || n.getStyleClass().contains("column-header")) {
                 return true;
@@ -863,12 +888,12 @@ public class EditorPane extends BorderPane {
     }
 
     /** 右键先选中鼠标所在行（不破坏已有 Shift/Ctrl 多选）。 */
-    private void selectRowUnder(javafx.scene.input.ContextMenuEvent e) {
-        javafx.scene.Node n = e.getPickResult().getIntersectedNode();
-        while (n != null && !(n instanceof javafx.scene.control.TableRow)) {
+    private void selectRowUnder(ContextMenuEvent e) {
+        Node n = e.getPickResult().getIntersectedNode();
+        while (n != null && !(n instanceof TableRow)) {
             n = n.getParent();
         }
-        if (n instanceof javafx.scene.control.TableRow<?> row && row.getItem() instanceof Row item
+        if (n instanceof TableRow<?> row && row.getItem() instanceof Row item
                 && !table.getSelectionModel().getSelectedItems().contains(item)) {
             table.getSelectionModel().select(item);
         }
@@ -886,19 +911,19 @@ public class EditorPane extends BorderPane {
         long skippedCnt = rowsSel.stream()
                 .filter(r -> app.project().isSkipped(r.orig)).count();
         rowMenu.getItems().clear();
-        javafx.scene.control.MenuItem keep = new javafx.scene.control.MenuItem(
+        MenuItem keep = new MenuItem(
                 skippedCnt == rowsSel.size()
                         ? "恢复翻译" + label
                         : "保留原文（不翻译）" + label);
         keep.setOnAction(e -> bulkSkip(rowsSel,
                 !(skippedCnt == rowsSel.size())));
-        javafx.scene.control.MenuItem clear = new javafx.scene.control.MenuItem(
+        MenuItem clear = new MenuItem(
                 "清空译文" + label);
         clear.setOnAction(e -> bulkClear(rowsSel));
-        javafx.scene.control.MenuItem copy = new javafx.scene.control.MenuItem(
+        MenuItem copy = new MenuItem(
                 rowsSel.size() == 1 ? "复制原字符串" : "复制首个原字符串");
-        copy.setOnAction(e -> javafx.scene.input.Clipboard.getSystemClipboard().setContent(
-                Map.of(javafx.scene.input.DataFormat.PLAIN_TEXT, rowsSel.get(0).orig)));
+        copy.setOnAction(e -> Clipboard.getSystemClipboard().setContent(
+                Map.of(DataFormat.PLAIN_TEXT, rowsSel.get(0).orig)));
         rowMenu.getItems().addAll(keep, clear, copy);
         rowMenu.show(table, x, y);
     }

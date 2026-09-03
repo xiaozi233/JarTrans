@@ -11,6 +11,7 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.RadioButton;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
@@ -76,19 +77,9 @@ public class PreferencesDialog extends Stage {
         hideEmpty.setOnAction(e -> app.applyHideEmpty(hideEmpty.isSelected()));
         statusFilterBox.getItems().setAll(
                 MainApp.STATE_FILTERS.stream().map(f -> f[1]).toList());
-        statusFilterBox.setValue(MainApp.STATE_FILTERS.stream()
-                .filter(f -> f[0].equals(app.statusFilterKey())).map(f -> f[1]).findFirst()
-                .orElse("全部"));
-        statusFilterBox.setOnAction(e -> {
-            String key = "all";
-            for (String[] f : MainApp.STATE_FILTERS) {
-                if (f[1].equals(statusFilterBox.getValue())) {
-                    key = f[0];
-                    break;
-                }
-            }
-            app.applyStatusFilter(key);
-        });
+        statusFilterBox.setValue(MainApp.stateLabelOfKey(app.statusFilterKey()));
+        statusFilterBox.setOnAction(e ->
+                app.applyStatusFilter(MainApp.stateKeyOfLabel(statusFilterBox.getValue())));
         HBox statusRow = new HBox(10, new Label("类列表默认状态筛选："), statusFilterBox);
         statusRow.setAlignment(Pos.CENTER_LEFT);
 
@@ -128,10 +119,10 @@ public class PreferencesDialog extends Stage {
         //noinspection unchecked
         shortcutTable.getColumns().addAll(colName, colKey);
         shortcutTable.setColumnResizePolicy(
-                javafx.scene.control.TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
+                TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
         shortcutTable.setPrefHeight(180);
         shortcutTable.setPlaceholder(new Label("（无）"));
-        for (String[] d : MainApp.SHORTCUT_DEFS) {
+        for (String[] d : Shortcuts.DEFS) {
             shortcutRows.add(new ShortcutRow(d[0], d[1]));
         }
         Button setKeyBtn = new Button("修改所选快捷键…");
@@ -162,9 +153,8 @@ public class PreferencesDialog extends Stage {
                 statusRow, secTranslate, onlyUntranslated, saveToDict,
                 autoSaveTrans, dblclickSource, secPack, authorRow, secShortcut,
                 shortcutTable, shortcutButtons, hintLabel);
-        body.setPadding(new Insets(0, 0, 0, 0));
         VBox.setVgrow(shortcutTable, Priority.ALWAYS);
-        root.setCenter(new javafx.scene.control.ScrollPane(body) {{
+        root.setCenter(new ScrollPane(body) {{
             setFitToWidth(true);
             setStyle("-fx-background-color: transparent; -fx-background: transparent;");
         }});
@@ -255,7 +245,7 @@ public class PreferencesDialog extends Stage {
             e.consume();
             return;
         }
-        String combo = MainApp.comboText(e);
+        String combo = Shortcuts.comboText(e);
         if (combo == null) {
             return; // 单个修饰键或无法表示的按键，继续等待
         }

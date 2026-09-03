@@ -1,13 +1,12 @@
 package com.jartrans.ui;
 
+import java.util.Optional;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.DialogPane;
 import javafx.scene.control.TextInputDialog;
 import javafx.stage.Window;
-
-import java.util.Optional;
 
 /** 消息框/输入框统一封装（对齐 tkinter messagebox/simpledialog 的行为）。 */
 public final class Dialogs {

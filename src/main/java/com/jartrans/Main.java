@@ -1,5 +1,6 @@
 package com.jartrans;
 
+import com.jartrans.ui.MainApp;
 import javafx.application.Application;
 
 /**
@@ -9,7 +10,7 @@ import javafx.application.Application;
 public final class Main {
 
     public static void main(String[] args) {
-        Application.launch(com.jartrans.ui.MainApp.class, args);
+        Application.launch(MainApp.class, args);
     }
 
     private Main() {

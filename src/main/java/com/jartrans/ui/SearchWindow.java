@@ -1,7 +1,12 @@
 package com.jartrans.ui;
 
 import com.jartrans.core.Project;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import javafx.animation.PauseTransition;
+import javafx.beans.property.SimpleStringProperty;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -10,6 +15,7 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
@@ -24,24 +30,19 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-
 /** 全局搜索窗口：输入即搜，支持原文/译文范围，并可批量替换译文。 */
 public class SearchWindow extends Stage {
 
     private final MainApp app;
     private final TextField queryField = new TextField();
     private final ComboBox<String> scopeBox = new ComboBox<>();
-    private final TableView<Project2Row> table = new TableView<>();
+    private final TableView<SearchRow> table = new TableView<>();
     private final Label countLabel = new Label("");
     private final TextField replaceField = new TextField();
     private final PauseTransition debounce =
             new PauseTransition(Duration.millis(160));
 
-    private record Project2Row(String cls, String orig, String trans, String statusKey) {
+    private record SearchRow(String cls, String orig, String trans, String statusKey) {
     }
 
     private static final Map<String, String> SCOPE_MAP = new LinkedHashMap<>();
@@ -99,19 +100,19 @@ public class SearchWindow extends Stage {
         replaceRow.getChildren().addAll(new Label("替换为："), replaceField,
                 repSelBtn, repAllBtn, repTip);
 
-        TableColumn<Project2Row, String> colCls = new TableColumn<>("类");
-        colCls.setCellValueFactory(d -> new javafx.beans.property.SimpleStringProperty(d.getValue().cls()));
+        TableColumn<SearchRow, String> colCls = new TableColumn<>("类");
+        colCls.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().cls()));
         colCls.setPrefWidth(240);
-        TableColumn<Project2Row, String> colOrig = new TableColumn<>("原字符串");
-        colOrig.setCellValueFactory(d -> new javafx.beans.property.SimpleStringProperty(
+        TableColumn<SearchRow, String> colOrig = new TableColumn<>("原字符串");
+        colOrig.setCellValueFactory(d -> new SimpleStringProperty(
                 Texts.displayText(d.getValue().orig())));
         colOrig.setPrefWidth(330);
-        TableColumn<Project2Row, String> colTrans = new TableColumn<>("译文");
-        colTrans.setCellValueFactory(d -> new javafx.beans.property.SimpleStringProperty(
+        TableColumn<SearchRow, String> colTrans = new TableColumn<>("译文");
+        colTrans.setCellValueFactory(d -> new SimpleStringProperty(
                 Texts.displayText(d.getValue().trans())));
         colTrans.setPrefWidth(260);
-        TableColumn<Project2Row, String> colStatus = new TableColumn<>("状态");
-        colStatus.setCellValueFactory(d -> new javafx.beans.property.SimpleStringProperty(
+        TableColumn<SearchRow, String> colStatus = new TableColumn<>("状态");
+        colStatus.setCellValueFactory(d -> new SimpleStringProperty(
                 EditorPane.STATUS_TEXT.get(d.getValue().statusKey())));
         colStatus.setPrefWidth(90);
         colStatus.setCellFactory(c -> new TableCell<>() {
@@ -128,10 +129,10 @@ public class SearchWindow extends Stage {
         //noinspection unchecked
         table.getColumns().addAll(colCls, colOrig, colTrans, colStatus);
         table.setColumnResizePolicy(
-                javafx.scene.control.TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
-        table.setRowFactory(tv -> new javafx.scene.control.TableRow<>() {
+                TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
+        table.setRowFactory(tv -> new TableRow<>() {
             @Override
-            protected void updateItem(Project2Row item, boolean empty) {
+            protected void updateItem(SearchRow item, boolean empty) {
                 super.updateItem(item, empty);
                 if (!empty && item != null) {
                     setOnMouseClicked(e -> {
@@ -202,14 +203,14 @@ public class SearchWindow extends Stage {
         List<Project.SearchResult> results = app.project().search(keyword, scope);
         table.getItems().clear();
         for (Project.SearchResult r : results) {
-            table.getItems().add(new Project2Row(r.cls(), r.orig(), r.trans(), r.status().key));
+            table.getItems().add(new SearchRow(r.cls(), r.orig(), r.trans(), r.status().key));
         }
         countLabel.setText(results.isEmpty() ? "没有匹配结果" : results.size() + " 条结果");
     }
 
-    private List<Project2Row> replaceable() {
-        List<Project2Row> out = new ArrayList<>();
-        for (Project2Row r : table.getItems()) {
+    private List<SearchRow> replaceable() {
+        List<SearchRow> out = new ArrayList<>();
+        for (SearchRow r : table.getItems()) {
             if ("skipped".equals(r.statusKey())) {
                 continue;
             }
@@ -218,7 +219,7 @@ public class SearchWindow extends Stage {
         return out;
     }
 
-    private boolean performReplace(Project2Row r, String replacement) {
+    private boolean performReplace(SearchRow r, String replacement) {
         if ("skipped".equals(r.statusKey())) {
             return false;
         }
@@ -237,7 +238,7 @@ public class SearchWindow extends Stage {
     }
 
     private void replaceSelected() {
-        Project2Row row = table.getSelectionModel().getSelectedItem();
+        SearchRow row = table.getSelectionModel().getSelectedItem();
         if (row == null) {
             Dialogs.info("提示", "请先在结果里选中一行。");
             return;
@@ -252,7 +253,7 @@ public class SearchWindow extends Stage {
     }
 
     private void replaceAll() {
-        List<Project2Row> rows = replaceable();
+        List<SearchRow> rows = replaceable();
         if (rows.isEmpty()) {
             Dialogs.info("提示", "当前结果没有可替换的行。");
             return;
@@ -273,7 +274,7 @@ public class SearchWindow extends Stage {
             return;
         }
         int n = 0;
-        for (Project2Row r : rows) {
+        for (SearchRow r : rows) {
             if (performReplace(r, replacement)) {
                 n++;
             }

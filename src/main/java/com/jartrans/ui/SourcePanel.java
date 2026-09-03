@@ -4,20 +4,6 @@ import com.jartrans.core.Bytecode;
 import com.jartrans.core.ClassFile;
 import com.jartrans.core.Disassembler;
 import com.jartrans.core.java.DecompilerManager;
-import javafx.application.Platform;
-import javafx.geometry.Insets;
-import javafx.geometry.Pos;
-import javafx.scene.control.Button;
-import javafx.scene.control.ComboBox;
-import javafx.scene.control.Label;
-import javafx.scene.control.ListView;
-import javafx.scene.control.TextField;
-import javafx.scene.input.MouseButton;
-import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.HBox;
-import javafx.scene.text.Text;
-import javafx.scene.text.TextFlow;
-
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -27,6 +13,26 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
+import javafx.application.Platform;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.ContentDisplay;
+import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
+import javafx.scene.control.ListView;
+import javafx.scene.control.TextField;
+import javafx.scene.input.MouseButton;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.paint.Color;
+import javafx.scene.text.Text;
+import javafx.scene.text.TextFlow;
+import javafx.util.Duration;
 
 /**
  * 源码页签：只读源码/字节码视图、语法着色、面板内搜索、双向跳转。
@@ -45,6 +51,7 @@ public class SourcePanel extends BorderPane {
             Pattern.compile("\"(?:\\\\.|[^\"\\\\\\n])*\"|'(?:\\\\.|[^'\\\\\\n])*'");
     private static final Pattern NUM_RE =
             Pattern.compile("\\b(0[xX][0-9a-fA-F_]+|\\d[\\d_]*(?:\\.[\\d_]+)?[fFdDlL]?)\\b");
+    private static final Pattern BLOCK_RE = Pattern.compile("/\\*|\\*/");
 
     /** 渲染模式。 */
     private enum Mode {JAVA, BYTECODE, LOADING}
@@ -63,13 +70,12 @@ public class SourcePanel extends BorderPane {
     private int currentHit = -1;
     private String pendingJump;
     private long loadingStartedAt;
-    private javafx.animation.Timeline loadingTimer;
+    private Timeline loadingTimer;
 
     private final ListView<String> listView = new ListView<>();
     private final ComboBox<String> fileBox = new ComboBox<>();
     private final TextField searchField = new TextField();
     private final Label info = new Label("");
-    private final Button setupBtn = new Button("配置反编译器");
     private final Label loadingLabel = new Label("");
     private final Button cancelBtn = new Button("取消反编译");
     private final HBox loadingBar = new HBox(8);
@@ -95,15 +101,15 @@ public class SourcePanel extends BorderPane {
         Button nextBtn = new Button("下一个");
         nextBtn.setOnAction(e -> findNext());
         info.setStyle("-fx-text-fill: -jr-muted;");
-        HBox.setHgrow(info, javafx.scene.layout.Priority.ALWAYS);
+        HBox.setHgrow(info, Priority.ALWAYS);
         bar.getChildren().addAll(fileBox, new Label("搜索:"), searchField, nextBtn, info);
         setTop(bar);
 
-        listView.setCellFactory(v -> new javafx.scene.control.ListCell<>() {
+        listView.setCellFactory(v -> new ListCell<>() {
             private final TextFlow flow = new TextFlow();
 
             {
-                setContentDisplay(javafx.scene.control.ContentDisplay.GRAPHIC_ONLY);
+                setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
                 flow.setStyle("-fx-font-family: Consolas, monospace; -fx-font-size: 13px;");
             }
 
@@ -217,7 +223,7 @@ public class SourcePanel extends BorderPane {
                     idx += 2;
                 }
                 // 块注释开/闭
-                Matcher bm = Pattern.compile("/\\*|\\*/").matcher(line);
+                Matcher bm = BLOCK_RE.matcher(line);
                 while (bm.find()) {
                     final int p = bm.start();
                     boolean insideStr = str.stream().anyMatch(s -> s[0] <= p && p < s[1]);
@@ -281,7 +287,7 @@ public class SourcePanel extends BorderPane {
             }
             if (s.start() > pos) {
                 Text plain = new Text(line.substring(pos, s.start()));
-                plain.setFill(javafx.scene.paint.Color.web(fg));
+                plain.setFill(Color.web(fg));
                 out.add(plain);
             }
             String color = switch (s.kind()) {
@@ -292,7 +298,7 @@ public class SourcePanel extends BorderPane {
                 default -> app.theme().color("syntax_banner");
             };
             Text t = new Text(line.substring(s.start(), Math.min(s.end(), line.length())));
-            t.setFill(javafx.scene.paint.Color.web(color));
+            t.setFill(Color.web(color));
             if (s.kind() == 4) {
                 t.setStyle("-fx-font-weight: bold;");
             }
@@ -301,7 +307,7 @@ public class SourcePanel extends BorderPane {
         }
         if (pos < line.length()) {
             Text plain = new Text(line.substring(pos));
-            plain.setFill(javafx.scene.paint.Color.web(fg));
+            plain.setFill(Color.web(fg));
             out.add(plain);
         }
         if (out.isEmpty()) {
@@ -391,8 +397,7 @@ public class SourcePanel extends BorderPane {
 
     private void showBytecode() {
         mode = Mode.BYTECODE;
-        loadingBar.setVisible(false);
-        loadingBar.setManaged(false);
+        hideLoading();
         fileBox.getItems().clear();
         ClassFile cf = app.project().classes().get(currentClass);
         if (cf == null) {
@@ -414,6 +419,10 @@ public class SourcePanel extends BorderPane {
     }
 
     private void hideLoading() {
+        if (loadingTimer != null) {
+            loadingTimer.stop();
+            loadingTimer = null;
+        }
         loadingBar.setVisible(false);
         loadingBar.setManaged(false);
     }
@@ -428,9 +437,9 @@ public class SourcePanel extends BorderPane {
         if (loadingTimer != null) {
             loadingTimer.stop();
         }
-        loadingTimer = new javafx.animation.Timeline(new javafx.animation.KeyFrame(
-                javafx.util.Duration.millis(500), e -> tickLoading()));
-        loadingTimer.setCycleCount(javafx.animation.Timeline.INDEFINITE);
+        loadingTimer = new Timeline(new KeyFrame(
+                Duration.millis(500), e -> tickLoading()));
+        loadingTimer.setCycleCount(Timeline.INDEFINITE);
         loadingTimer.play();
         tickLoading();
     }

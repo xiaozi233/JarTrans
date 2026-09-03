@@ -1,8 +1,10 @@
 package com.jartrans.ui;
 
 import com.jartrans.core.DictionaryManager;
+import java.nio.file.Path;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.geometry.Insets;
+import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -12,13 +14,11 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
-
-import java.nio.file.Path;
-import java.util.List;
 
 /** 多词典管理：新建 / 重命名 / 删除 / 导入 / 导出 / 切换当前词典。对应 dict_manager_dialog.py。 */
 public class DictManagerDialog extends Stage {
@@ -81,12 +81,12 @@ public class DictManagerDialog extends Stage {
         Button closeBtn = new Button("关闭");
         closeBtn.setOnAction(e -> close());
         Separator sep1 = new Separator();
-        sep1.setOrientation(javafx.geometry.Orientation.VERTICAL);
+        sep1.setOrientation(Orientation.VERTICAL);
         Separator sep2 = new Separator();
-        sep2.setOrientation(javafx.geometry.Orientation.VERTICAL);
+        sep2.setOrientation(Orientation.VERTICAL);
         HBox right = new HBox(closeBtn);
         right.setAlignment(Pos.CENTER_RIGHT);
-        HBox.setHgrow(right, javafx.scene.layout.Priority.ALWAYS);
+        HBox.setHgrow(right, Priority.ALWAYS);
         bar.getChildren().addAll(createBtn, renameBtn, removeBtn, sep1, importBtn,
                 exportBtn, sep2, activateBtn, right);
         root.setCenter(new VBox(table, bar));
@@ -275,10 +275,5 @@ public class DictManagerDialog extends Stage {
         }
         app.setStatus("已切换到词典「" + name + "」");
         syncApp();
-    }
-
-    @SuppressWarnings("unused")
-    private List<String> names() {
-        return dicts.names();
     }
 }

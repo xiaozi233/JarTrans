@@ -1,6 +1,7 @@
 package com.jartrans.ui;
 
 import com.jartrans.core.Dictionary;
+import java.util.Map;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -14,11 +15,10 @@ import javafx.scene.control.TextField;
 import javafx.scene.control.TitledPane;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
-
-import java.util.Map;
 
 /** 词典条目编辑对话框（可切换当前编辑的词典）。对应 gui/dict_dialog.py。 */
 public class DictDialog extends Stage {
@@ -59,7 +59,7 @@ public class DictDialog extends Stage {
         }
         HBox topRight = new HBox(countLabel);
         topRight.setAlignment(Pos.CENTER_RIGHT);
-        HBox.setHgrow(topRight, javafx.scene.layout.Priority.ALWAYS);
+        HBox.setHgrow(topRight, Priority.ALWAYS);
         top.getChildren().add(topRight);
         root.setTop(top);
 
@@ -86,7 +86,7 @@ public class DictDialog extends Stage {
         colTrans.setPrefWidth(380);
         //noinspection unchecked
         table.getColumns().addAll(colOrig, colTrans);
-        table.setColumnResizePolicy(javafx.scene.control.TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
         table.getSelectionModel().selectedItemProperty().addListener((o, ov, nv) -> {
             if (nv != null) {
                 origField.setText(nv.getKey());
@@ -95,7 +95,7 @@ public class DictDialog extends Stage {
         });
 
         VBox mid = new VBox(search, table);
-        VBox.setVgrow(table, javafx.scene.layout.Priority.ALWAYS);
+        VBox.setVgrow(table, Priority.ALWAYS);
         root.setCenter(mid);
 
         // ---- 编辑条目 ----

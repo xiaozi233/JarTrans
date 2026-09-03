@@ -1,10 +1,5 @@
 package com.jartrans.ui;
 
-import javafx.animation.KeyFrame;
-import javafx.animation.Timeline;
-import javafx.scene.Scene;
-import javafx.util.Duration;
-
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -14,6 +9,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
+import javafx.scene.Scene;
+import javafx.util.Duration;
 
 /**
  * 主题管理：浅色 / 深色 / 跟随系统。
@@ -126,10 +125,6 @@ public final class Theme {
 
     public String color(String key) {
         return palette.get(key);
-    }
-
-    public String stateColor(String state) {
-        return palette.getOrDefault("state_" + state, palette.get("fg"));
     }
 
     public String statusColor(String status) {

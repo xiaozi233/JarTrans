@@ -5,13 +5,26 @@ import com.jartrans.core.LangPack;
 import com.jartrans.core.Project;
 import com.jartrans.core.Settings;
 import com.jartrans.core.java.DecompilerManager;
+import com.jartrans.core.java.DecompilerType;
 import com.jartrans.core.java.JavaEnv;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import javafx.animation.PauseTransition;
+import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
@@ -21,35 +34,37 @@ import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.ProgressBar;
+import javafx.scene.control.RadioMenuItem;
+import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleGroup;
+import javafx.scene.control.Tooltip;
+import javafx.scene.control.TreeCell;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.DataFormat;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
+import javafx.scene.input.MouseButton;
+import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.shape.Circle;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
-
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import javafx.util.Duration;
 
 /**
  * JavaFX 主应用与控制器（对应 Python gui/app.py）。
  * 界面骨架在 main_view.fxml 中，本类通过 FXMLLoader.setController 注入。
  */
-public class MainApp extends javafx.application.Application {
+public class MainApp extends Application {
 
     // 类状态常量
-    static final List<String> CLASS_STATES = Project.CLASS_STATES;
-    static final List<String> MARK_STATES = Project.MANUAL_STATES;
     static final Map<String, String> STATE_LABEL = new LinkedHashMap<>(Map.of(
             "empty", "无字符串", "todo", "未开始", "doing", "翻译中",
             "done", "已完成", "ignore", "已忽略"));
@@ -57,37 +72,25 @@ public class MainApp extends javafx.application.Application {
             new String[]{"all", "全部"}, new String[]{"todo", "未开始"},
             new String[]{"doing", "翻译中"}, new String[]{"done", "已完成"},
             new String[]{"ignore", "已忽略"}, new String[]{"empty", "无字符串"});
-    static final Map<String, String> THEME_ITEMS = new LinkedHashMap<>(Map.of(
-            "system", "跟随系统", "light", "浅色", "dark", "深色"));
 
-    // 可自定义快捷键：id / 显示名 / 默认组合键。存储于 settings 的 "key_<id>"。
-    static final List<String[]> SHORTCUT_DEFS = List.of(
-            new String[]{"undo", "撤销", "Ctrl+Z"},
-            new String[]{"redo", "重做", "Ctrl+Y"},
-            new String[]{"save", "保存译文", "Ctrl+S"},
-            new String[]{"find", "类内搜索（当前类）", "Ctrl+F"},
-            new String[]{"replace", "替换译文（当前类）", "Ctrl+R"},
-            new String[]{"gsearch", "全包搜索", "Ctrl+Alt+F"},
-            new String[]{"prefs", "打开首选项", "Ctrl+,"});
+    // 可自定义快捷键的定义与解析见 Shortcuts（SHORTCUT_DEFS 单一来源，存于 settings 的 "key_<id>"）。
 
-    // 类树节点信息
-    private static final String TYPE_ROOT = "root";
-    private static final String TYPE_DIR = "dir";
-    private static final String TYPE_CLASS = "class";    private Settings settings;
+    private Settings settings;
     private Theme theme;
     private Project project;
     private Stage stage;
     private Scene mainScene;
     /** 输入防抖：过滤框每字符即时过滤、工具栏搜索框即时反馈。 */
-    private final javafx.animation.PauseTransition filterDebounce =
-            new javafx.animation.PauseTransition(javafx.util.Duration.millis(120));
-    private final javafx.animation.PauseTransition searchDebounce =
-            new javafx.animation.PauseTransition(javafx.util.Duration.millis(180));
+    private final PauseTransition filterDebounce =
+            new PauseTransition(Duration.millis(120));
+    private final PauseTransition searchDebounce =
+            new PauseTransition(Duration.millis(180));
 
     private String javaPathCache;
     private String javaVersionCache;
     private boolean decompiling;
-    private volatile boolean decompileCancelled;
+    /** 进行中的单类反编译任务（供「取消反编译」中断与丢弃结果）。 */
+    private Task<List<Path>> activeDecompileTask;
     private Map<String, Path> indexCache;
     /** 已按单类反编译过的类 → 产出的 .java 文件（本会话内复用）。 */
     private final Map<String, List<Path>> singleClassFiles = new HashMap<>();
@@ -99,11 +102,11 @@ public class MainApp extends javafx.application.Application {
     @FXML
     private CheckMenuItem hideEmptyItem;
     @FXML
-    private javafx.scene.control.RadioMenuItem themeSystemItem;
+    private RadioMenuItem themeSystemItem;
     @FXML
-    private javafx.scene.control.RadioMenuItem themeLightItem;
+    private RadioMenuItem themeLightItem;
     @FXML
-    private javafx.scene.control.RadioMenuItem themeDarkItem;
+    private RadioMenuItem themeDarkItem;
     @FXML
     private ToggleGroup themeGroup;
     @FXML
@@ -117,15 +120,15 @@ public class MainApp extends javafx.application.Application {
     @FXML
     private CheckBox hideEmptyCheck;
     @FXML
-    private javafx.scene.layout.FlowPane legendBox;
+    private FlowPane legendBox;
     @FXML
     private TreeView<String> classTree;
     @FXML
     private TabPane tabPane;
     @FXML
-    private javafx.scene.control.Tab editorTab;
+    private Tab editorTab;
     @FXML
-    private javafx.scene.control.Tab sourceTab;
+    private Tab sourceTab;
     @FXML
     private EditorPane editor;
     @FXML
@@ -137,9 +140,8 @@ public class MainApp extends javafx.application.Application {
     @FXML
     private Label statsLabel;
 
-    // 树内部状态
-    private final Map<String, TreeItem<String>> classNodes = new HashMap<>();
-    private final Map<TreeItem<String>, String[]> nodeInfo = new HashMap<>(); // type / path / cls
+    // 类树状态与过滤/构建/查询逻辑（纯模型，不碰 TreeView 控件）
+    private ClassTreeModel treeModel;
     private ContextMenu lastTreeMenu; // 最近一次类树右键菜单（左键点其它处时收起）
 
     // 图例控件（圆点走 CSS 状态类，无代码上色）
@@ -153,7 +155,7 @@ public class MainApp extends javafx.application.Application {
 
         FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/jartrans/ui/main_view.fxml"));
         loader.setController(this);
-        javafx.scene.Parent root = loader.load();
+        Parent root = loader.load();
 
         stage.setTitle(AppMeta.APP_NAME + " — " + AppMeta.APP_TAGLINE);
         stage.setMinWidth(980);
@@ -173,6 +175,7 @@ public class MainApp extends javafx.application.Application {
     // ---------- 初始化 ----------
 
     private void initUi() {
+        treeModel = new ClassTreeModel(project);
         // 主题
         theme.onChange(this::onThemeChanged);
         String mode = theme.mode();
@@ -192,10 +195,7 @@ public class MainApp extends javafx.application.Application {
 
         // 状态筛选
         statusBox.getItems().setAll(STATE_FILTERS.stream().map(f -> f[1]).toList());
-        String savedFilter = settings.getString("status_filter");
-        statusBox.setValue(STATE_FILTERS.stream()
-                .filter(f -> f[0].equals(savedFilter)).map(f -> f[1]).findFirst()
-                .orElse("全部"));
+        statusBox.setValue(stateLabelOfKey(settings.getString("status_filter")));
         statusBox.valueProperty().addListener((o, ov, nv) -> onStatusFilterChanged());
 
         // 过滤框即时过滤：每输入一个字符立即重建类列表，无需回车
@@ -212,7 +212,7 @@ public class MainApp extends javafx.application.Application {
 
         // 类树
         classTree.setShowRoot(false);
-        classTree.setCellFactory(tv -> new javafx.scene.control.TreeCell<>() {
+        classTree.setCellFactory(tv -> new TreeCell<>() {
             @Override
             protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
@@ -226,23 +226,24 @@ public class MainApp extends javafx.application.Application {
                 // 避免代码 setTextFill 被 CSS 脉冲覆盖导致色值漂移（dot 与文字必同步）
                 getStyleClass().removeIf(c -> c.startsWith("cell-state-") || c.equals("cell-dir"));
                 setGraphic(null);
-                String[] info = nodeInfo.get(getTreeItem());
-                if (info != null && TYPE_CLASS.equals(info[0])) {
-                    String st = project.classState(info[1]);
+                String kind = treeModel.kindOf(getTreeItem());
+                if (ClassTreeModel.TYPE_CLASS.equals(kind)) {
+                    String cls = treeModel.targetOf(getTreeItem());
+                    String st = project.classState(cls);
                     getStyleClass().add("cell-state-" + st);
                     // 彩色状态圆点：与文字同规则（.state-dot.cell-state-*）
-                    javafx.scene.shape.Circle dot = new javafx.scene.shape.Circle(3.5);
+                    Circle dot = new Circle(3.5);
                     dot.getStyleClass().addAll("state-dot", "cell-state-" + st);
                     setGraphic(dot);
-                } else if (info != null && TYPE_DIR.equals(info[0])) {
+                } else if (ClassTreeModel.TYPE_DIR.equals(kind)) {
                     getStyleClass().add("cell-dir");
                 }
             }
         });
         classTree.getSelectionModel().selectedItemProperty().addListener((o, ov, nv) -> onTreeSelect(nv));
         // 左键点树任意处即收起右键菜单（修复右键后再左键点同类不关闭）
-        classTree.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_PRESSED, e -> {
-            if (e.getButton() == javafx.scene.input.MouseButton.PRIMARY
+        classTree.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
+            if (e.getButton() == MouseButton.PRIMARY
                     && lastTreeMenu != null && lastTreeMenu.isShowing()) {
                 lastTreeMenu.hide();
             }
@@ -276,11 +277,11 @@ public class MainApp extends javafx.application.Application {
     /** 填充类状态图例。始终保留一个「显示/隐藏」开关按钮；开启时附带彩色圆点+文字。 */
     private void buildLegend() {
         legendBox.getChildren().clear();
-        legendBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        legendBox.setAlignment(Pos.CENTER_LEFT);
         final boolean visible = legendVisible();
         Button toggle = new Button(visible ? "隐藏图例" : "显示图例");
         toggle.setStyle("-fx-font-size: 11px; -fx-padding: 1 8 1 8;");
-        toggle.setTooltip(new javafx.scene.control.Tooltip(
+        toggle.setTooltip(new Tooltip(
                 visible ? "收起类状态图例" : "展开类状态图例（彩色圆点+说明）"));
         toggle.setOnAction(e -> applyLegendVisible(!legendVisible()));
         legendBox.getChildren().add(toggle);
@@ -288,15 +289,15 @@ public class MainApp extends javafx.application.Application {
             return;
         }
         for (String st : List.of("todo", "doing", "done", "ignore", "empty")) {
-            javafx.scene.shape.Circle dot = new javafx.scene.shape.Circle(4);
+            Circle dot = new Circle(4);
             dot.getStyleClass().addAll("state-dot", "cell-state-" + st);
-            javafx.scene.control.Tooltip.install(dot,
-                    new javafx.scene.control.Tooltip(STATE_LABEL.get(st)));
+            Tooltip.install(dot,
+                    new Tooltip(STATE_LABEL.get(st)));
             Label text = new Label(STATE_LABEL.get(st));
             text.getStyleClass().addAll("legend-txt", "cell-state-" + st);
             text.setStyle("-fx-font-size: 11px;");
             HBox pair = new HBox(3, dot, text);
-            pair.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+            pair.setAlignment(Pos.CENTER_LEFT);
             legendBox.getChildren().add(pair);
         }
     }
@@ -488,58 +489,19 @@ public class MainApp extends javafx.application.Application {
 
     // ---------- 快捷键（可自定义，存于 settings key_<id>） ----------
 
-    /** 规范化存储文本：修饰符统一大写、按键名统一。 */
-    static String normalizeShortcut(String text) {
-        if (text == null) {
-            return "";
-        }
-        StringBuilder sb = new StringBuilder();
-        for (String part : text.split("\\+")) {
-            String p = part.trim();
-            if (p.isEmpty()) {
-                continue;
-            }
-            if (sb.length() > 0) {
-                sb.append('+');
-            }
-            String low = p.toLowerCase();
-            if (low.length() == 1 && Character.isLetter(low.charAt(0))) {
-                sb.append(low.toUpperCase()); // 字母键统一大写存储
-            } else {
-                sb.append(switch (low) {
-                    case "ctrl", "control" -> "Ctrl";
-                    case "alt" -> "Alt";
-                    case "shift" -> "Shift";
-                    case "meta", "cmd", "command" -> "Meta";
-                    default -> low.length() == 1 ? low : p.toUpperCase();
-                });
-            }
-        }
-        return sb.toString();
-    }
-
-    static String defaultShortcut(String id) {
-        for (String[] d : SHORTCUT_DEFS) {
-            if (d[0].equals(id)) {
-                return d[2];
-            }
-        }
-        return "";
-    }
-
     /** 当前生效的快捷键文本（未自定义时为默认值）。 */
     public String shortcutText(String id) {
         String stored = settings.getString("key_" + id);
-        return stored.isBlank() ? defaultShortcut(id) : stored;
+        return stored.isBlank() ? Shortcuts.defaultFor(id) : stored;
     }
 
     /** 把某个动作绑定到新的组合键；成功返回 true。重复组合返回 false。 */
     public boolean applyShortcut(String id, String comboText) {
-        String norm = normalizeShortcut(comboText);
-        if (norm.isEmpty() || parseShortcut(norm) == null) {
+        String norm = Shortcuts.normalize(comboText);
+        if (norm.isEmpty() || Shortcuts.parse(norm) == null) {
             return false;
         }
-        for (String[] d : SHORTCUT_DEFS) {
+        for (String[] d : Shortcuts.DEFS) {
             if (d[0].equals(id)) {
                 continue;
             }
@@ -558,7 +520,7 @@ public class MainApp extends javafx.application.Application {
 
     public void resetShortcut(String id) {
         try {
-            settings.set("key_" + id, defaultShortcut(id));
+            settings.set("key_" + id, Shortcuts.defaultFor(id));
         } catch (Exception ignored) {
             // 忽略
         }
@@ -566,7 +528,7 @@ public class MainApp extends javafx.application.Application {
     }
 
     public void resetAllShortcuts() {
-        for (String[] d : SHORTCUT_DEFS) {
+        for (String[] d : Shortcuts.DEFS) {
             try {
                 settings.set("key_" + d[0], d[2]);
             } catch (Exception ignored) {
@@ -574,186 +536,6 @@ public class MainApp extends javafx.application.Application {
             }
         }
         registerShortcuts(mainScene);
-    }
-
-    private static KeyCode parseKeyToken(String token) {
-        if (token == null || token.isEmpty()) {
-            return null;
-        }
-        if (token.length() == 1) {
-            char c = token.charAt(0);
-            if (c >= 'a' && c <= 'z') {
-                return javafx.scene.input.KeyCode.valueOf(token.toUpperCase());
-            }
-            if (c >= 'A' && c <= 'Z') {
-                return javafx.scene.input.KeyCode.valueOf(token);
-            }
-            if (c >= '0' && c <= '9') {
-                return javafx.scene.input.KeyCode.valueOf("DIGIT" + c);
-            }
-            return switch (c) {
-                case ',' -> javafx.scene.input.KeyCode.COMMA;
-                case '.' -> javafx.scene.input.KeyCode.PERIOD;
-                case ';' -> javafx.scene.input.KeyCode.SEMICOLON;
-                case '\'' -> javafx.scene.input.KeyCode.QUOTE;
-                case '`' -> javafx.scene.input.KeyCode.BACK_QUOTE;
-                case '-' -> javafx.scene.input.KeyCode.MINUS;
-                case '=' -> javafx.scene.input.KeyCode.EQUALS;
-                case '/' -> javafx.scene.input.KeyCode.SLASH;
-                case '\\' -> javafx.scene.input.KeyCode.BACK_SLASH;
-                case '[' -> javafx.scene.input.KeyCode.OPEN_BRACKET;
-                case ']' -> javafx.scene.input.KeyCode.CLOSE_BRACKET;
-                case ' ' -> javafx.scene.input.KeyCode.SPACE;
-                default -> null;
-            };
-        }
-        return switch (token) {
-            case "Space" -> javafx.scene.input.KeyCode.SPACE;
-            case "Enter" -> javafx.scene.input.KeyCode.ENTER;
-            case "Tab" -> javafx.scene.input.KeyCode.TAB;
-            case "Escape", "Esc" -> javafx.scene.input.KeyCode.ESCAPE;
-            case "Backspace", "BackSpace" -> javafx.scene.input.KeyCode.BACK_SPACE;
-            case "Delete" -> javafx.scene.input.KeyCode.DELETE;
-            case "Home" -> javafx.scene.input.KeyCode.HOME;
-            case "End" -> javafx.scene.input.KeyCode.END;
-            case "PageUp" -> javafx.scene.input.KeyCode.PAGE_UP;
-            case "PageDown" -> javafx.scene.input.KeyCode.PAGE_DOWN;
-            case "Up", "ArrowUp" -> javafx.scene.input.KeyCode.UP;
-            case "Down", "ArrowDown" -> javafx.scene.input.KeyCode.DOWN;
-            case "Left", "ArrowLeft" -> javafx.scene.input.KeyCode.LEFT;
-            case "Right", "ArrowRight" -> javafx.scene.input.KeyCode.RIGHT;
-            default -> {
-                try {
-                    yield javafx.scene.input.KeyCode.valueOf(token);
-                } catch (IllegalArgumentException e) {
-                    yield null;
-                }
-            }
-        };
-    }
-
-    /** 按键 → 可逆的文本记号（与 parseKeyToken 互为逆）。 */
-    private static String keyToken(KeyCode code) {
-        if (code == null) {
-            return null;
-        }
-        String n = code.name();
-        if (n.length() == 1 && Character.isLetter(n.charAt(0))) {
-            return n; // 字母 A-Z
-        }
-        if (n.startsWith("DIGIT") && n.length() == 6 && Character.isDigit(n.charAt(5))) {
-            return n.substring(5); // 数字 0-9
-        }
-        if (n.length() >= 2 && n.charAt(0) == 'F'
-                && Character.isDigit(n.charAt(1))) {
-            return n; // 功能键 F1-F24
-        }
-        return switch (code) {
-            case COMMA -> ",";
-            case PERIOD -> ".";
-            case SEMICOLON -> ";";
-            case QUOTE -> "'";
-            case BACK_QUOTE -> "`";
-            case MINUS -> "-";
-            case EQUALS -> "=";
-            case SLASH -> "/";
-            case BACK_SLASH -> "\\";
-            case OPEN_BRACKET -> "[";
-            case CLOSE_BRACKET -> "]";
-            case SPACE -> "Space";
-            case ENTER -> "Enter";
-            case TAB -> "Tab";
-            case ESCAPE -> "Esc";
-            case BACK_SPACE -> "Backspace";
-            case DELETE -> "Delete";
-            case HOME -> "Home";
-            case END -> "End";
-            case PAGE_UP -> "PageUp";
-            case PAGE_DOWN -> "PageDown";
-            case UP -> "Up";
-            case DOWN -> "Down";
-            case LEFT -> "Left";
-            case RIGHT -> "Right";
-            default -> null; // 不支持随意重绑的按键
-        };
-    }
-
-    /** 由按键事件构造组合键文本；修饰键单独按下或按键不可重绑时返回 null。 */
-    static String comboText(javafx.scene.input.KeyEvent e) {
-        KeyCode code = e.getCode();
-        if (code == null || code.isModifierKey() || code == KeyCode.UNDEFINED) {
-            return null;
-        }
-        boolean fn = code.name().matches("F\\d+");
-        if (!e.isControlDown() && !e.isAltDown() && !e.isShiftDown()
-                && !e.isMetaDown() && !fn) {
-            return null; // 无修饰键且非 F 键，容易与正常输入冲突，不采用
-        }
-        String token = keyToken(code);
-        if (token == null) {
-            return null;
-        }
-        StringBuilder sb = new StringBuilder();
-        if (e.isControlDown()) {
-            sb.append("Ctrl+");
-        }
-        if (e.isAltDown()) {
-            sb.append("Alt+");
-        }
-        if (e.isShiftDown()) {
-            sb.append("Shift+");
-        }
-        if (e.isMetaDown()) {
-            sb.append("Meta+");
-        }
-        sb.append(token);
-        return sb.toString();
-    }
-
-    /** 把 "Ctrl+Alt+F" 样式的文本解析为组合键；非法返回 null。 */
-    static KeyCodeCombination parseShortcut(String text) {        if (text == null || text.isBlank()) {
-            return null;
-        }
-        boolean ctrl = false, alt = false, shift = false, meta = false;
-        String[] parts = text.split("\\+");
-        KeyCode key = null;
-        for (int i = 0; i < parts.length; i++) {
-            String p = parts[i].trim();
-            if (i == parts.length - 1) {
-                key = parseKeyToken(p);
-                break;
-            }
-            String low = p.toLowerCase();
-            if (low.equals("ctrl") || low.equals("control")) {
-                ctrl = true;
-            } else if (low.equals("alt")) {
-                alt = true;
-            } else if (low.equals("shift")) {
-                shift = true;
-            } else if (low.equals("meta") || low.equals("cmd") || low.equals("command")) {
-                meta = true;
-            } else {
-                return null;
-            }
-        }
-        if (key == null) {
-            return null;
-        }
-        List<javafx.scene.input.KeyCombination.Modifier> mods = new ArrayList<>();
-        if (ctrl) {
-            mods.add(javafx.scene.input.KeyCombination.CONTROL_DOWN);
-        }
-        if (alt) {
-            mods.add(javafx.scene.input.KeyCombination.ALT_DOWN);
-        }
-        if (shift) {
-            mods.add(javafx.scene.input.KeyCombination.SHIFT_DOWN);
-        }
-        if (meta) {
-            mods.add(javafx.scene.input.KeyCombination.META_DOWN);
-        }
-        return new javafx.scene.input.KeyCodeCombination(key,
-                mods.toArray(new javafx.scene.input.KeyCombination.Modifier[0]));
     }
 
     /** 清空并重建主场景的全部快捷键（含 Ctrl+Shift+Z 重做别名）。 */
@@ -765,9 +547,9 @@ public class MainApp extends javafx.application.Application {
         put(scene, "undo", this::undoAction);
         put(scene, "redo", this::redoAction);
         scene.getAccelerators().put(
-                new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.Z,
-                        javafx.scene.input.KeyCombination.CONTROL_DOWN,
-                        javafx.scene.input.KeyCombination.SHIFT_DOWN), this::redoAction);
+                new KeyCodeCombination(KeyCode.Z,
+                        KeyCombination.CONTROL_DOWN,
+                        KeyCombination.SHIFT_DOWN), this::redoAction);
         put(scene, "save", () -> {
             if (project.hasJar()) {
                 editor.saveTranslation();
@@ -780,7 +562,7 @@ public class MainApp extends javafx.application.Application {
     }
 
     private void put(Scene scene, String id, Runnable action) {
-        KeyCodeCombination combo = parseShortcut(shortcutText(id));
+        KeyCodeCombination combo = Shortcuts.parse(shortcutText(id));
         if (combo != null) {
             scene.getAccelerators().put(combo, action);
         }
@@ -848,33 +630,21 @@ public class MainApp extends javafx.application.Application {
         String suffix = theme.mode().equals(Theme.MODE_SYSTEM)
                 ? "（" + (theme.dark() ? "系统为深色" : "系统为浅色") + "）"
                 : "";
-        setStatus("主题已切换：" + THEME_ITEMS.get(theme.mode()) + suffix);
+        setStatus("主题已切换：" + Theme.LABELS.get(theme.mode()) + suffix);
     }
 
     // ---------- 类树 ----------
 
-    private List<String> filteredClasses() {
-        String keyword = filterField.getText().trim().toLowerCase();
-        String state = stateFilterKey();
-        boolean hideEmpty = hideEmptyCheck.isSelected();
-        List<String> out = new ArrayList<>();
-        for (String cls : project.classOrder()) {
-            if (hideEmpty && !project.hasTranslatable(cls)) {
-                continue;
-            }
-            if (!"all".equals(state) && !project.classState(cls).equals(state)) {
-                continue;
-            }
-            if (!keyword.isEmpty() && !cls.toLowerCase().contains(keyword)) {
-                continue;
-            }
-            out.add(cls);
-        }
-        return out;
+    /** 当前类树过滤条件（从过滤框/状态下拉/隐藏空类控件读取）。 */
+    private ClassTreeModel.ViewOptions currentView() {
+        return new ClassTreeModel.ViewOptions(
+                filterField.getText().trim().toLowerCase(),
+                stateKeyOfLabel(statusBox.getValue()),
+                hideEmptyCheck.isSelected());
     }
 
-    private String stateFilterKey() {
-        String label = statusBox.getValue();
+    /** 状态筛选显示名 → 状态键；未知返回 "all"。 */
+    static String stateKeyOfLabel(String label) {
         for (String[] f : STATE_FILTERS) {
             if (f[1].equals(label)) {
                 return f[0];
@@ -883,130 +653,71 @@ public class MainApp extends javafx.application.Application {
         return "all";
     }
 
-    private void rebuildTree() {
-        String keep = editor.currentClass();
-        classTree.getRoot();
-        TreeItem<String> newRoot = new TreeItem<>("");
-        classNodes.clear();
-        nodeInfo.clear();
-        classTree.setRoot(newRoot);
+    /** 状态筛选键 → 显示名；未知返回 "全部"。 */
+    static String stateLabelOfKey(String key) {
+        for (String[] f : STATE_FILTERS) {
+            if (f[0].equals(key)) {
+                return f[1];
+            }
+        }
+        return "全部";
+    }
 
+    private void rebuildTree() {
+        TreeItem<String> newRoot = new TreeItem<>("");
+        classTree.setRoot(newRoot);
         if (!project.hasJar()) {
             return;
         }
-        List<String> visible = filteredClasses();
-        boolean filtering = !filterField.getText().trim().isEmpty()
-                || !"all".equals(stateFilterKey()) || hideEmptyCheck.isSelected();
-        TreeItem<String> root = new TreeItem<>(project.jarName() + "（"
-                + visible.size() + "/" + project.classOrder().size() + " 类）");
-        root.setExpanded(true);
-        newRoot.getChildren().add(root);
-        nodeInfo.put(root, new String[]{TYPE_ROOT, ""});
-        Map<String, TreeItem<String>> dirs = new HashMap<>();
-        for (String cls : visible) {
-            String[] parts = cls.split("/");
-            TreeItem<String> parent = root;
-            StringBuilder path = new StringBuilder();
-            for (int i = 0; i < parts.length - 1; i++) {
-                String part = parts[i];
-                path.append(path.length() > 0 ? "/" : "").append(part);
-                String key = path.toString();
-                TreeItem<String> d = dirs.get(key);
-                if (d == null) {
-                    d = new TreeItem<>(part);
-                    d.setExpanded(filtering);
-                    parent.getChildren().add(d);
-                    nodeInfo.put(d, new String[]{TYPE_DIR, key});
-                    dirs.put(key, d);
+        String keep = editor.currentClass();
+        TreeItem<String> content = treeModel.rebuild(project.jarName(), currentView());
+        newRoot.getChildren().add(content);
+        if (keep != null) {
+            TreeItem<String> kept = treeModel.nodeOf(keep);
+            if (kept != null) {
+                treeModel.expandPathTo(kept);
+                classTree.getSelectionModel().select(kept);
+                int row = classTree.getRow(kept);
+                if (row >= 0) {
+                    classTree.scrollTo(row);
                 }
-                parent = d;
-            }
-            String st = project.classState(cls);
-            TreeItem<String> node = new TreeItem<>(nodeText(cls, st));
-            parent.getChildren().add(node);
-            nodeInfo.put(node, new String[]{TYPE_CLASS, cls});
-            classNodes.put(cls, node);
-        }
-        if (keep != null && classNodes.containsKey(keep)) {
-            TreeItem<String> kept = classNodes.get(keep);
-            kept.setExpanded(true);
-            TreeItem<String> p = kept.getParent();
-            while (p != null) {
-                p.setExpanded(true);
-                p = p.getParent();
-            }
-            classTree.getSelectionModel().select(kept);
-            int row = classTree.getRow(kept);
-            if (row >= 0) {
-                classTree.scrollTo(row);
             }
         }
     }
 
-    private String nodeText(String cls, String state) {
-        String name = cls.substring(cls.lastIndexOf('/') + 1);
-        switch (state) {
-            case "done":
-                return name + "  ✓";
-            case "ignore":
-                return name + "  —";
-            case "empty":
-                return name + "  (0)";
-            default: {
-                int n = project.untranslatedCount(cls);
-                return name + "  (" + n + ")";
-            }
-        }
+    /** 当前状态下拉选中的状态键。 */
+    private String stateFilterKey() {
+        return stateKeyOfLabel(statusBox.getValue());
     }
 
-    /** 只刷新已有节点的文字与颜色（不改变展开状态）。 */
+    /** 只刷新已有节点的文字与颜色（不改变展开状态）；过滤中则整体重建。 */
     void refreshClassNodes() {
-        if (!"all".equals(stateFilterKey()) || hideEmptyCheck.isSelected()
-                || !filterField.getText().trim().isEmpty()) {
+        if (currentView().isFiltering()) {
             rebuildTree();
             return;
         }
-        for (Map.Entry<String, TreeItem<String>> e : classNodes.entrySet()) {
-            String cls = e.getKey();
-            String st = project.classState(cls);
-            e.getValue().setValue(nodeText(cls, st));
-        }
+        treeModel.refreshTexts();
         classTree.refresh();
     }
 
     private void expandAll() {
-        expandNode(classTree.getRoot());
-    }
-
-    private void expandNode(TreeItem<String> node) {
-        node.setExpanded(true);
-        for (TreeItem<String> child : node.getChildren()) {
-            expandNode(child);
-        }
+        ClassTreeModel.expandRecursively(classTree.getRoot());
     }
 
     private void collapseAll() {
         for (TreeItem<String> child : classTree.getRoot().getChildren()) {
-            collapseNode(child);
+            ClassTreeModel.collapseRecursively(child);
         }
-    }
-
-    private void collapseNode(TreeItem<String> node) {
-        for (TreeItem<String> child : node.getChildren()) {
-            collapseNode(child);
-        }
-        node.setExpanded(false);
     }
 
     private void onTreeSelect(TreeItem<String> node) {
         if (node == null) {
             return;
         }
-        String[] info = nodeInfo.get(node);
-        if (info == null || !TYPE_CLASS.equals(info[0])) {
+        if (!ClassTreeModel.TYPE_CLASS.equals(treeModel.kindOf(node))) {
             return;
         }
-        String cls = info[1];
+        String cls = treeModel.targetOf(node);
         if (editor.currentClass() == null || !editor.currentClass().equals(cls)) {
             editor.showClass(cls);
         }
@@ -1016,21 +727,7 @@ public class MainApp extends javafx.application.Application {
     }
 
     private void showTreeMenu(TreeItem<String> node, double x, double y) {
-        String[] info = nodeInfo.get(node);
-        List<String> targets;
-        if (info == null || TYPE_ROOT.equals(info[0])) {
-            targets = new ArrayList<>(classNodes.keySet());
-        } else if (TYPE_DIR.equals(info[0])) {
-            String prefix = info[1] + "/";
-            targets = new ArrayList<>();
-            for (String c : classNodes.keySet()) {
-                if (c.startsWith(prefix)) {
-                    targets.add(c);
-                }
-            }
-        } else {
-            targets = List.of(info[1]);
-        }
+        List<String> targets = treeModel.targetsFor(node);
         if (targets.isEmpty()) {
             return;
         }
@@ -1058,8 +755,8 @@ public class MainApp extends javafx.application.Application {
         MenuItem collapseItem = new MenuItem("折叠全部");
         collapseItem.setOnAction(ev -> collapseAll());
         menu.getItems().addAll(markItem, autoItem, todoItem, doingItem, doneItem,
-                ignoreItem, new javafx.scene.control.SeparatorMenuItem(),
-                fillItem, copyItem, new javafx.scene.control.SeparatorMenuItem(),
+                ignoreItem, new SeparatorMenuItem(),
+                fillItem, copyItem, new SeparatorMenuItem(),
                 expandItem, collapseItem);
         lastTreeMenu = menu;
         menu.show(classTree, x, y);
@@ -1111,8 +808,8 @@ public class MainApp extends javafx.application.Application {
         List<String> sorted = new ArrayList<>(classes);
         sorted.sort(String::compareTo);
         String text = String.join("\n", sorted);
-        javafx.scene.input.Clipboard.getSystemClipboard().setContent(
-                Map.of(javafx.scene.input.DataFormat.PLAIN_TEXT, text));
+        Clipboard.getSystemClipboard().setContent(
+                Map.of(DataFormat.PLAIN_TEXT, text));
         setStatus("已复制 " + classes.size() + " 个类路径到剪贴板");
     }
 
@@ -1189,7 +886,7 @@ public class MainApp extends javafx.application.Application {
         refreshClassNodes();
         updateStats();
         editor.refreshRows();
-        Dialogs.info("完成", "词典自动填充了 " + count + " 条未翻译字符串（标记为\"自动" + "）。");
+        Dialogs.info("完成", "词典自动填充了 " + count + " 条未翻译字符串（标记为\"自动）。");
     }
 
     private void fillClassFromDictionary() {
@@ -1210,41 +907,48 @@ public class MainApp extends javafx.application.Application {
 
     // ---------- 动作 ----------
 
-    private void openJar() {
+    /** 打开文件选择框（可多组扩展名过滤）；取消返回 null。 */
+    private Path askOpenFile(String title, FileChooser.ExtensionFilter... filters) {
         FileChooser chooser = new FileChooser();
-        chooser.setTitle("选择 jar 文件");
-        chooser.getExtensionFilters().addAll(
+        chooser.setTitle(title);
+        chooser.getExtensionFilters().addAll(filters);
+        File file = chooser.showOpenDialog(stage);
+        return file == null ? null : file.toPath();
+    }
+
+    /** 保存文件选择框；取消返回 null。 */
+    private Path askSaveFile(String title, String initialName,
+                             FileChooser.ExtensionFilter... filters) {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle(title);
+        if (initialName != null) {
+            chooser.setInitialFileName(initialName);
+        }
+        chooser.getExtensionFilters().addAll(filters);
+        File file = chooser.showSaveDialog(stage);
+        return file == null ? null : file.toPath();
+    }
+
+    private void openJar() {
+        Path path = askOpenFile("选择 jar 文件",
                 new FileChooser.ExtensionFilter("Jar 文件", "*.jar"),
                 new FileChooser.ExtensionFilter("所有文件", "*.*"));
-        File file = chooser.showOpenDialog(stage);
-        if (file == null) {
+        if (path == null) {
             return;
         }
-        Path path = file.toPath();
         setStatus("正在解析 jar …");
         Task<Boolean> task = new Task<>() {
             @Override
-            protected Boolean call() {
-                try {
-                    project.openJar(path);
-                    return true;
-                } catch (Exception exc) {
-                    return false;
-                }
+            protected Boolean call() throws Exception {
+                project.openJar(path);
+                return true;
             }
         };
         task.setOnSucceeded(ev -> {
-            boolean ok = task.getValue();
-            if (!ok) {
-                Dialogs.error("错误", "打开 jar 失败：\n"
-                        + (task.getException() != null ? task.getException().getMessage()
-                        : "文件损坏或不是有效的 jar/zip"));
-                setStatus("打开失败");
-                return;
-            }
             rebuildTree();
             editor.showClass(null);
-            singleClassFiles.clear();
+            // 新 jar：旧 jar 的反编译产物/索引全部失效
+            invalidateDecompilerState();
             updateStats();
             String msg = "已打开 " + project.jarName() + "：共 "
                     + project.classOrder().size() + " 个类";
@@ -1253,6 +957,14 @@ public class MainApp extends javafx.application.Application {
             }
             setStatus(msg);
         });
+        task.setOnFailed(ev -> {
+            Throwable ex = task.getException();
+            String detail = ex == null ? null : ex.getMessage();
+            Dialogs.error("错误", "打开 jar 失败：\n"
+                    + (detail == null || detail.isEmpty()
+                    ? "文件损坏或不是有效的 jar/zip" : detail));
+            setStatus("打开失败");
+        });
         new Thread(task, "open-jar").start();
     }
 
@@ -1260,17 +972,14 @@ public class MainApp extends javafx.application.Application {
         if (!requireJar()) {
             return;
         }
-        FileChooser chooser = new FileChooser();
-        chooser.setTitle("导出汉化 Jar");
-        chooser.setInitialFileName("translated_" + project.jarName());
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Jar 文件", "*.jar"));
-        File file = chooser.showSaveDialog(stage);
-        if (file == null) {
+        Path out = askSaveFile("导出汉化 Jar", "translated_" + project.jarName(),
+                new FileChooser.ExtensionFilter("Jar 文件", "*.jar"));
+        if (out == null) {
             return;
         }
         try {
-            int count = project.exportJar(file.toPath(), true);
-            Dialogs.info("完成", "已写入 " + count + " 个汉化的类：\n" + file.toPath());
+            int count = project.exportJar(out, true);
+            Dialogs.info("完成", "已写入 " + count + " 个汉化的类：\n" + out);
         } catch (Exception exc) {
             Dialogs.error("错误", "导出失败：\n" + exc.getMessage());
         }
@@ -1280,18 +989,15 @@ public class MainApp extends javafx.application.Application {
         if (!requireJar()) {
             return;
         }
-        FileChooser chooser = new FileChooser();
-        chooser.setTitle("选择语言包");
-        chooser.getExtensionFilters().addAll(
+        Path file = askOpenFile("选择语言包",
                 new FileChooser.ExtensionFilter("JSON 文件", "*.json"),
                 new FileChooser.ExtensionFilter("所有文件", "*.*"));
-        File file = chooser.showOpenDialog(stage);
         if (file == null) {
             return;
         }
         Map<String, Object> pack;
         try {
-            pack = LangPack.readPack(file.toPath());
+            pack = LangPack.readPack(file);
         } catch (LangPack.LangPackException exc) {
             Dialogs.error("错误", exc.getMessage());
             return;
@@ -1325,19 +1031,16 @@ public class MainApp extends javafx.application.Application {
         if (!requireJar()) {
             return;
         }
-        FileChooser chooser = new FileChooser();
-        chooser.setTitle("导出语言包");
-        chooser.setInitialFileName("langpack.json");
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("JSON 文件", "*.json"));
-        File file = chooser.showSaveDialog(stage);
+        Path file = askSaveFile("导出语言包", "langpack.json",
+                new FileChooser.ExtensionFilter("JSON 文件", "*.json"));
         if (file == null) {
             return;
         }
         // 作者取首选项默认值（settings.pack_author），不再每次弹窗询问
         String author = settings.getString("pack_author").trim();
         try {
-            project.exportPack(file.toPath(), author);
-            Dialogs.info("完成", "语言包已导出到：\n" + file.toPath()
+            project.exportPack(file, author);
+            Dialogs.info("完成", "语言包已导出到：\n" + file
                     + "\n作者：" + (author.isEmpty() ? "（未设置，可在首选项中填写）" : author)
                     + "\n（含 " + project.classStatus().size() + " 个类的手动状态标记）");
         } catch (Exception exc) {
@@ -1345,58 +1048,9 @@ public class MainApp extends javafx.application.Application {
         }
     }
 
+    /** 展示导入语言包时的失效条目列表（独立窗口）。 */
     private void showMissing() {
-        List<LangPack.MissingEntry> missing = project.lastMissing();
-        Stage win = new Stage();
-        win.setTitle("失效条目（" + missing.size() + "）");
-        win.setWidth(880);
-        win.setHeight(460);
-        win.initOwner(stage);
-        win.setResizable(true);
-        win.setMinWidth(640);
-        win.setMinHeight(360);
-        win.initModality(javafx.stage.Modality.NONE);
-        javafx.scene.layout.VBox vbox = new javafx.scene.layout.VBox(6);
-        vbox.setPadding(new Insets(6));
-        vbox.getStyleClass().add("root-pane");
-        javafx.scene.control.TableView<LangPack.MissingEntry> table =
-                new javafx.scene.control.TableView<>();
-        javafx.scene.layout.VBox.setVgrow(table, javafx.scene.layout.Priority.ALWAYS);
-        javafx.scene.control.TableColumn<LangPack.MissingEntry, String> c1 =
-                new javafx.scene.control.TableColumn<>("类");
-        c1.setCellValueFactory(d -> new javafx.beans.property.SimpleStringProperty(d.getValue().cls()));
-        javafx.scene.control.TableColumn<LangPack.MissingEntry, String> c2 =
-                new javafx.scene.control.TableColumn<>("原字符串");
-        c2.setCellValueFactory(d -> new javafx.beans.property.SimpleStringProperty(
-                Texts.displayText(d.getValue().orig())));
-        javafx.scene.control.TableColumn<LangPack.MissingEntry, String> c3 =
-                new javafx.scene.control.TableColumn<>("译文");
-        c3.setCellValueFactory(d -> new javafx.beans.property.SimpleStringProperty(
-                Texts.displayText(d.getValue().trans())));
-        //noinspection unchecked
-        table.getColumns().addAll(c1, c2, c3);
-        table.getItems().setAll(missing);
-        vbox.getChildren().add(table);
-        javafx.scene.control.Button toDict = new javafx.scene.control.Button(
-                "全部存入词典（供新版本复用）");
-        toDict.setOnAction(ev -> {
-            for (LangPack.MissingEntry m : missing) {
-                if (!m.trans().isEmpty()) {
-                    project.dictionary().add(m.orig(), m.trans());
-                }
-            }
-            try {
-                project.dictionary().save();
-            } catch (Exception ignored) {
-                // 写盘失败不阻断
-            }
-            Dialogs.info("完成", "已将 " + missing.size() + " 条失效条目存入词典。");
-        });
-        HBox bottom = new HBox(toDict);
-        vbox.getChildren().add(bottom);
-        win.setScene(new Scene(vbox));
-        theme.attach(win.getScene());
-        win.show();
+        new MissingEntriesWindow(this).show();
     }
 
     private SearchWindow searchWindow;
@@ -1512,7 +1166,7 @@ public class MainApp extends javafx.application.Application {
     }
 
     public void jumpTo(String cls, String orig) {
-        TreeItem<String> node = classNodes.get(cls);
+        TreeItem<String> node = treeModel.nodeOf(cls);
         if (node != null) {
             classTree.getSelectionModel().select(node);
             int row = classTree.getRow(node);
@@ -1551,7 +1205,7 @@ public class MainApp extends javafx.application.Application {
     }
 
     /** 取当前反编译器（内置 Vineflower 自动兜底）。 */
-    private Object[] currentTool() {
+    private DecompilerManager.Selection currentTool() {
         // 三种反编译器均内置：缺失时自动释放，保证有可用引擎
         DecompilerManager.ensureBundledAll();
         return DecompilerManager.currentDecompiler(settings);
@@ -1590,7 +1244,7 @@ public class MainApp extends javafx.application.Application {
             then.accept("single", cached);
             return;
         }
-        Object[] dec = currentTool();
+        DecompilerManager.Selection dec = currentTool();
         if (dec == null) {
             maybePromptSetup();
             then.accept("bytecode", null);
@@ -1600,9 +1254,7 @@ public class MainApp extends javafx.application.Application {
             then.accept("loading", null);
             return;
         }
-        com.jartrans.core.java.DecompilerType type =
-                (com.jartrans.core.java.DecompilerType) dec[0];
-        String decPath = (String) dec[1];
+        DecompilerType type = dec.type();
         String inner = internalName(cls);
         // 目标类 + 内部类（如 Foo 与 Foo$Inner），整组一次喂给反编译器
         List<String> names = new ArrayList<>();
@@ -1613,7 +1265,6 @@ public class MainApp extends javafx.application.Application {
             }
         }
         decompiling = true;
-        decompileCancelled = false;
         setStatus("正在反编译 " + inner + " …");
         Task<List<java.nio.file.Path>> task = new Task<>() {
             @Override
@@ -1625,17 +1276,13 @@ public class MainApp extends javafx.application.Application {
                 }
                 setJavaInfo(java.path(), java.version());
                 return DecompilerManager.decompileClasses(project.jarPath().toString(), sha,
-                        names, java.path(), decPath, type,
-                        line -> {
-                            if (line != null && !line.isBlank()) {
-                                System.out.println("[decomp] " + line);
-                            }
-                        },
-                        () -> decompileCancelled);
+                        names, type);
             }
         };
+        activeDecompileTask = task;
         task.setOnSucceeded(ev -> {
             decompiling = false;
+            activeDecompileTask = null;
             List<java.nio.file.Path> files = task.getValue();
             if (files.isEmpty()) {
                 setStatus("反编译未生成源码（可能类被混淆/无法解析），已回退字节码视图");
@@ -1648,6 +1295,7 @@ public class MainApp extends javafx.application.Application {
         });
         task.setOnFailed(ev -> {
             decompiling = false;
+            activeDecompileTask = null;
             String msg = task.getException() == null ? "" : task.getException().getMessage();
             setStatus("反编译失败：" + msg);
             if (!String.valueOf(msg).contains("已取消")) {
@@ -1655,13 +1303,30 @@ public class MainApp extends javafx.application.Application {
             }
             then.accept("bytecode", null);
         });
+        task.setOnCancelled(ev -> {
+            // 用户点击「取消反编译」：丢弃未回填的结果并回退字节码视图
+            decompiling = false;
+            activeDecompileTask = null;
+            setStatus("已取消反编译");
+            then.accept("bytecode", null);
+        });
         new Thread(task, "decompile-class").start();
         then.accept("loading", null);
     }
 
+    /**
+     * 「取消反编译」：中断进行中的单类反编译，丢弃其尚未回填的结果并回退字节码视图。
+     * 进程内反编译器为黑盒引擎，中断后旧线程可能仍在后台自然收尾，但结果不再上屏、
+     * 状态与缓存均不写入（onCancelled 同步给出「已取消反编译」反馈）。
+     */
     public void cancelDecompile() {
-        decompileCancelled = true;
-        DecompilerManager.cancelActive();
+        Task<List<Path>> task = activeDecompileTask;
+        if (task == null) {
+            setStatus("当前没有正在进行的反编译");
+            return;
+        }
+        task.cancel(true);
+        // cancel(true) 会同步触发 onCancelled：置 decompiling=false、回退字节码、更新状态栏
     }
 
     public Map<String, Path> decompiledIndex() {
@@ -1721,29 +1386,15 @@ public class MainApp extends javafx.application.Application {
 
     // ---------- 撤销 / 重做（翻译 · 不翻译 · 类状态） ----------
 
-    /** 一条可撤销操作。kind: trans(译文)/skip(不翻译)/mark(类状态)。 */
-    private record Hist(String kind, String cls, String orig, String before, String after) {
-    }
-
-    private static final String AUTO = "*auto";
-    private static final int HIST_LIMIT = 200;
-    private final java.util.ArrayDeque<Hist> undoStack = new java.util.ArrayDeque<>();
-    private final java.util.ArrayDeque<Hist> redoStack = new java.util.ArrayDeque<>();
-
-    private void pushHist(Hist h) {
-        undoStack.addFirst(h);
-        if (undoStack.size() > HIST_LIMIT) {
-            undoStack.removeLast();
-        }
-        redoStack.clear();
-    }
+    /** 撤销/重做历史栈（回放动作在本类 applyHist 实现）。 */
+    private final EditHistory history = new EditHistory();
 
     /** 记录一次译文变更（EditorPane 保存/清空后按生效值调用）。 */
     void recordTranslation(String cls, String orig, String before, String after) {
         if (before.equals(after)) {
             return;
         }
-        pushHist(new Hist("trans", cls, orig, before, after));
+        history.push(new EditHistory.Hist("trans", cls, orig, before, after));
     }
 
     /** 记录「不翻译」切换。 */
@@ -1751,17 +1402,18 @@ public class MainApp extends javafx.application.Application {
         if (before == after) {
             return;
         }
-        pushHist(new Hist("skip", null, orig, before ? "1" : "0", after ? "1" : "0"));
+        history.push(new EditHistory.Hist("skip", null, orig,
+                before ? "1" : "0", after ? "1" : "0"));
     }
 
     /** 记录类状态手动标记（null 视为自动）。 */
     void recordClassMark(String cls, String beforeManual, String afterManual) {
-        String b = beforeManual == null ? AUTO : beforeManual;
-        String a = afterManual == null ? AUTO : afterManual;
+        String b = beforeManual == null ? EditHistory.AUTO : beforeManual;
+        String a = afterManual == null ? EditHistory.AUTO : afterManual;
         if (b.equals(a)) {
             return;
         }
-        pushHist(new Hist("mark", cls, null, b, a));
+        history.push(new EditHistory.Hist("mark", cls, null, b, a));
     }
 
     private String histLabel(String kind) {
@@ -1774,33 +1426,32 @@ public class MainApp extends javafx.application.Application {
     }
 
     private void undoAction() {
-        if (undoStack.isEmpty()) {
+        if (!history.canUndo()) {
             setStatus("没有可撤销的操作");
             return;
         }
-        Hist h = undoStack.removeFirst();
+        EditHistory.Hist h = history.takeUndo();
         applyHist(h, h.before());
-        redoStack.addFirst(h);
         setStatus("已撤销：" + histLabel(h.kind()));
     }
 
     private void redoAction() {
-        if (redoStack.isEmpty()) {
+        if (!history.canRedo()) {
             setStatus("没有可重做的操作");
             return;
         }
-        Hist h = redoStack.removeFirst();
+        EditHistory.Hist h = history.takeRedo();
         applyHist(h, h.after());
-        undoStack.addFirst(h);
         setStatus("已重做：" + histLabel(h.kind()));
     }
 
-    private void applyHist(Hist h, String target) {
+    private void applyHist(EditHistory.Hist h, String target) {
         try {
             switch (h.kind()) {
                 case "trans" -> project.setTranslation(h.cls(), h.orig(), target);
                 case "skip" -> project.setTextSkipped(h.orig(), "1".equals(target));
-                case "mark" -> project.setClassStatus(h.cls(), AUTO.equals(target) ? null : target);
+                case "mark" -> project.setClassStatus(h.cls(),
+                        EditHistory.AUTO.equals(target) ? null : target);
                 default -> {
                     return;
                 }

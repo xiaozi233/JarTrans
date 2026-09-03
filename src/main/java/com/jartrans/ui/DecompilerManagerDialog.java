@@ -6,6 +6,9 @@ import com.jartrans.core.java.DecompilerDownloader;
 import com.jartrans.core.java.DecompilerManager;
 import com.jartrans.core.java.DecompilerType;
 import com.jartrans.core.java.JavaEnv;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -22,12 +25,9 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
-
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.List;
 
 /**
  * 反编译管理器（对应并扩展 setup_dialog.py）。
@@ -119,9 +119,6 @@ public class DecompilerManagerDialog extends Stage {
         removeBtn.setOnAction(e -> removeSelected());
         autoDetectBtn.setOnAction(e -> refreshJava(true));
         pickJavaBtn.setOnAction(e -> pickJava());
-        tree.setOnMouseClicked(e -> {
-            // 展开交互交给默认行为
-        });
 
         setScene(new Scene(root));
         app.theme().attach(getScene());
@@ -372,15 +369,7 @@ public class DecompilerManagerDialog extends Stage {
         };
         task.setOnSucceeded(e -> {
             int code = task.getValue()[0];
-            boolean proceed = true;
-            if (code > 0) {
-                // 进程能启动就说明 jar 可执行（如 Vineflower 对 --version 回答
-                // "error: no sources given"，属正常）
-                proceed = true;
-            } else if (code == -2) {
-                proceed = false;
-            }
-            if (!proceed) {
+            if (code == -2) {
                 setBusy("校验失败", 0);
                 setStatus("可执行性验证出错（java -jar 超时），请检查下载内容。");
                 try {
@@ -390,6 +379,9 @@ public class DecompilerManagerDialog extends Stage {
                 }
                 return;
             }
+            // 进程能启动就说明 jar 可执行（如 Vineflower 对 --version 回答
+            // "error: no sources given"，属正常）；code == -1 表示未检测到 java，
+            // 文件已通过 zip 魔数校验，同样允许登记。
             try {
                 DecompilerDownloader.promote(part, finalPath);
             } catch (Exception exc) {
@@ -572,11 +564,11 @@ public class DecompilerManagerDialog extends Stage {
     }
 
     private void pickJava() {
-        javafx.stage.FileChooser chooser = new javafx.stage.FileChooser();
+        FileChooser chooser = new FileChooser();
         chooser.setTitle("选择 java 可执行文件");
         chooser.getExtensionFilters().addAll(
-                new javafx.stage.FileChooser.ExtensionFilter("java.exe", "java.exe"),
-                new javafx.stage.FileChooser.ExtensionFilter("所有文件", "*.*"));
+                new FileChooser.ExtensionFilter("java.exe", "java.exe"),
+                new FileChooser.ExtensionFilter("所有文件", "*.*"));
         java.io.File file = chooser.showOpenDialog(this);
         if (file == null) {
             return;
@@ -600,13 +592,8 @@ public class DecompilerManagerDialog extends Stage {
 
     private void setBusy(String text, double value) {
         dlLabel.setText(text);
-        if (value < -1) {
-            progress.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
-        } else if (value < 0) {
-            progress.setProgress(ProgressIndicator.INDETERMINATE_PROGRESS);
-        } else {
-            progress.setProgress(value);
-        }
+        progress.setProgress(value < 0
+                ? ProgressIndicator.INDETERMINATE_PROGRESS : value);
     }
 
     private void setStatus(String text) {
