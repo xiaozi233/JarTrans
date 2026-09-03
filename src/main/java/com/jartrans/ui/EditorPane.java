@@ -63,6 +63,8 @@ public class EditorPane extends BorderPane {
     private final ObservableList<Row> rows = FXCollections.observableArrayList();
     private final TableView<Row> table = new TableView<>(rows);
     private final TextArea editor = new TextArea();
+    private final javafx.scene.control.ContextMenu colMenu = new javafx.scene.control.ContextMenu();
+    private final javafx.scene.control.ContextMenu rowMenu = new javafx.scene.control.ContextMenu();
     private final Label hint = new Label("");
     private final javafx.scene.shape.Circle stateDot = new javafx.scene.shape.Circle(4);
     private final ComboBox<String> classStateBox = new ComboBox<>();
@@ -142,16 +144,30 @@ public class EditorPane extends BorderPane {
             }
         });
         table.getSelectionModel().selectedItemProperty().addListener((o, ov, nv) -> onSelect());
+        // 支持 Shift/Ctrl 多选，配合右键批量操作
+        table.getSelectionModel().setSelectionMode(
+                javafx.scene.control.SelectionMode.MULTIPLE);
+        // 左键点表格任意处都收起上下文菜单（修复右键后再左键不关闭的问题）
+        table.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_PRESSED, e -> {
+            if (e.getButton() == javafx.scene.input.MouseButton.PRIMARY) {
+                if (colMenu.isShowing()) {
+                    colMenu.hide();
+                }
+                if (rowMenu.isShowing()) {
+                    rowMenu.hide();
+                }
+            }
+        });
         table.setOnMouseClicked(e -> {
             if (e.getClickCount() == 2) {
                 viewInSource();
             }
         });
 
-        // ---- 右键菜单：表头=显示/隐藏列；数据行=不翻译/翻译 ----
-        javafx.scene.control.ContextMenu colMenu = new javafx.scene.control.ContextMenu();
-        javafx.scene.control.ContextMenu rowMenu = new javafx.scene.control.ContextMenu();
+        // ---- 右键菜单：表头=显示/隐藏列；数据行=不翻译/恢复/清空等（支持多选批量） ----
         table.setOnContextMenuRequested(e -> {
+            rowMenu.hide();
+            colMenu.hide();
             javafx.scene.Node t = e.getPickResult().getIntersectedNode();
             if (t == null) {
                 t = e.getTarget() instanceof javafx.scene.Node n ? n : null;
@@ -177,7 +193,8 @@ public class EditorPane extends BorderPane {
                 }
                 colMenu.show(table, e.getScreenX(), e.getScreenY());
             } else {
-                showRowMenu(rowMenu, e.getScreenX(), e.getScreenY());
+                selectRowUnder(e);
+                showRowMenu(e.getScreenX(), e.getScreenY());
             }
         });
 
@@ -473,32 +490,88 @@ public class EditorPane extends BorderPane {
         return false;
     }
 
-    private void showRowMenu(javafx.scene.control.ContextMenu menu, double x, double y) {
-        Row row = table.getSelectionModel().getSelectedItem();
-        if (row == null || row.internal || currentClass == null || app == null) {
-            return;
+    /** 右键先选中鼠标所在行（不破坏已有 Shift/Ctrl 多选）。 */
+    private void selectRowUnder(javafx.scene.input.ContextMenuEvent e) {
+        javafx.scene.Node n = e.getPickResult().getIntersectedNode();
+        while (n != null && !(n instanceof javafx.scene.control.TableRow)) {
+            n = n.getParent();
         }
-        boolean skipped = app.project().isSkipped(row.orig);
-        menu.getItems().clear();
-        javafx.scene.control.MenuItem toggle = new javafx.scene.control.MenuItem(
-                skipped ? "恢复翻译此文本" : "此文本不翻译（保留原文）");
-        toggle.setOnAction(e -> toggleSkip(row.orig));
-        javafx.scene.control.MenuItem copy = new javafx.scene.control.MenuItem("复制原字符串");
-        copy.setOnAction(e -> javafx.scene.input.Clipboard.getSystemClipboard().setContent(
-                Map.of(javafx.scene.input.DataFormat.PLAIN_TEXT, row.orig)));
-        menu.getItems().addAll(toggle, copy);
-        menu.show(table, x, y);
+        if (n instanceof javafx.scene.control.TableRow<?> row && row.getItem() instanceof Row item
+                && !table.getSelectionModel().getSelectedItems().contains(item)) {
+            table.getSelectionModel().select(item);
+        }
     }
 
-    private void toggleSkip(String orig) {
-        boolean before = app.project().isSkipped(orig);
-        boolean after = !before;
-        app.recordSkip(orig, before, after);
-        try {
-            app.project().setTextSkipped(orig, after);
-        } catch (Exception ignored) {
-            // 写盘失败不阻断
+    /** 右键菜单：支持多选批量（保留原文/恢复/清空译文/复制）。 */
+    private void showRowMenu(double x, double y) {
+        java.util.List<Row> rowsSel = new java.util.ArrayList<>(
+                table.getSelectionModel().getSelectedItems());
+        rowsSel.removeIf(r -> r.internal);
+        if (rowsSel.isEmpty() || currentClass == null || app == null) {
+            return;
         }
+        String label = rowsSel.size() > 1 ? "（" + rowsSel.size() + " 行）" : "";
+        long skippedCnt = rowsSel.stream()
+                .filter(r -> app.project().isSkipped(r.orig)).count();
+        rowMenu.getItems().clear();
+        javafx.scene.control.MenuItem keep = new javafx.scene.control.MenuItem(
+                skippedCnt == rowsSel.size()
+                        ? "恢复翻译" + label
+                        : "保留原文（不翻译）" + label);
+        keep.setOnAction(e -> bulkSkip(rowsSel,
+                !(skippedCnt == rowsSel.size())));
+        javafx.scene.control.MenuItem clear = new javafx.scene.control.MenuItem(
+                "清空译文" + label);
+        clear.setOnAction(e -> bulkClear(rowsSel));
+        javafx.scene.control.MenuItem copy = new javafx.scene.control.MenuItem(
+                rowsSel.size() == 1 ? "复制原字符串" : "复制首个原字符串");
+        copy.setOnAction(e -> javafx.scene.input.Clipboard.getSystemClipboard().setContent(
+                Map.of(javafx.scene.input.DataFormat.PLAIN_TEXT, rowsSel.get(0).orig)));
+        rowMenu.getItems().addAll(keep, clear, copy);
+        rowMenu.show(table, x, y);
+    }
+
+    /** 批量设置「不翻译」。 */
+    private void bulkSkip(java.util.List<Row> rowsSel, boolean skip) {
+        int n = 0;
+        for (Row r : rowsSel) {
+            boolean cur = app.project().isSkipped(r.orig);
+            if (cur == skip) {
+                continue;
+            }
+            app.recordSkip(r.orig, cur, skip);
+            try {
+                app.project().setTextSkipped(r.orig, skip);
+            } catch (Exception ignored) {
+                // 写盘失败不阻断
+            }
+            n++;
+        }
+        refreshAfterBulk(rowsSel.get(0).orig);
+        app.setStatus(n == 0 ? "无需变更" : "已将 " + n + " 条文本设为"
+                + (skip ? "「不翻译」" : "可翻译"));
+    }
+
+    /** 批量清空译文。 */
+    private void bulkClear(java.util.List<Row> rowsSel) {
+        int n = 0;
+        for (Row r : rowsSel) {
+            if (app.project().isSkipped(r.orig)) {
+                continue; // 保留原文的不可清（本就无生效译文）
+            }
+            String before = app.project().effective(currentClass).getOrDefault(r.orig, "");
+            if (before.isEmpty()) {
+                continue;
+            }
+            app.project().setTranslation(currentClass, r.orig, "");
+            app.recordTranslation(currentClass, r.orig, before, "");
+            n++;
+        }
+        refreshAfterBulk(rowsSel.get(0).orig);
+        app.setStatus("已清空 " + n + " 条译文");
+    }
+
+    private void refreshAfterBulk(String orig) {
         refreshRows();
         app.refreshClassNodes();
         app.updateStats();

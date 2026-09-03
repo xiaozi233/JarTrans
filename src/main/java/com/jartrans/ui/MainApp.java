@@ -123,6 +123,7 @@ public class MainApp extends javafx.application.Application {
     // 树内部状态
     private final Map<String, TreeItem<String>> classNodes = new HashMap<>();
     private final Map<TreeItem<String>, String[]> nodeInfo = new HashMap<>(); // type / path / cls
+    private ContextMenu lastTreeMenu; // 最近一次类树右键菜单（左键点其它处时收起）
 
     // 图例控件（圆点走 CSS 状态类，无代码上色）
 
@@ -218,6 +219,13 @@ public class MainApp extends javafx.application.Application {
             }
         });
         classTree.getSelectionModel().selectedItemProperty().addListener((o, ov, nv) -> onTreeSelect(nv));
+        // 左键点树任意处即收起右键菜单（修复右键后再左键点同类不关闭）
+        classTree.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_PRESSED, e -> {
+            if (e.getButton() == javafx.scene.input.MouseButton.PRIMARY
+                    && lastTreeMenu != null && lastTreeMenu.isShowing()) {
+                lastTreeMenu.hide();
+            }
+        });
         classTree.setOnContextMenuRequested(e -> {
             TreeItem<String> item = classTree.getSelectionModel().getSelectedItem();
             if (item == null) {
@@ -659,6 +667,9 @@ public class MainApp extends javafx.application.Application {
         if (targets.isEmpty()) {
             return;
         }
+        if (lastTreeMenu != null && lastTreeMenu.isShowing()) {
+            lastTreeMenu.hide();
+        }
         ContextMenu menu = new ContextMenu();
         MenuItem markItem = new MenuItem("标记状态（" + targets.size() + " 个类）");
         MenuItem autoItem = new MenuItem("自动（按翻译进度）");
@@ -683,6 +694,7 @@ public class MainApp extends javafx.application.Application {
                 ignoreItem, new javafx.scene.control.SeparatorMenuItem(),
                 fillItem, copyItem, new javafx.scene.control.SeparatorMenuItem(),
                 expandItem, collapseItem);
+        lastTreeMenu = menu;
         menu.show(classTree, x, y);
     }
 
