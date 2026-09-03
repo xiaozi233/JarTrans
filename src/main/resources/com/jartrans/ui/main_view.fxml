@@ -106,9 +106,6 @@
                            onAction="#onOpenSearch"/>
                 <Button text="全局搜索" onAction="#onOpenSearch"/>
                 <Separator orientation="VERTICAL"/>
-                <Label text="主题："/>
-                <ComboBox fx:id="themeBox" prefWidth="100"/>
-                <Separator orientation="VERTICAL"/>
                 <Button text="反编译管理器…" onAction="#onOpenDecompilerManager"/>
             </ToolBar>
         </VBox>

@@ -106,7 +106,6 @@ public final class Theme {
 
     public Theme(String mode) {
         this.mode = MODES.contains(mode) ? mode : MODE_SYSTEM;
-        this.systemDark = systemPrefersDark();
         apply();
         startWatch();
     }
@@ -140,12 +139,13 @@ public final class Theme {
     public void setMode(String newMode) {
         String m = MODES.contains(newMode) ? newMode : MODE_SYSTEM;
         if (m.equals(mode)) {
+            // system 模式即便没切换，也按当前系统偏好重新探测一次
+            if (m.equals(MODE_SYSTEM)) {
+                apply();
+            }
             return;
         }
         mode = m;
-        if (m.equals(MODE_SYSTEM)) {
-            systemDark = systemPrefersDark();
-        }
         apply();
     }
 
@@ -169,6 +169,10 @@ public final class Theme {
     // ---------- 应用 ----------
 
     private void apply() {
+        // 跟随系统模式：每次都重新探测，不缓存，避免启动时探测失败导致整局卡在错的主题上
+        if (mode.equals(MODE_SYSTEM)) {
+            systemDark = systemPrefersDark();
+        }
         palette = (mode.equals(MODE_DARK) || (mode.equals(MODE_SYSTEM) && systemDark))
                 ? DARK : LIGHT;
         String url = stylesheetUrl();
@@ -196,12 +200,29 @@ public final class Theme {
                             .redirectOutput(out.toFile())
                             .redirectErrorStream(true)
                             .start();
-                    proc.waitFor(3, TimeUnit.SECONDS);
-                    String text = Files.readString(out, StandardCharsets.UTF_16LE);
-                    if (!text.contains("0x0")) {
+                    if (!proc.waitFor(5, TimeUnit.SECONDS)) {
+                        proc.destroyForcibly();
+                        return false;
+                    }
+                    String text;
+                    try {
+                        text = Files.readString(out, StandardCharsets.UTF_16LE);
+                        if (!text.contains("0x")) {
+                            text = Files.readString(out, StandardCharsets.UTF_8);
+                        }
+                    } catch (java.nio.charset.MalformedInputException ex) {
                         text = Files.readString(out, StandardCharsets.UTF_8);
                     }
-                    return text.trim().endsWith("0x0");
+                    text = text.trim();
+                    if (text.contains("AppsUseLightTheme")) {
+                        // 取最后一行 REG_DWORD 值
+                        for (String line : text.split("\\R")) {
+                            if (line.contains("0x")) {
+                                return line.trim().endsWith("0x0") || line.trim().endsWith("0x00");
+                            }
+                        }
+                    }
+                    return false;
                 } finally {
                     Files.deleteIfExists(out);
                 }
@@ -211,7 +232,7 @@ public final class Theme {
                         "AppleInterfaceStyle")
                         .redirectErrorStream(true)
                         .start();
-                proc.waitFor(3, TimeUnit.SECONDS);
+                proc.waitFor(5, TimeUnit.SECONDS);
                 String text = new String(proc.getInputStream().readAllBytes(),
                         StandardCharsets.UTF_8);
                 return text.contains("Dark");
@@ -225,7 +246,7 @@ public final class Theme {
                         "org.gnome.desktop.interface", "color-scheme")
                         .redirectErrorStream(true)
                         .start();
-                proc.waitFor(3, TimeUnit.SECONDS);
+                proc.waitFor(5, TimeUnit.SECONDS);
                 String text = new String(proc.getInputStream().readAllBytes(),
                         StandardCharsets.UTF_8).toLowerCase();
                 return text.contains("dark");

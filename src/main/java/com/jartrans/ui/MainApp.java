@@ -96,8 +96,6 @@ public class MainApp extends javafx.application.Application {
     @FXML
     private TextField searchField;
     @FXML
-    private ComboBox<String> themeBox;
-    @FXML
     private TextField filterField;
     @FXML
     private ComboBox<String> statusBox;
@@ -161,14 +159,6 @@ public class MainApp extends javafx.application.Application {
         theme.onChange(this::onThemeChanged);
         String mode = theme.mode();
         setThemeSelections(mode);
-        themeBox.getItems().setAll(THEME_ITEMS.values());
-        themeBox.setValue(THEME_ITEMS.get(mode));
-        themeBox.valueProperty().addListener((o, ov, nv) -> {
-            String m = THEME_ITEMS.entrySet().stream()
-                    .filter(e -> e.getValue().equals(nv)).map(Map.Entry::getKey)
-                    .findFirst().orElse("system");
-            setThemeMode(m);
-        });
 
         showInternalItem.setSelected(false);
         hideEmptyItem.setSelected(settings.getBool("hide_empty"));
@@ -426,12 +416,15 @@ public class MainApp extends javafx.application.Application {
     private void setThemeMode(String mode) {
         theme.setMode(mode);
         setThemeSelections(theme.mode());
-        themeBox.setValue(THEME_ITEMS.get(theme.mode()));
         try {
             settings.set("theme", theme.mode());
         } catch (Exception ignored) {
             // 设置写盘失败不阻断
         }
+        String suffix = theme.mode().equals(Theme.MODE_SYSTEM)
+                ? "（" + (theme.dark() ? "系统为深色" : "系统为浅色") + "）"
+                : "";
+        setStatus("主题已切换：" + THEME_ITEMS.get(theme.mode()) + suffix);
     }
 
     // ---------- 类树 ----------
