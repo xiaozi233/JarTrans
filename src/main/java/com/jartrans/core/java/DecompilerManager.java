@@ -266,19 +266,31 @@ public final class DecompilerManager {
             throw new DecompileException("jar 中未找到指定类：" + classNames);
         }
         try {
-            if (type == DecompilerType.VINEFLOWER) {
-                // Vineflower 已随应用以库形式打入 classpath：进程内反编译，无子进程
-                runVineflowerInProcess(out, input);
-                return producedFor(out, classNames);
-            }
-            return runWithInput(out, javaPath, decompilerPath, type,
-                    input, classNames, log, cancelCheck);
+            // 三种引擎均已随应用打进 classpath：全部进程内反编译，无子进程
+            runEngineInProcess(type, out, input);
+            return producedFor(out, classNames);
         } finally {
             try {
                 Files.deleteIfExists(input);
             } catch (IOException ignored) {
                 // 清理失败忽略
             }
+        }
+    }
+
+    /** 进程内执行指定引擎（沿用 CLI 等价参数，输出写入 out 目录）。 */
+    private static void runEngineInProcess(DecompilerType type, Path out, Path inJar)
+            throws DecompileException {
+        try {
+            switch (type) {
+                case VINEFLOWER -> runVineflowerInProcess(out, inJar);
+                case CFR -> org.benf.cfr.reader.Main.main(new String[]{
+                        inJar.toString(), "--outputdir", out.toString()});
+                case PROCYON -> com.strobel.decompiler.DecompilerDriver.main(new String[]{
+                        inJar.toString(), "-o", out.toString()});
+            }
+        } catch (Throwable exc) {
+            throw new DecompileException("进程内反编译失败（" + type.displayName() + "）：" + exc);
         }
     }
 
@@ -332,60 +344,6 @@ public final class DecompilerManager {
                 Files.deleteIfExists(archive);
             }
         }
-    }
-
-    private static List<Path> runWithInput(Path out, String javaPath, String decompilerPath,
-                                           DecompilerType type, Path inJar,
-                                           java.util.Collection<String> classNames,
-                                           LogSink log, CancelCheck cancelCheck)
-            throws DecompileException {
-        List<String> cmd = type.buildCommand(javaPath, decompilerPath,
-                inJar.toString(), out.toString());
-        int code;
-        try {
-            ProcessBuilder pb = new ProcessBuilder(cmd);
-            pb.redirectErrorStream(true);
-            Process proc = pb.start();
-            ACTIVE_PROCESS.set(proc);
-            try (InputStream in = proc.getInputStream()) {
-                byte[] buf = new byte[4096];
-                var baos = new java.io.ByteArrayOutputStream();
-                int n;
-                while ((n = in.read(buf)) > 0) {
-                    if (cancelCheck != null && cancelCheck.isCancelled()) {
-                        proc.destroyForcibly();
-                        throw new DecompileException("已取消");
-                    }
-                    baos.write(buf, 0, n);
-                    byte[] all = baos.toByteArray();
-                    int lineStart = 0;
-                    for (int i = 0; i < all.length; i++) {
-                        if (all[i] == '\n') {
-                            emitLine(log, all, lineStart, i);
-                            lineStart = i + 1;
-                        }
-                    }
-                    baos.reset();
-                    baos.write(all, lineStart, all.length - lineStart);
-                }
-                if (baos.size() > 0) {
-                    emitLine(log, baos.toByteArray(), 0, baos.size());
-                }
-            }
-            code = proc.waitFor();
-        } catch (IOException exc) {
-            throw new DecompileException("无法启动反编译器：" + exc.getMessage());
-        } catch (InterruptedException exc) {
-            Thread.currentThread().interrupt();
-            throw new DecompileException("已取消");
-        } finally {
-            ACTIVE_PROCESS.set(null);
-        }
-
-        if (code != 0) {
-            throw new DecompileException("反编译器退出码 " + code + "，详见输出日志");
-        }
-        return producedFor(out, classNames);
     }
 
     /** 只返回与本次请求类相关的产物（其它类累积产物不在此列）。 */

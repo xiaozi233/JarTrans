@@ -1196,7 +1196,7 @@ public class MainApp extends javafx.application.Application {
             return;
         }
         Object[] dec = currentTool();
-        if (dec == null || getJavaQuick() == null) {
+        if (dec == null) {
             maybePromptSetup();
             then.accept("bytecode", null);
             return;
