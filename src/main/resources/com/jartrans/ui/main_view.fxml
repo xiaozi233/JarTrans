@@ -40,6 +40,8 @@
                     <MenuItem text="打开 Jar..." onAction="#onOpenJar"/>
                     <MenuItem text="导出汉化 Jar..." onAction="#onExportJar"/>
                     <SeparatorMenuItem/>
+                    <MenuItem text="首选项…" onAction="#onOpenPreferences"/>
+                    <SeparatorMenuItem/>
                     <MenuItem text="退出" onAction="#onExit"/>
                 </Menu>
                 <Menu text="语言包">
@@ -85,9 +87,13 @@
                 </Menu>
                 <Menu text="源码">
                     <MenuItem text="查看当前类源码" onAction="#onViewCurrentSource"/>
-                    <MenuItem text="反编译管理器…" onAction="#onOpenDecompilerManager"/>
                     <SeparatorMenuItem/>
                     <MenuItem text="清理反编译缓存" onAction="#onClearDecompileCache"/>
+                </Menu>
+                <Menu text="搜索">
+                    <MenuItem text="全包搜索 (Ctrl+Alt+F)" onAction="#onGlobalSearch"/>
+                    <MenuItem text="当前类内搜索 (Ctrl+F)" onAction="#onFindInClass"/>
+                    <MenuItem text="当前类内替换译文 (Ctrl+R)" onAction="#onReplaceInClass"/>
                 </Menu>
                 <Menu text="帮助">
                     <MenuItem text="关于" onAction="#onAbout"/>
@@ -108,7 +114,7 @@
                            onAction="#onOpenSearch"/>
                 <Button text="全局搜索" onAction="#onOpenSearch"/>
                 <Separator orientation="VERTICAL"/>
-                <Button text="反编译管理器…" onAction="#onOpenDecompilerManager"/>
+                <Button text="首选项…" onAction="#onOpenPreferences"/>
             </ToolBar>
         </VBox>
     </top>

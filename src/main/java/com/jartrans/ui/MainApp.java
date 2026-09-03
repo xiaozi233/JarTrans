@@ -21,12 +21,13 @@ import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.ProgressBar;
-import javafx.scene.control.RadioButton;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.layout.HBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
@@ -59,6 +60,16 @@ public class MainApp extends javafx.application.Application {
     static final Map<String, String> THEME_ITEMS = new LinkedHashMap<>(Map.of(
             "system", "跟随系统", "light", "浅色", "dark", "深色"));
 
+    // 可自定义快捷键：id / 显示名 / 默认组合键。存储于 settings 的 "key_<id>"。
+    static final List<String[]> SHORTCUT_DEFS = List.of(
+            new String[]{"undo", "撤销", "Ctrl+Z"},
+            new String[]{"redo", "重做", "Ctrl+Y"},
+            new String[]{"save", "保存译文", "Ctrl+S"},
+            new String[]{"find", "类内搜索（当前类）", "Ctrl+F"},
+            new String[]{"replace", "替换译文（当前类）", "Ctrl+R"},
+            new String[]{"gsearch", "全包搜索", "Ctrl+Alt+F"},
+            new String[]{"prefs", "打开首选项", "Ctrl+,"});
+
     // 类树节点信息
     private static final String TYPE_ROOT = "root";
     private static final String TYPE_DIR = "dir";
@@ -66,6 +77,12 @@ public class MainApp extends javafx.application.Application {
     private Theme theme;
     private Project project;
     private Stage stage;
+    private Scene mainScene;
+    /** 输入防抖：过滤框每字符即时过滤、工具栏搜索框即时反馈。 */
+    private final javafx.animation.PauseTransition filterDebounce =
+            new javafx.animation.PauseTransition(javafx.util.Duration.millis(120));
+    private final javafx.animation.PauseTransition searchDebounce =
+            new javafx.animation.PauseTransition(javafx.util.Duration.millis(180));
 
     private String javaPathCache;
     private String javaVersionCache;
@@ -142,18 +159,10 @@ public class MainApp extends javafx.application.Application {
         stage.setMinWidth(980);
         stage.setMinHeight(620);
         Scene scene = new Scene(root, 1320, 840);
+        this.mainScene = scene;
         theme.attach(scene);
-        // Ctrl+Z 撤销 / Ctrl+Y、Ctrl+Shift+Z 重做（翻译、不翻译、类状态）
-        scene.getAccelerators().put(
-                new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.Z,
-                        javafx.scene.input.KeyCombination.CONTROL_DOWN), this::undoAction);
-        scene.getAccelerators().put(
-                new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.Y,
-                        javafx.scene.input.KeyCombination.CONTROL_DOWN), this::redoAction);
-        scene.getAccelerators().put(
-                new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.Z,
-                        javafx.scene.input.KeyCombination.CONTROL_DOWN,
-                        javafx.scene.input.KeyCombination.SHIFT_DOWN), this::redoAction);
+        // 快捷键集中注册（可自定义，见首选项）：撤销/重做/保存/查找/替换/全局搜索/首选项
+        registerShortcuts(scene);
         stage.setScene(scene);
         stage.show();
         stage.setOnCloseRequest(e -> onClose());
@@ -188,6 +197,18 @@ public class MainApp extends javafx.application.Application {
                 .filter(f -> f[0].equals(savedFilter)).map(f -> f[1]).findFirst()
                 .orElse("全部"));
         statusBox.valueProperty().addListener((o, ov, nv) -> onStatusFilterChanged());
+
+        // 过滤框即时过滤：每输入一个字符立即重建类列表，无需回车
+        filterDebounce.setOnFinished(x -> {
+            if (project.hasJar()) {
+                rebuildTree();
+                updateStats();
+            }
+        });
+        filterField.textProperty().addListener((o, ov, nv) -> filterDebounce.playFromStart());
+        // 工具栏「全局搜索」框：输入即时在状态栏反馈匹配数，回车/按钮打开明细窗口
+        searchDebounce.setOnFinished(x -> quickSearchStatus());
+        searchField.textProperty().addListener((o, ov, nv) -> searchDebounce.playFromStart());
 
         // 类树
         classTree.setShowRoot(false);
@@ -435,11 +456,6 @@ public class MainApp extends javafx.application.Application {
     }
 
     @FXML
-    public void onOpenDecompilerManager(ActionEvent e) {
-        new DecompilerManagerDialog(this).show();
-    }
-
-    @FXML
     public void onClearDecompileCache(ActionEvent e) {
         DecompilerManager.clearAllCache();
         indexCache = null;
@@ -449,6 +465,26 @@ public class MainApp extends javafx.application.Application {
 
     @FXML
     public void onOpenSearch(ActionEvent e) {
+        openSearch();
+    }
+
+    @FXML
+    public void onOpenPreferences(ActionEvent e) {
+        openPreferences();
+    }
+
+    @FXML
+    public void onFindInClass(ActionEvent e) {
+        openFindInClass();
+    }
+
+    @FXML
+    public void onReplaceInClass(ActionEvent e) {
+        openReplaceInClass();
+    }
+
+    @FXML
+    public void onGlobalSearch(ActionEvent e) {
         openSearch();
     }
 
@@ -466,6 +502,355 @@ public class MainApp extends javafx.application.Application {
     @FXML
     public void onExit(ActionEvent e) {
         onClose();
+    }
+
+    // ---------- 快捷键（可自定义，存于 settings key_<id>） ----------
+
+    /** 规范化存储文本：修饰符统一大写、按键名统一。 */
+    static String normalizeShortcut(String text) {
+        if (text == null) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (String part : text.split("\\+")) {
+            String p = part.trim();
+            if (p.isEmpty()) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append('+');
+            }
+            String low = p.toLowerCase();
+            if (low.length() == 1 && Character.isLetter(low.charAt(0))) {
+                sb.append(low.toUpperCase()); // 字母键统一大写存储
+            } else {
+                sb.append(switch (low) {
+                    case "ctrl", "control" -> "Ctrl";
+                    case "alt" -> "Alt";
+                    case "shift" -> "Shift";
+                    case "meta", "cmd", "command" -> "Meta";
+                    default -> low.length() == 1 ? low : p.toUpperCase();
+                });
+            }
+        }
+        return sb.toString();
+    }
+
+    static String defaultShortcut(String id) {
+        for (String[] d : SHORTCUT_DEFS) {
+            if (d[0].equals(id)) {
+                return d[2];
+            }
+        }
+        return "";
+    }
+
+    /** 当前生效的快捷键文本（未自定义时为默认值）。 */
+    public String shortcutText(String id) {
+        String stored = settings.getString("key_" + id);
+        return stored.isBlank() ? defaultShortcut(id) : stored;
+    }
+
+    /** 把某个动作绑定到新的组合键；成功返回 true。重复组合返回 false。 */
+    public boolean applyShortcut(String id, String comboText) {
+        String norm = normalizeShortcut(comboText);
+        if (norm.isEmpty() || parseShortcut(norm) == null) {
+            return false;
+        }
+        for (String[] d : SHORTCUT_DEFS) {
+            if (d[0].equals(id)) {
+                continue;
+            }
+            if (shortcutText(d[0]).equalsIgnoreCase(norm)) {
+                return false; // 已被其它动作占用
+            }
+        }
+        try {
+            settings.set("key_" + id, norm);
+        } catch (Exception ignored) {
+            // 写盘失败不阻断
+        }
+        registerShortcuts(mainScene);
+        return true;
+    }
+
+    public void resetShortcut(String id) {
+        try {
+            settings.set("key_" + id, defaultShortcut(id));
+        } catch (Exception ignored) {
+            // 忽略
+        }
+        registerShortcuts(mainScene);
+    }
+
+    public void resetAllShortcuts() {
+        for (String[] d : SHORTCUT_DEFS) {
+            try {
+                settings.set("key_" + d[0], d[2]);
+            } catch (Exception ignored) {
+                // 忽略
+            }
+        }
+        registerShortcuts(mainScene);
+    }
+
+    private static KeyCode parseKeyToken(String token) {
+        if (token == null || token.isEmpty()) {
+            return null;
+        }
+        if (token.length() == 1) {
+            char c = token.charAt(0);
+            if (c >= 'a' && c <= 'z') {
+                return javafx.scene.input.KeyCode.valueOf(token.toUpperCase());
+            }
+            if (c >= 'A' && c <= 'Z') {
+                return javafx.scene.input.KeyCode.valueOf(token);
+            }
+            if (c >= '0' && c <= '9') {
+                return javafx.scene.input.KeyCode.valueOf("DIGIT" + c);
+            }
+            return switch (c) {
+                case ',' -> javafx.scene.input.KeyCode.COMMA;
+                case '.' -> javafx.scene.input.KeyCode.PERIOD;
+                case ';' -> javafx.scene.input.KeyCode.SEMICOLON;
+                case '\'' -> javafx.scene.input.KeyCode.QUOTE;
+                case '`' -> javafx.scene.input.KeyCode.BACK_QUOTE;
+                case '-' -> javafx.scene.input.KeyCode.MINUS;
+                case '=' -> javafx.scene.input.KeyCode.EQUALS;
+                case '/' -> javafx.scene.input.KeyCode.SLASH;
+                case '\\' -> javafx.scene.input.KeyCode.BACK_SLASH;
+                case '[' -> javafx.scene.input.KeyCode.OPEN_BRACKET;
+                case ']' -> javafx.scene.input.KeyCode.CLOSE_BRACKET;
+                case ' ' -> javafx.scene.input.KeyCode.SPACE;
+                default -> null;
+            };
+        }
+        return switch (token) {
+            case "Space" -> javafx.scene.input.KeyCode.SPACE;
+            case "Enter" -> javafx.scene.input.KeyCode.ENTER;
+            case "Tab" -> javafx.scene.input.KeyCode.TAB;
+            case "Escape", "Esc" -> javafx.scene.input.KeyCode.ESCAPE;
+            case "Backspace", "BackSpace" -> javafx.scene.input.KeyCode.BACK_SPACE;
+            case "Delete" -> javafx.scene.input.KeyCode.DELETE;
+            case "Home" -> javafx.scene.input.KeyCode.HOME;
+            case "End" -> javafx.scene.input.KeyCode.END;
+            case "PageUp" -> javafx.scene.input.KeyCode.PAGE_UP;
+            case "PageDown" -> javafx.scene.input.KeyCode.PAGE_DOWN;
+            case "Up", "ArrowUp" -> javafx.scene.input.KeyCode.UP;
+            case "Down", "ArrowDown" -> javafx.scene.input.KeyCode.DOWN;
+            case "Left", "ArrowLeft" -> javafx.scene.input.KeyCode.LEFT;
+            case "Right", "ArrowRight" -> javafx.scene.input.KeyCode.RIGHT;
+            default -> {
+                try {
+                    yield javafx.scene.input.KeyCode.valueOf(token);
+                } catch (IllegalArgumentException e) {
+                    yield null;
+                }
+            }
+        };
+    }
+
+    /** 按键 → 可逆的文本记号（与 parseKeyToken 互为逆）。 */
+    private static String keyToken(KeyCode code) {
+        if (code == null) {
+            return null;
+        }
+        String n = code.name();
+        if (n.length() == 1 && Character.isLetter(n.charAt(0))) {
+            return n; // 字母 A-Z
+        }
+        if (n.startsWith("DIGIT") && n.length() == 6 && Character.isDigit(n.charAt(5))) {
+            return n.substring(5); // 数字 0-9
+        }
+        if (n.length() >= 2 && n.charAt(0) == 'F'
+                && Character.isDigit(n.charAt(1))) {
+            return n; // 功能键 F1-F24
+        }
+        return switch (code) {
+            case COMMA -> ",";
+            case PERIOD -> ".";
+            case SEMICOLON -> ";";
+            case QUOTE -> "'";
+            case BACK_QUOTE -> "`";
+            case MINUS -> "-";
+            case EQUALS -> "=";
+            case SLASH -> "/";
+            case BACK_SLASH -> "\\";
+            case OPEN_BRACKET -> "[";
+            case CLOSE_BRACKET -> "]";
+            case SPACE -> "Space";
+            case ENTER -> "Enter";
+            case TAB -> "Tab";
+            case ESCAPE -> "Esc";
+            case BACK_SPACE -> "Backspace";
+            case DELETE -> "Delete";
+            case HOME -> "Home";
+            case END -> "End";
+            case PAGE_UP -> "PageUp";
+            case PAGE_DOWN -> "PageDown";
+            case UP -> "Up";
+            case DOWN -> "Down";
+            case LEFT -> "Left";
+            case RIGHT -> "Right";
+            default -> null; // 不支持随意重绑的按键
+        };
+    }
+
+    /** 由按键事件构造组合键文本；修饰键单独按下或按键不可重绑时返回 null。 */
+    static String comboText(javafx.scene.input.KeyEvent e) {
+        KeyCode code = e.getCode();
+        if (code == null || code.isModifierKey() || code == KeyCode.UNDEFINED) {
+            return null;
+        }
+        boolean fn = code.name().matches("F\\d+");
+        if (!e.isControlDown() && !e.isAltDown() && !e.isShiftDown()
+                && !e.isMetaDown() && !fn) {
+            return null; // 无修饰键且非 F 键，容易与正常输入冲突，不采用
+        }
+        String token = keyToken(code);
+        if (token == null) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
+        if (e.isControlDown()) {
+            sb.append("Ctrl+");
+        }
+        if (e.isAltDown()) {
+            sb.append("Alt+");
+        }
+        if (e.isShiftDown()) {
+            sb.append("Shift+");
+        }
+        if (e.isMetaDown()) {
+            sb.append("Meta+");
+        }
+        sb.append(token);
+        return sb.toString();
+    }
+
+    /** 把 "Ctrl+Alt+F" 样式的文本解析为组合键；非法返回 null。 */
+    static KeyCodeCombination parseShortcut(String text) {        if (text == null || text.isBlank()) {
+            return null;
+        }
+        boolean ctrl = false, alt = false, shift = false, meta = false;
+        String[] parts = text.split("\\+");
+        KeyCode key = null;
+        for (int i = 0; i < parts.length; i++) {
+            String p = parts[i].trim();
+            if (i == parts.length - 1) {
+                key = parseKeyToken(p);
+                break;
+            }
+            String low = p.toLowerCase();
+            if (low.equals("ctrl") || low.equals("control")) {
+                ctrl = true;
+            } else if (low.equals("alt")) {
+                alt = true;
+            } else if (low.equals("shift")) {
+                shift = true;
+            } else if (low.equals("meta") || low.equals("cmd") || low.equals("command")) {
+                meta = true;
+            } else {
+                return null;
+            }
+        }
+        if (key == null) {
+            return null;
+        }
+        List<javafx.scene.input.KeyCombination.Modifier> mods = new ArrayList<>();
+        if (ctrl) {
+            mods.add(javafx.scene.input.KeyCombination.CONTROL_DOWN);
+        }
+        if (alt) {
+            mods.add(javafx.scene.input.KeyCombination.ALT_DOWN);
+        }
+        if (shift) {
+            mods.add(javafx.scene.input.KeyCombination.SHIFT_DOWN);
+        }
+        if (meta) {
+            mods.add(javafx.scene.input.KeyCombination.META_DOWN);
+        }
+        return new javafx.scene.input.KeyCodeCombination(key,
+                mods.toArray(new javafx.scene.input.KeyCombination.Modifier[0]));
+    }
+
+    /** 清空并重建主场景的全部快捷键（含 Ctrl+Shift+Z 重做别名）。 */
+    void registerShortcuts(Scene scene) {
+        if (scene == null) {
+            return;
+        }
+        scene.getAccelerators().clear();
+        put(scene, "undo", this::undoAction);
+        put(scene, "redo", this::redoAction);
+        scene.getAccelerators().put(
+                new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.Z,
+                        javafx.scene.input.KeyCombination.CONTROL_DOWN,
+                        javafx.scene.input.KeyCombination.SHIFT_DOWN), this::redoAction);
+        put(scene, "save", () -> {
+            if (project.hasJar()) {
+                editor.saveTranslation();
+            }
+        });
+        put(scene, "find", this::openFindInClass);
+        put(scene, "replace", this::openReplaceInClass);
+        put(scene, "gsearch", this::openSearch);
+        put(scene, "prefs", this::openPreferences);
+    }
+
+    private void put(Scene scene, String id, Runnable action) {
+        KeyCodeCombination combo = parseShortcut(shortcutText(id));
+        if (combo != null) {
+            scene.getAccelerators().put(combo, action);
+        }
+    }
+
+    private void ensureEditorClass() {
+        if (!project.hasJar()) {
+            return;
+        }
+        if (editor.currentClass() == null && !project.classOrder().isEmpty()) {
+            editor.showClass(project.classOrder().get(0));
+        }
+    }
+
+    /** Ctrl+F：切到翻译页并呼出「类内查找」。 */
+    void openFindInClass() {
+        if (!project.hasJar()) {
+            setStatus("请先打开一个 jar 文件");
+            return;
+        }
+        tabPane.getSelectionModel().select(editorTab);
+        ensureEditorClass();
+        editor.beginFind();
+    }
+
+    /** Ctrl+R：切到翻译页并呼出「类内替换」。 */
+    void openReplaceInClass() {
+        if (!project.hasJar()) {
+            setStatus("请先打开一个 jar 文件");
+            return;
+        }
+        tabPane.getSelectionModel().select(editorTab);
+        ensureEditorClass();
+        editor.beginReplace();
+    }
+
+    // ---------- 首选项 ----------
+
+    private PreferencesDialog prefDialog;
+
+    public void openPreferences() {
+        if (prefDialog != null && prefDialog.isShowing()) {
+            prefDialog.toFront();
+            return;
+        }
+        prefDialog = new PreferencesDialog(this);
+        prefDialog.show();
+    }
+
+    /** 供测试/复用：最近一次打开的首选项窗口（可能为 null）。 */
+    public PreferencesDialog preferencesDialog() {
+        return prefDialog;
     }
 
     // ---------- 主题 ----------
@@ -1038,11 +1423,45 @@ public class MainApp extends javafx.application.Application {
         win.show();
     }
 
+    private SearchWindow searchWindow;
+
+    /** 工具栏全局搜索框输入后：状态栏即时显示匹配数（防抖触发）。 */
+    private void quickSearchStatus() {
+        if (!project.hasJar()) {
+            setStatus("");
+            return;
+        }
+        String kw = searchField.getText().trim();
+        if (kw.isEmpty()) {
+            setStatus("");
+            return;
+        }
+        try {
+            int n = project.search(kw, "both").size();
+            setStatus(n == 0
+                    ? "全局搜索「" + kw + "」：没有匹配结果"
+                    : "全局搜索「" + kw + "」：共 " + n + " 处匹配（回车或点按钮查看明细）");
+        } catch (Exception exc) {
+            setStatus("搜索失败：" + exc.getMessage());
+        }
+    }
+
     void openSearch() {
+        openGlobalSearch(searchField.getText().trim());
+    }
+
+    /** 打开全局搜索窗口并预填关键词；已打开则复用并更新。 */
+    void openGlobalSearch(String keyword) {
         if (!requireJar()) {
             return;
         }
-        new SearchWindow(this).show();
+        if (searchWindow != null && searchWindow.isShowing()) {
+            searchWindow.setQuery(keyword == null ? "" : keyword);
+            searchWindow.toFront();
+            return;
+        }
+        searchWindow = new SearchWindow(this, keyword == null ? "" : keyword);
+        searchWindow.show();
     }
 
     // ---------- 源码查看 ----------
@@ -1226,7 +1645,7 @@ public class MainApp extends javafx.application.Application {
                 JavaEnv.JavaResult java = JavaEnv.findJava(settings);
                 if (java.path() == null) {
                     throw new DecompilerManager.DecompileException(
-                            "未找到可用的 java，请通过菜单「源码 → 反编译管理器」手动指定。");
+                            "反编译器初始化失败，请重试或清理反编译缓存后再试。");
                 }
                 setJavaInfo(java.path(), java.version());
                 return DecompilerManager.decompileClasses(project.jarPath().toString(), sha,
@@ -1286,12 +1705,9 @@ public class MainApp extends javafx.application.Application {
             return;
         }
         javaPrompted = true;
-        if (Dialogs.confirm("提示",
-                "查看反编译源码需要：java 运行时 + 反编译器 jar（Vineflower/CFR/Procyon）。\n"
-                        + "当前没有检测到 java，也未配置反编译器。\n\n现在打开反编译管理器吗？"
-                        + "（关闭后仍可使用字节码视图）")) {
-            new DecompilerManagerDialog(this).show();
-        }
+        Dialogs.info("提示",
+                "反编译器未能就绪，已回退字节码视图。\n"
+                        + "可在「源码 → 清理反编译缓存」后重试。");
     }
 
     // ---------- 其他 ----------
@@ -1457,6 +1873,52 @@ public class MainApp extends javafx.application.Application {
 
     public boolean showInternal() {
         return showInternalItem.isSelected();
+    }
+
+    // ---------- 首选项联动入口 ----------
+
+    public String themeMode() {
+        return theme.mode();
+    }
+
+    public void applyThemeMode(String mode) {
+        setThemeMode(mode);
+    }
+
+    public boolean hideEmptyEnabled() {
+        return hideEmptyCheck.isSelected();
+    }
+
+    public void applyHideEmpty(boolean v) {
+        hideEmptyCheck.setSelected(v);
+        hideEmptyItem.setSelected(v);
+        onFilterChanged(null);
+    }
+
+    public boolean legendCompact() {
+        return isLegendCompact();
+    }
+
+    public void applyLegendCompact(boolean v) {
+        try {
+            settings.set("legend_compact", v);
+        } catch (Exception ignored) {
+            // 写盘失败不阻断
+        }
+        buildLegend();
+    }
+
+    public String statusFilterKey() {
+        return stateFilterKey();
+    }
+
+    public void applyStatusFilter(String key) {
+        for (String[] f : STATE_FILTERS) {
+            if (f[0].equals(key)) {
+                statusBox.setValue(f[1]);
+                return;
+            }
+        }
     }
 
     private void onClose() {

@@ -55,6 +55,12 @@ public final class Settings {
                 data.put(k, parsed.get(k));
             }
         }
+        // 额外键（如自定义快捷键 key_*）也一并载入，保证跨会话生效
+        for (Map.Entry<String, Object> e : parsed.entrySet()) {
+            if (!data.containsKey(e.getKey())) {
+                data.put(e.getKey(), e.getValue());
+            }
+        }
     }
 
     public void save() throws IOException {
