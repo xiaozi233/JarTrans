@@ -109,4 +109,31 @@ class ProjectTest {
         p.setTranslation(cls, "Press \0 Start", "按下");
         assertEquals("done", p.classState(cls));
     }
+
+    @Test
+    void statsAndManualStateAccessors() throws Exception {
+        Path jarPath = TestClasses.writeSampleJar(tmp, "d.jar", false);
+        Project p = new Project(tmp.resolve("d4.json"));
+        p.openJar(jarPath);
+        String cls = "demo/Test.class";
+        assertTrue(p.hasTranslatable(cls));
+
+        long[] stats = p.stats();
+        assertEquals(2, stats[0]); // 样本类两个字符串
+        assertEquals(0, stats[1]);
+        assertEquals(2, p.untranslatedCount(cls));
+
+        Map<String, Integer> cs = p.classStats();
+        assertEquals(1, cs.get("todo"));
+        assertEquals(0, cs.get("done"));
+        assertTrue(!p.isManualState(cls));
+
+        p.setClassStatus(cls, "ignore");
+        assertTrue(p.isManualState(cls));
+        assertEquals("ignore", p.classState(cls));
+        cs = p.classStats();
+        assertEquals(1, cs.get("ignore"));
+        assertEquals(0, cs.get("todo"));
+        assertTrue(p.dictionaryLabel().endsWith("d4"));
+    }
 }

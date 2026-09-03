@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -80,5 +81,14 @@ class ClassFileTest {
         CpEntry longEntry = cf.entries.get(6);
         assertEquals(ClassFile.CONSTANT_Long, longEntry.tag);
         assertEquals(9, cf.count - 1); // count=10，索引 1..9
+    }
+
+    @Test
+    void internalTextsExcludeLiteralTexts() throws Exception {
+        ClassFile cf = ClassFile.parse(TestClasses.buildSampleClass());
+        // 样本字面量: "Hello, 世界!"、"Press \0 Start"；其余 Utf8 为类名/属性名
+        List<String> internal = cf.internalTexts(Set.of("Hello, 世界!", "Press \0 Start"));
+        assertEquals(List.of("demo/Test", "Code"), internal,
+                "内部 Utf8 应按常量池顺序返回且不含字符串字面量");
     }
 }

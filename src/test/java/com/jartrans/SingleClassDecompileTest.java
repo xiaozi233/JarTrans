@@ -55,15 +55,11 @@ class SingleClassDecompileTest {
         jarTool.waitFor();
 
         DecompilerManager.ensureBundledAll(); // 三种反编译器都应内置可用
-        Object[] dec = DecompilerManager.currentDecompiler(new com.jartrans.core.Settings());
-        String javaExe = Path.of(home, "bin", "java.exe").toString();
         String sha = sha16(jar);
 
         long t0 = System.nanoTime();
         List<Path> betaFiles = DecompilerManager.decompileClasses(jar.toString(), sha,
-                List.of("p/Beta", "p/Beta$Inner"),
-                javaExe, (String) dec[1], DecompilerType.VINEFLOWER,
-                line -> System.out.println("   [vf] " + line), () -> false);
+                List.of("p/Beta", "p/Beta$Inner"), DecompilerType.VINEFLOWER);
         long ms = (System.nanoTime() - t0) / 1_000_000;
         System.out.println("[single] Beta decompile took " + ms + " ms -> "
                 + betaFiles.stream().map(p -> p.getFileName().toString()).toList());
@@ -75,9 +71,7 @@ class SingleClassDecompileTest {
 
         // 同一缓存目录再反编译 Alpha → 增量且两批互不干扰
         List<Path> alphaFiles = DecompilerManager.decompileClasses(jar.toString(), sha,
-                List.of("p/Alpha"),
-                javaExe, (String) dec[1], DecompilerType.VINEFLOWER, l -> {
-                }, () -> false);
+                List.of("p/Alpha"), DecompilerType.VINEFLOWER);
         System.out.println("[single] Alpha files="
                 + alphaFiles.stream().map(p -> p.getFileName().toString()).toList());
         assertFalse(alphaFiles.isEmpty());
@@ -90,8 +84,7 @@ class SingleClassDecompileTest {
             Path tool = DecompilerManager.toolsDir().resolve(engine.key + ".jar");
             assertTrue(Files.isRegularFile(tool), engine + " jar 应存在");
             List<Path> files = DecompilerManager.decompileClasses(jar.toString(), sha,
-                    List.of("p/Alpha"), javaExe, tool.toString(), engine, l -> {
-                    }, () -> false);
+                    List.of("p/Alpha"), engine);
             System.out.println("[single] " + engine + " files="
                     + files.stream().map(p -> p.getFileName().toString()).toList());
             assertFalse(files.isEmpty(), engine + " 应能反编译单类");

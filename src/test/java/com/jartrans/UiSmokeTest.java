@@ -3,6 +3,7 @@ package com.jartrans;
 import com.jartrans.ui.MainApp;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
+import javafx.scene.Scene;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -27,7 +28,7 @@ class UiSmokeTest {
             Parent root = loader.load();
             assertNotNull(root);
             // 校验主题 CSS 与关键控件可实例化
-            javafx.scene.Scene scene = new javafx.scene.Scene(root, 1320, 840);
+            Scene scene = new Scene(root, 1320, 840);
             scene.getStylesheets().setAll(
                     MainApp.class.getResource("/com/jartrans/ui/light.css").toExternalForm());
             scene.getRoot().applyCss();

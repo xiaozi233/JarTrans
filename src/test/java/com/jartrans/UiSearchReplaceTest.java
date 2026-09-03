@@ -1,10 +1,12 @@
 package com.jartrans;
 
 import com.jartrans.core.Project;
+import com.jartrans.core.Settings;
 import com.jartrans.ui.EditorPane;
 import com.jartrans.ui.MainApp;
 import com.jartrans.ui.PreferencesDialog;
 import com.jartrans.ui.SearchWindow;
+import javafx.scene.control.TextArea;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -87,7 +89,7 @@ class UiSearchReplaceTest {
             assertFalse(app.applyShortcut("gsearch", "Ctrl+Alt+K"), "重复组合应被拒绝");
             app.resetShortcut("find");
             assertEquals("Ctrl+F", app.shortcutText("find"));
-            assertEquals("Ctrl+F", new com.jartrans.core.Settings().getString("key_find"));
+            assertEquals("Ctrl+F", new Settings().getString("key_find"));
 
             // --- 全局搜索窗口：预填关键词并即时出结果 ---
             SearchWindow win = new SearchWindow(app, "hello");
@@ -113,7 +115,7 @@ class UiSearchReplaceTest {
             assertTrue(app.settings().getBool("auto_save_translation"), "自动保存默认应开启");
             java.lang.reflect.Field f = EditorPane.class.getDeclaredField("editor");
             f.setAccessible(true);
-            javafx.scene.control.TextArea ta = (javafx.scene.control.TextArea) f.get(ed);
+            TextArea ta = (TextArea) f.get(ed);
             String rowOrig = ed.selectedOrig();
             assertTrue(rowOrig != null && !rowOrig.isEmpty());
             ed.selectRow(rowOrig); // 保证编辑区为该行
