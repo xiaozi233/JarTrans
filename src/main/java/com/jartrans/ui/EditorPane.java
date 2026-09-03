@@ -85,7 +85,7 @@ public class EditorPane extends BorderPane {
         head.setPadding(new Insets(2, 2, 6, 2));
         head.setAlignment(Pos.CENTER_LEFT);
         classStateBox.getItems().addAll("自动", "未开始", "翻译中", "已完成", "已忽略");
-        classStateBox.setPrefWidth(90);
+        classStateBox.setPrefWidth(112);
         classStateBox.getSelectionModel().selectFirst();
         classStateBox.valueProperty().addListener((o, ov, nv) -> onClassStateBox());
         stateDot.setStyle("-fx-font-size: 14px;");

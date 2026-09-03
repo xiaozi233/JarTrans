@@ -195,11 +195,18 @@ public class MainApp extends javafx.application.Application {
                 String[] info = nodeInfo.get(getTreeItem());
                 if (info != null && TYPE_CLASS.equals(info[0])) {
                     String st = project.classState(info[1]);
-                    setTextFill(Color.web(theme.stateColor(st)));
+                    Color stateColor = Color.web(theme.stateColor(st));
+                    setTextFill(stateColor);
+                    // 彩色状态圆点：未开始/翻译中/已完成/已忽略/无字符串 一眼可辨
+                    javafx.scene.shape.Circle dot = new javafx.scene.shape.Circle(3.5);
+                    dot.setFill(stateColor);
+                    setGraphic(dot);
                 } else if (info != null && TYPE_DIR.equals(info[0])) {
                     setTextFill(Color.web(theme.color("fg_muted")));
+                    setGraphic(null);
                 } else {
                     setTextFill(Color.web(theme.color("fg")));
+                    setGraphic(null);
                 }
             }
         });

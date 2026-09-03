@@ -36,6 +36,15 @@
     -fx-selection-bar: -jr-select-bg;
     -fx-selection-bar-text: -jr-select-fg;
     -fx-selection-bar-non-focused: derive(-jr-select-bg, -20%);
+
+    /* ---- Modena 基础色重定义：让未显式覆写的控件（表格单元格、内部 Text 等）
+         也能按本主题推导出正确的文字/背景色（修深色对比度不足） ---- */
+    -fx-base: -jr-bg;
+    -fx-background: -jr-bg;
+    -fx-color: -jr-surface;
+    -fx-text-base-color: -jr-fg;
+    -fx-control-inner-background: -jr-field-bg;
+    -fx-control-inner-background-alt: derive(-jr-field-bg, -3%);
 }
 
 /* ---------- 基底 ---------- */
@@ -214,6 +223,7 @@
     -fx-text-fill: -jr-fg;
     -fx-background-color: transparent;
     -fx-padding: 5 8 5 8;
+    -fx-graphic-text-gap: 7;
 }
 .tree-cell:filled:hover {
     -fx-background-color: -jr-accent-soft;

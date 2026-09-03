@@ -131,7 +131,7 @@
                         <CheckBox fx:id="hideEmptyCheck" text="隐藏无字符串的类"
                                   onAction="#onFilterChanged"/>
                         <Label text="状态："/>
-                        <ComboBox fx:id="statusBox" prefWidth="90"/>
+                        <ComboBox fx:id="statusBox" prefWidth="116"/>
                     </HBox>
                     <HBox fx:id="legendBox" spacing="10"/>
                     <TreeView fx:id="classTree" VBox.vgrow="ALWAYS"/>
