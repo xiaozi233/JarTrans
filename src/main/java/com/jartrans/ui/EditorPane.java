@@ -198,10 +198,8 @@ public class EditorPane extends BorderPane {
         useDictBtn.setOnAction(e -> useDictionary());
         Button clearBtn = new Button("清空译文");
         clearBtn.setOnAction(e -> clearTranslation());
-        Button srcBtn = new Button("在源码中查看");
-        srcBtn.setOnAction(e -> viewInSource());
         hint.setStyle("-fx-text-fill: -jr-muted;");
-        buttons.getChildren().addAll(saveBtn, useDictBtn, clearBtn, srcBtn, saveDict, hint);
+        buttons.getChildren().addAll(saveBtn, useDictBtn, clearBtn, saveDict, hint);
         saveDict.setOnAction(e -> setQuiet("save_to_dict", saveDict.isSelected()));
 
         VBox editBox = new VBox(buttons, editor);

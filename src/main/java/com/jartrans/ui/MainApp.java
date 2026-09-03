@@ -230,6 +230,13 @@ public class MainApp extends javafx.application.Application {
         sourcePanel.setApp(this);
         sourcePanel.refreshTheme();
 
+        // 切到「源码」页签 = 对当前类反编译并查看（避免与编辑器里的按钮重复）
+        tabPane.getSelectionModel().selectedItemProperty().addListener((o, ov, nv) -> {
+            if (nv == sourceTab) {
+                onSourceTabOpened();
+            }
+        });
+
         // 初始状态
         buildLegend();
         refreshClassNodes();
@@ -1070,7 +1077,29 @@ public class MainApp extends javafx.application.Application {
         showSourceFor(cls, null);
     }
 
+    private void onSourceTabOpened() {
+        if (!project.hasJar()) {
+            return;
+        }
+        String cls = editor.currentClass();
+        if (cls == null && !project.classOrder().isEmpty()) {
+            cls = project.classOrder().get(0);
+        }
+        if (cls == null) {
+            return;
+        }
+        if (cls.equals(sourcePanel.currentClass())) {
+            return; // 该类的源码已在显示中，无需重复反编译
+        }
+        sourcePanel.display(cls, null);
+    }
+
     public void showSourceFor(String cls, String orig) {
+        // 已在源码页且正显示该类时，切页签触发的自动反编译已覆盖，避免重复
+        if (orig == null && tabPane.getSelectionModel().getSelectedItem() == sourceTab
+                && cls.equals(sourcePanel.currentClass())) {
+            return;
+        }
         tabPane.getSelectionModel().select(sourceTab);
         sourcePanel.display(cls, orig);
     }
