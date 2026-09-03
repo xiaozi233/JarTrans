@@ -1,5 +1,6 @@
 package com.jartrans.core;
 
+import com.jartrans.core.json.Json;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -69,18 +70,18 @@ public final class LangPack {
     }
 
     public static void writePack(Path path, Map<String, Object> pack) throws IOException {
-        com.jartrans.core.json.Json.writeFile(path, pack);
+        Json.writeFile(path, pack);
     }
 
     @SuppressWarnings("unchecked")
     public static Map<String, Object> readPack(Path path) throws LangPackException {
         Object data;
         try {
-            data = com.jartrans.core.json.Json.readFile(path);
+            data = Json.readFile(path);
         } catch (IOException exc) {
             throw new LangPackException("无法读取语言包：" + exc.getMessage());
         }
-        Map<String, Object> map = com.jartrans.core.json.Json.object(data);
+        Map<String, Object> map = Json.object(data);
         if (map == null || !(map.get("entries") instanceof Map)) {
             throw new LangPackException("语言包格式不正确：缺少 entries 对象");
         }
@@ -103,14 +104,14 @@ public final class LangPack {
         Map<String, Map<String, String>> applied = new LinkedHashMap<>();
         List<MissingEntry> missing = new ArrayList<>();
         Map<String, Object> entries =
-                com.jartrans.core.json.Json.object(pack.get("entries"));
+                Json.object(pack.get("entries"));
         if (entries == null) {
             return new MatchResult(applied, missing);
         }
         for (Map.Entry<String, Object> e : entries.entrySet()) {
             String cls = e.getKey();
             Map<String, Object> pairs =
-                    com.jartrans.core.json.Json.object(e.getValue());
+                    Json.object(e.getValue());
             if (pairs == null) {
                 continue;
             }

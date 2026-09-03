@@ -54,32 +54,4 @@ public enum DecompilerType {
         }
         return null;
     }
-
-    /** 构建反编译命令。 */
-    public java.util.List<String> buildCommand(String javaPath, String decompilerPath,
-                                               String jarPath, String outDir) {
-        java.util.List<String> cmd = new java.util.ArrayList<>();
-        cmd.add(javaPath);
-        cmd.add("-jar");
-        cmd.add(decompilerPath);
-        switch (this) {
-            case CFR -> {
-                cmd.add(jarPath);
-                cmd.add("--outputdir");
-                cmd.add(outDir);
-            }
-            case VINEFLOWER -> {
-                // java -jar vineflower.jar <source> <destination>
-                cmd.add(jarPath);
-                cmd.add(outDir);
-            }
-            case PROCYON -> {
-                // java -jar procyon.jar <jar> -o <dir>
-                cmd.add(jarPath);
-                cmd.add("-o");
-                cmd.add(outDir);
-            }
-        }
-        return cmd;
-    }
 }

@@ -1,7 +1,6 @@
 package com.jartrans.core;
 
 import com.jartrans.core.json.Json;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -54,17 +53,9 @@ public final class Settings {
         if (parsed == null) {
             return;
         }
-        for (String k : defaults().keySet()) {
-            if (parsed.containsKey(k)) {
-                data.put(k, parsed.get(k));
-            }
-        }
-        // 额外键（如自定义快捷键 key_*）也一并载入，保证跨会话生效
-        for (Map.Entry<String, Object> e : parsed.entrySet()) {
-            if (!data.containsKey(e.getKey())) {
-                data.put(e.getKey(), e.getValue());
-            }
-        }
+        // data 已含 defaults 全部默认键：parsed 覆盖同名键，
+        // 额外键（如自定义快捷键 key_*）保持解析顺序追加到末尾，保证跨会话生效
+        data.putAll(parsed);
     }
 
     public void save() throws IOException {

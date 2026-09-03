@@ -18,12 +18,8 @@ public final class Disassembler {
             return null;
         }
         if (entry.tag == ClassFile.CONSTANT_String) {
-            int si = ClassFile.u2(entry.raw, 0);
-            CpEntry target = cf.entries.get(si);
-            if (target != null && target.tag == ClassFile.CONSTANT_Utf8) {
-                return pythonRepr(target.text());
-            }
-            return "<损坏的字符串引用>";
+            String text = cf.utf8At(ClassFile.u2(entry.raw, 0));
+            return text != null ? pythonRepr(text) : "<损坏的字符串引用>";
         }
         if (entry.tag == ClassFile.CONSTANT_Class) {
             return "class " + utf8Text(cf, ClassFile.u2(entry.raw, 0));
@@ -32,9 +28,8 @@ public final class Disassembler {
     }
 
     private static String utf8Text(ClassFile cf, int idx) {
-        CpEntry entry = cf.entries.get(idx);
-        return (entry != null && entry.tag == ClassFile.CONSTANT_Utf8)
-                ? entry.text() : "#" + idx;
+        String text = cf.utf8At(idx);
+        return text != null ? text : "#" + idx;
     }
 
     /** 模拟 Python repr(str) 的显示效果（带单引号与常用转义）。 */

@@ -85,9 +85,8 @@ public final class Json {
         } else if (value instanceof Double d) {
             if (d.isNaN() || d.isInfinite()) {
                 sb.append("null");
-            } else if (d == Math.floor(d) && !d.isInfinite() && Math.abs(d) < 1e15) {
-                long l = d.longValue();
-                sb.append(l);
+            } else if (d == Math.floor(d) && Math.abs(d) < 1e15) {
+                sb.append(d.longValue()); // 整数值不输出小数点（对齐 Python json）
             } else {
                 sb.append(d);
             }

@@ -2,7 +2,7 @@ package com.jartrans.core;
 
 import com.jartrans.core.jar.JarPacker;
 import com.jartrans.core.jar.JarReader;
-
+import com.jartrans.core.json.Json;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -52,9 +52,33 @@ public final class Project {
     public record FailedClass(String name, String reason) {
     }
 
+    /** 一个类可翻译字符串的收集结果：按首次出现顺序 + 全量集合。 */
+    private record ClassTexts(List<TextCount> items, Set<String> set) {
+    }
+
+    /** 收集 class 中的可翻译字符串字面量（按首次出现顺序计数）。 */
+    private static ClassTexts collectTexts(ClassFile cf) {
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        List<String> seq = new ArrayList<>();
+        for (Literal lit : cf.literals()) {
+            if (lit.text == null) {
+                continue;
+            }
+            int prev = counts.getOrDefault(lit.text, 0);
+            counts.put(lit.text, prev + 1);
+            if (prev == 0) {
+                seq.add(lit.text);
+            }
+        }
+        List<TextCount> items = new ArrayList<>();
+        for (String t : seq) {
+            items.add(new TextCount(t, counts.get(t)));
+        }
+        return new ClassTexts(items, counts.keySet());
+    }
+
     private final DictionaryManager dicts;   // 可为 null（单词典模式）
     private Dictionary dictionary;
-    private final String dictionaryLabelFallback;
 
     private JarReader jar;
     private final Map<String, ClassFile> classes = new LinkedHashMap<>();
@@ -72,28 +96,26 @@ public final class Project {
     private String sha256;
 
     public Project() {
-        this(null, null, null);
+        this(null, null);
     }
 
     /** 单词典模式（与 Python 版 selftest 场景一致）。 */
     public Project(Path dictionaryPath) {
-        this(null, dictionaryPath, null);
+        this(null, dictionaryPath);
     }
 
     /** 多词典模式。 */
     public Project(DictionaryManager dicts) {
-        this(dicts, null, null);
+        this(dicts, null);
     }
 
-    private Project(DictionaryManager dicts, Path dictionaryPath, String labelFallback) {
+    private Project(DictionaryManager dicts, Path dictionaryPath) {
         if (dicts != null) {
             this.dicts = dicts;
             this.dictionary = dicts.activeDictionary();
-            this.dictionaryLabelFallback = null;
         } else if (dictionaryPath != null) {
             this.dicts = null;
             this.dictionary = new Dictionary(dictionaryPath);
-            this.dictionaryLabelFallback = null;
         } else {
             DictionaryManager manager;
             try {
@@ -103,7 +125,6 @@ public final class Project {
             }
             this.dicts = manager;
             this.dictionary = manager.activeDictionary();
-            this.dictionaryLabelFallback = null;
         }
     }
 
@@ -150,31 +171,13 @@ public final class Project {
         failed.clear();
         methodUsage.clear();
 
-        Map<String, Map<String, Integer>> counts = new LinkedHashMap<>();
-        Map<String, List<String>> seqs = new LinkedHashMap<>();
         for (String name : reader.classNames()) {
             try {
                 ClassFile cf = ClassFile.parse(reader.readClass(name));
-                Map<String, Integer> cnt = new LinkedHashMap<>();
-                List<String> seq = new ArrayList<>();
-                for (Literal lit : cf.literals()) {
-                    if (lit.text == null) {
-                        continue;
-                    }
-                    if (cnt.containsKey(lit.text)) {
-                        cnt.merge(lit.text, 1, Integer::sum);
-                    } else {
-                        cnt.put(lit.text, 1);
-                        seq.add(lit.text);
-                    }
-                }
+                ClassTexts ct = collectTexts(cf);
                 classes.put(name, cf);
-                List<TextCount> list = new ArrayList<>();
-                for (String t : seq) {
-                    list.add(new TextCount(t, cnt.get(t)));
-                }
-                texts.put(name, list);
-                textSets.put(name, cnt.keySet());
+                texts.put(name, ct.items());
+                textSets.put(name, ct.set());
                 classOrder.add(name);
                 try {
                     methodUsage.put(name, Bytecode.stringUsage(cf));
@@ -376,7 +379,7 @@ public final class Project {
         }
         lastMissing = result.missing();
         Object statusObj = pack.get("class_status");
-        Map<String, Object> status = com.jartrans.core.json.Json.object(statusObj);
+        Map<String, Object> status = Json.object(statusObj);
         boolean changed = false;
         if (status != null && !status.isEmpty()) {
             for (Map.Entry<String, Object> e : status.entrySet()) {
@@ -407,7 +410,11 @@ public final class Project {
         return total;
     }
 
-    public void exportPack(Path path, String author) throws IOException {
+    /**
+     * 参与导出的内容：{类路径: 生效译文}。
+     * 已忽略的类整类剔除；「不翻译」文本已由 effectiveForExport 剔除；无生效译文的类不列出。
+     */
+    private Map<String, Map<String, String>> translationsForExport() {
         Map<String, Map<String, String>> entries = new LinkedHashMap<>();
         for (String cls : classOrder) {
             if (isIgnored(cls)) {
@@ -418,8 +425,12 @@ public final class Project {
                 entries.put(cls, eff);
             }
         }
+        return entries;
+    }
+
+    public void exportPack(Path path, String author) throws IOException {
         Map<String, Object> pack = LangPack.buildPack(jarName(), jarSha256(),
-                author, entries, classStatus);
+                author, translationsForExport(), classStatus);
         if (!skipTexts.isEmpty()) {
             List<String> sorted = new ArrayList<>(skipTexts);
             sorted.sort(String::compareTo);
@@ -433,18 +444,11 @@ public final class Project {
     /** 写回全部已翻译的类并导出（已忽略类与「不翻译」文本不写入）。rewrite 内部会做写回校验。 */
     public int exportJar(Path outPath, boolean stripSignature) throws IOException {
         Map<String, byte[]> modified = new LinkedHashMap<>();
-        for (String cls : classOrder) {
-            if (isIgnored(cls)) {
-                continue; // 已忽略 = 整类保留原文
-            }
-            Map<String, String> eff = effectiveForExport(cls);
-            if (eff.isEmpty()) {
-                continue;
-            }
+        for (Map.Entry<String, Map<String, String>> e : translationsForExport().entrySet()) {
             try {
-                modified.put(cls, classes.get(cls).rewrite(eff));
-            } catch (ClassFileException e) {
-                throw new IOException("重写 " + cls + " 失败：" + e.getMessage(), e);
+                modified.put(e.getKey(), classes.get(e.getKey()).rewrite(e.getValue()));
+            } catch (ClassFileException exc) {
+                throw new IOException("重写 " + e.getKey() + " 失败：" + exc.getMessage(), exc);
             }
         }
         JarPacker.save(jar, outPath, modified, stripSignature);
@@ -566,8 +570,8 @@ public final class Project {
         if (!Files.exists(file)) {
             return new LinkedHashMap<>();
         }
-        Map<String, Object> data = com.jartrans.core.json.Json.object(
-                com.jartrans.core.json.Json.readFileQuiet(file));
+        Map<String, Object> data = Json.object(
+                Json.readFileQuiet(file));
         return data != null ? data : new LinkedHashMap<>();
     }
 
@@ -579,7 +583,7 @@ public final class Project {
             return;
         }
         Object got = readProgressFile().get(key);
-        Map<String, Object> map = com.jartrans.core.json.Json.object(got);
+        Map<String, Object> map = Json.object(got);
         if (map == null) {
             return;
         }
@@ -619,7 +623,7 @@ public final class Project {
         Path file = AppDirs.progressFile();
         Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
         try {
-            com.jartrans.core.json.Json.writeFile(tmp, data);
+            Json.writeFile(tmp, data);
             Files.move(tmp, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException ignored) {
             // 进度写入失败不影响主流程
@@ -637,11 +641,11 @@ public final class Project {
             Map<String, String> eff = effective(cls);
             for (TextCount tc : texts.get(cls)) {
                 String trans = eff.getOrDefault(tc.text(), "");
-                boolean hit = ("orig".equals(scope) || "both".equals(scope))
-                        && tc.text().toLowerCase().contains(q)
-                        || ("trans".equals(scope) || "both".equals(scope))
+                boolean origHit = ("orig".equals(scope) || "both".equals(scope))
+                        && tc.text().toLowerCase().contains(q);
+                boolean transHit = ("trans".equals(scope) || "both".equals(scope))
                         && trans.toLowerCase().contains(q);
-                if (hit) {
+                if (origHit || transHit) {
                     results.add(new SearchResult(cls, tc.text(), trans, status(cls, tc.text())));
                 }
             }

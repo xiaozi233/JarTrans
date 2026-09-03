@@ -1,7 +1,10 @@
 package com.jartrans.core.java;
 
+import com.jartrans.core.jar.JarReader;
+import com.jartrans.core.json.Json;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -69,29 +72,27 @@ public final class DecompilerDownloader {
                 throw new DownloadException("查询 GitHub 发布信息失败：HTTP " + resp.statusCode());
             }
         } catch (IOException | InterruptedException exc) {
-            if (exc instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
+            restoreInterrupt(exc);
             throw new DownloadException("查询 GitHub 发布信息失败：" + exc.getMessage(), exc);
         }
 
         Object parsed;
         try {
-            parsed = com.jartrans.core.json.Json.parse(body);
+            parsed = Json.parse(body);
         } catch (IOException exc) {
             throw new DownloadException("GitHub 返回内容无法解析：" + exc.getMessage(), exc);
         }
-        var data = com.jartrans.core.json.Json.object(parsed);
+        var data = Json.object(parsed);
         if (data == null) {
             throw new DownloadException("GitHub 返回内容无法解析");
         }
         List<Asset> assets = new ArrayList<>();
         Object rawAssets = data.get("assets");
-        var assetList = com.jartrans.core.json.Json.object(rawAssets) != null
+        var assetList = Json.object(rawAssets) != null
                 ? null : (rawAssets instanceof List<?> l ? l : List.of());
         if (assetList != null) {
             for (Object o : assetList) {
-                var a = com.jartrans.core.json.Json.object(o);
+                var a = Json.object(o);
                 if (a == null) {
                     continue;
                 }
@@ -111,6 +112,13 @@ public final class DecompilerDownloader {
 
     private static long asLong(Object o) {
         return o instanceof Number n ? n.longValue() : 0L;
+    }
+
+    /** 捕获块内调用：若由中断引起则恢复线程中断标记。 */
+    private static void restoreInterrupt(Exception exc) {
+        if (exc instanceof InterruptedException) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     /**
@@ -158,7 +166,7 @@ public final class DecompilerDownloader {
             CancelCheck check = cancelCheck != null ? cancelCheck : () -> false;
             byte[] buf = new byte[65536];
             long done = 0;
-            try (OutputStream2 out = new OutputStream2(dest)) {
+            try (OutputStream out = Files.newOutputStream(dest)) {
                 while (true) {
                     if (check.isCancelled()) {
                         throw new DownloadException("已取消");
@@ -211,8 +219,8 @@ public final class DecompilerDownloader {
     }
 
     private static Long contentLength(HttpResponse<?> resp) {
-        return resp.headers().firstValueAsLong("Content-Length").orElse(-1L) >= 0
-                ? resp.headers().firstValueAsLong("Content-Length").orElse(-1L) : null;
+        java.util.OptionalLong value = resp.headers().firstValueAsLong("Content-Length");
+        return value.isPresent() ? value.getAsLong() : null;
     }
 
     private static void deleteQuietly(Path p) {
@@ -233,26 +241,8 @@ public final class DecompilerDownloader {
         boolean isCancelled();
     }
 
-    /** 简单文件输出封装（避免在 lambda 中处理 IOException）。 */
-    private static final class OutputStream2 implements AutoCloseable {
-        private final java.io.OutputStream out;
-
-        OutputStream2(Path dest) throws IOException {
-            this.out = Files.newOutputStream(dest);
-        }
-
-        void write(byte[] buf, int off, int len) throws IOException {
-            out.write(buf, off, len);
-        }
-
-        @Override
-        public void close() throws IOException {
-            out.close();
-        }
-    }
-
     public static boolean isZipFile(Path path) {
-        return com.jartrans.core.jar.JarReader.isZipFile(path);
+        return JarReader.isZipFile(path);
     }
 
     public static String humanSize(long n) {

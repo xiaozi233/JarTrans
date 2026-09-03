@@ -330,16 +330,11 @@ public final class Bytecode {
                     if (idx < 0) {
                         continue;
                     }
-                    CpEntry entry = cf.entries.get(idx);
-                    if (entry == null || entry.tag != ClassFile.CONSTANT_String) {
+                    String text = cf.stringTextAt(idx);
+                    if (text == null) {
                         continue;
                     }
-                    int si = ClassFile.u2(entry.raw, 0);
-                    CpEntry target = cf.entries.get(si);
-                    if (target == null || target.tag != ClassFile.CONSTANT_Utf8) {
-                        continue;
-                    }
-                    List<String> names = usage.computeIfAbsent(target.text(), k -> new ArrayList<>());
+                    List<String> names = usage.computeIfAbsent(text, k -> new ArrayList<>());
                     if (!names.contains(method.name())) {
                         names.add(method.name());
                     }

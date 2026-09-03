@@ -1,7 +1,6 @@
 package com.jartrans.core;
 
 import com.jartrans.core.json.Json;
-
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
@@ -333,17 +332,11 @@ public final class DictionaryManager {
             throw new IllegalArgumentException("词典不存在。");
         }
         dic.save();
-        Map<String, Object> sorted = new TreeMapLike();
+        // 导出按码点排序（与 Python 版 sort_keys=True 一致）
+        Map<String, Object> sorted = new java.util.TreeMap<>(Json.CODE_POINT_ORDER);
         sorted.putAll(dic.entries());
         Json.writeFile(dest, sorted);
         return dic.size();
-    }
-
-    /** 按码点排序的 LinkedHashMap 替代（TreeMap 已够用，直接用 TreeMap）。 */
-    private static final class TreeMapLike extends java.util.TreeMap<String, Object> {
-        TreeMapLike() {
-            super(Json.CODE_POINT_ORDER);
-        }
     }
 
     // ---------- 工具 ----------

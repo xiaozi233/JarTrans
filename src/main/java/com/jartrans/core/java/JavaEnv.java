@@ -1,7 +1,6 @@
 package com.jartrans.core.java;
 
 import com.jartrans.core.Settings;
-
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
@@ -162,7 +161,8 @@ public final class JavaEnv {
     /** 返回 (路径, 版本)；找不到时 path 为 null，tried 为已尝试列表。 */
     public static JavaResult findJava(Settings settings) {
         List<String> tried = new ArrayList<>();
-        String[] best = {null, null}; // path, version
+        String bestPath = null;
+        String bestVersion = null;
         List<Long> bestKey = null;
         String pathJava = whichJava();
         String configured = settings != null ? settings.getString("java_path") : "";
@@ -178,17 +178,16 @@ public final class JavaEnv {
             List<Long> key = versionKey(version);
             if (bestKey == null || compareKeys(key, bestKey) > 0) {
                 bestKey = key;
-                best[0] = path;
-                best[1] = version;
+                bestPath = path;
+                bestVersion = version;
             }
             if (path.equals(pathJava) || (settings != null && path.equals(configured))) {
                 // 显式指定的路径优先级最高，命中即用
                 return new JavaResult(path, version, tried);
             }
         }
-        if (bestKey != null) {
-            return new JavaResult(best[0], best[1], tried);
-        }
-        return new JavaResult(null, null, tried);
+        return bestPath != null
+                ? new JavaResult(bestPath, bestVersion, tried)
+                : new JavaResult(null, null, tried);
     }
 }

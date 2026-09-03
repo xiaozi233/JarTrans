@@ -137,6 +137,21 @@ public final class ClassFile {
 
     // ---------- 提取 ----------
 
+    /** 若给定索引处是 CONSTANT_Utf8 条目，返回其解码文本；否则返回 null。 */
+    public String utf8At(int index) {
+        CpEntry entry = entries.get(index);
+        return (entry != null && entry.tag == CONSTANT_Utf8) ? entry.text() : null;
+    }
+
+    /** 若给定索引处是 CONSTANT_String 条目，返回它指向的 Utf8 文本；损坏引用返回 null。 */
+    public String stringTextAt(int index) {
+        CpEntry entry = entries.get(index);
+        if (entry == null || entry.tag != CONSTANT_String) {
+            return null;
+        }
+        return utf8At(u2(entry.raw, 0));
+    }
+
     /** 所有字符串字面量，按常量池索引顺序。损坏引用的 text 为 null。 */
     public List<Literal> literals() {
         List<Literal> result = new ArrayList<>();
@@ -145,9 +160,7 @@ public final class ClassFile {
                 continue;
             }
             int si = u2(entry.raw, 0);
-            CpEntry target = entries.get(si);
-            String text = (target != null && target.tag == CONSTANT_Utf8) ? target.text() : null;
-            result.add(new Literal(entry.index, si, text));
+            result.add(new Literal(entry.index, si, stringTextAt(entry.index)));
         }
         return result;
     }
