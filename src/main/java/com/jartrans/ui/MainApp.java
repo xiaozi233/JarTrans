@@ -432,7 +432,7 @@ public class MainApp extends javafx.application.Application {
                 + "不改动、不移动任何原有常量和字节码结构。\n"
                 + "写回前会自动做结构校验，确保 class 文件可被 JVM 正常加载。\n\n"
                 + "支持浅色/深色/跟随系统主题、多词典切换、类状态标记与过滤、\n"
-                + "三种反编译器（Vineflower / CFR / Procyon）下载管理。");
+                + "内置 Vineflower 反编译器（CFR / Procyon 可联网下载）。");
     }
 
     @FXML
@@ -1094,6 +1094,11 @@ public class MainApp extends javafx.application.Application {
 
     public void ensureSourceReady(String cls, java.util.function.BiConsumer<String, Object> then) {
         Object[] dec = DecompilerManager.currentDecompiler(settings);
+        if (dec == null) {
+            // 内置 Vineflower 兜底：tools/ 缺失时自动释放，无需联网/手动配置
+            DecompilerManager.ensureBundledDecompiler();
+            dec = DecompilerManager.currentDecompiler(settings);
+        }
         if (dec == null) {
             maybePromptSetup();
             then.accept("bytecode", null);

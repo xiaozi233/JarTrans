@@ -31,6 +31,10 @@ public final class DecompilerManager {
     public static final Path CACHE_ROOT =
             Paths.get(System.getProperty("java.io.tmpdir"), "jartrans_decomp");
 
+    /** 随应用内置的 Vineflower（Apache-2.0），首次需要时自动释放到 tools/，无需联网下载。 */
+    public static final String BUNDLED_RESOURCE = "/com/jartrans/bundled/vineflower.jar";
+    public static final String BUNDLED_FILENAME = "vineflower.jar";
+
     private static final AtomicReference<Process> ACTIVE_PROCESS = new AtomicReference<>();
 
     private DecompilerManager() {
@@ -97,6 +101,42 @@ public final class DecompilerManager {
             return new Object[]{first.type(), first.path().toString()};
         }
         return null;
+    }
+
+    /** tools/ 中是否已有可用的 Vineflower。 */
+    public static boolean hasVineflower() {
+        for (ToolEntry entry : scanTools()) {
+            if (entry.type() == DecompilerType.VINEFLOWER) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 确保 Vineflower 可用：tools/ 中缺失时，把随应用内置的 jar 释放过去。
+     * 成功后无需联网与配置即可被 scanTools/currentDecompiler 发现。
+     */
+    public static boolean ensureBundledDecompiler() {
+        if (hasVineflower()) {
+            return true;
+        }
+        try {
+            Path dir = toolsDir();
+            Files.createDirectories(dir);
+            Path target = dir.resolve(BUNDLED_FILENAME);
+            if (!Files.isRegularFile(target)) {
+                try (InputStream in = DecompilerManager.class.getResourceAsStream(BUNDLED_RESOURCE)) {
+                    if (in == null) {
+                        return false;
+                    }
+                    Files.copy(in, target);
+                }
+            }
+            return Files.isRegularFile(target) && DecompilerDownloader.isZipFile(target);
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     public static Path cacheDir(String jarSha256) {
