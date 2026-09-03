@@ -1,5 +1,8 @@
 package com.jartrans.ui;
 
+import com.jartrans.core.java.DecompilerManager;
+import com.jartrans.core.java.DecompilerType;
+
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -36,6 +39,7 @@ public class PreferencesDialog extends Stage {
     private final CheckBox legendVisible = new CheckBox("显示类状态图例（彩色圆点+说明）");
     private final CheckBox hideEmpty = new CheckBox("隐藏无可翻译字符串的类");
     private final ComboBox<String> statusFilterBox = new ComboBox<>();
+    private final ComboBox<String> decompilerBox = new ComboBox<>();
     private final CheckBox onlyUntranslated = new CheckBox("翻译表格只看未翻译");
     private final CheckBox saveToDict = new CheckBox("保存译文时自动记入词典");
     private final CheckBox autoSaveTrans = new CheckBox("译文自动保存（输入停顿或切换行/类时自动写入）");
@@ -108,6 +112,17 @@ public class PreferencesDialog extends Stage {
         HBox authorRow = new HBox(8, new Label("导出作者（默认值）："), authorField);
         authorRow.setAlignment(Pos.CENTER_LEFT);
 
+        // ---------- 源码查看 ----------
+        Label secSource = section("源码查看");
+        decompilerBox.getItems().setAll(
+                java.util.Arrays.stream(DecompilerType.values())
+                        .map(DecompilerType::displayName).toList());
+        decompilerBox.setValue(currentDecompilerDisplayName());
+        decompilerBox.setPrefWidth(180);
+        decompilerBox.setOnAction(e -> applyDecompilerChoice());
+        HBox decompilerRow = new HBox(8, new Label("反编译器（内置，源码页生效）："), decompilerBox);
+        decompilerRow.setAlignment(Pos.CENTER_LEFT);
+
         // ---------- 快捷键 ----------
         Label secShortcut = section("快捷键（点击组合可修改）");
         TableColumn<ShortcutRow, String> colName = new TableColumn<>("功能");
@@ -151,7 +166,8 @@ public class PreferencesDialog extends Stage {
         // ---------- 组装 ----------
         VBox body = new VBox(10, secAppearance, themeRow, legendVisible, hideEmpty,
                 statusRow, secTranslate, onlyUntranslated, saveToDict,
-                autoSaveTrans, dblclickSource, secPack, authorRow, secShortcut,
+                autoSaveTrans, dblclickSource, secPack, authorRow,
+                secSource, decompilerRow, secShortcut,
                 shortcutTable, shortcutButtons, hintLabel);
         VBox.setVgrow(shortcutTable, Priority.ALWAYS);
         root.setCenter(new ScrollPane(body) {{
@@ -206,6 +222,34 @@ public class PreferencesDialog extends Stage {
             app.settings().set("pack_author", v);
         } catch (Exception ignored) {
             // 写盘失败不阻断
+        }
+    }
+
+    /** 下拉初始显示：settings 未指定时对齐默认优先级（Vineflower）。 */
+    private String currentDecompilerDisplayName() {
+        DecompilerType t = DecompilerType.fromKey(app.settings().getString("decompiler_type"));
+        return (t == null ? DecompilerType.VINEFLOWER : t).displayName();
+    }
+
+    /** 用户切换反编译器：持久化设置，并清空本会话旧引擎的源码缓存。 */
+    private void applyDecompilerChoice() {
+        String chosen = decompilerBox.getValue();
+        if (chosen == null) {
+            return;
+        }
+        for (DecompilerType t : DecompilerType.values()) {
+            if (t.displayName().equals(chosen)) {
+                try {
+                    app.settings().set("decompiler_type", t.key);
+                } catch (Exception ignored) {
+                    // 写盘失败不阻断
+                }
+                // 不同引擎产物同名互不兼容：清内存索引并清盘，避免旧产物混杂
+                app.invalidateDecompilerState();
+                DecompilerManager.clearAllCache();
+                status("反编译器已切换为 " + t.displayName() + "（重新打开源码页生效）");
+                return;
+            }
         }
     }
 

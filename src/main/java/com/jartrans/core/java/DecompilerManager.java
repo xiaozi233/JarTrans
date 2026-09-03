@@ -14,6 +14,8 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Stream;
 
 /**
@@ -92,7 +94,7 @@ public final class DecompilerManager {
         return found;
     }
 
-    /** 配置的优先，其次 tools/ 扫描。无可用反编译器时返回 null。 */
+    /** 配置的优先，其次用户显式选择的引擎，最后按内置优先级回退。无可用时返回 null。 */
     public static Selection currentDecompiler(Settings settings) {
         String configured = settings.getString("decompiler_path");
         if (!configured.isEmpty() && Files.isRegularFile(Paths.get(configured))
@@ -101,7 +103,16 @@ public final class DecompilerManager {
             return new Selection(type != null ? type : DecompilerType.VINEFLOWER, configured);
         }
         List<ToolEntry> scan = scanTools();
-        // 默认优先级：Vineflower > CFR > Procyon
+        // 用户显式选择（首选项「源码查看」/settings.decompiler_type）的引擎优先
+        DecompilerType explicit = DecompilerType.fromKey(settings.getString("decompiler_type"));
+        if (explicit != null) {
+            for (ToolEntry entry : scan) {
+                if (entry.type() == explicit) {
+                    return new Selection(entry.type(), entry.path().toString());
+                }
+            }
+        }
+        // 未选择或所选缺失：默认优先级 Vineflower > CFR > Procyon
         for (DecompilerType preferred : List.of(DecompilerType.VINEFLOWER,
                 DecompilerType.CFR, DecompilerType.PROCYON)) {
             for (ToolEntry entry : scan) {
@@ -194,14 +205,41 @@ public final class DecompilerManager {
         }
     }
 
+    /** 同一 jar（sha 前 16 位）输出目录的互斥锁；说明见 decompileClasses。 */
+    private static final ConcurrentHashMap<String, ReentrantLock> OUTPUT_LOCKS =
+            new ConcurrentHashMap<>();
+
     /**
      * 反编译 jar 中的若干类（classNames 为不带 .class 的内部名，可含内部类）到缓存目录，
      * 返回本次产出的 .java 绝对路径。只把选中的类字节复制到临时输入目录喂给反编译器，
      * 避免整 jar 反编译的等待。输出累积在 cacheDir(sha)/classes 下（不带 .ok 标记）。
+     *
+     * <p>同一 sha 的输出目录互斥：进程内反编译器不可中断，取消后旧任务线程仍在后台
+     * 自然收尾；若立即放行新任务会并发写同一 classes 目录（半截结果包、unwrap/删除
+     * 互相占用）。因此按 sha 串行执行，后到的任务排队等待；等待期间可响应取消
+     * （lockInterruptibly），进入引擎执行后仍不可中断（引擎黑盒）。
      */
     public static List<Path> decompileClasses(String jarPath, String sha256,
                                               java.util.Collection<String> classNames,
                                               DecompilerType type)
+            throws DecompileException {
+        ReentrantLock lock = OUTPUT_LOCKS.computeIfAbsent(sha256, k -> new ReentrantLock());
+        try {
+            lock.lockInterruptibly();
+        } catch (InterruptedException exc) {
+            Thread.currentThread().interrupt();
+            throw new DecompileException("已取消（等待上一个反编译完成时被中断）");
+        }
+        try {
+            return decompileClassesLocked(jarPath, sha256, classNames, type);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private static List<Path> decompileClassesLocked(String jarPath, String sha256,
+                                                     java.util.Collection<String> classNames,
+                                                     DecompilerType type)
             throws DecompileException {
         Path base = cacheDir(sha256);
         Path out = base.resolve("classes");
@@ -307,21 +345,30 @@ public final class DecompilerManager {
             }
         }
         for (Path archive : archives) {
-            try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(archive.toFile())) {
-                var entries = zf.entries();
-                while (entries.hasMoreElements()) {
-                    var entry = entries.nextElement();
-                    if (entry.isDirectory() || !entry.getName().endsWith(".java")) {
-                        continue;
-                    }
-                    Path dest = out.resolve(entry.getName());
-                    Files.createDirectories(dest.getParent());
-                    try (InputStream in = zf.getInputStream(entry)) {
-                        Files.copy(in, dest, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            try {
+                try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(archive.toFile())) {
+                    var entries = zf.entries();
+                    while (entries.hasMoreElements()) {
+                        var entry = entries.nextElement();
+                        if (entry.isDirectory() || !entry.getName().endsWith(".java")) {
+                            continue;
+                        }
+                        Path dest = out.resolve(entry.getName());
+                        Files.createDirectories(dest.getParent());
+                        try (InputStream in = zf.getInputStream(entry)) {
+                            Files.copy(in, dest, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                        }
                     }
                 }
-            } finally {
                 Files.deleteIfExists(archive);
+            } catch (IOException exc) {
+                // 单个结果包损坏（取消/历史并发残留的半截文件）或被占用：删掉残留，
+                // 不让它拖垮本次任务——损坏文件下次不会再被当作产物使用。
+                try {
+                    Files.deleteIfExists(archive);
+                } catch (IOException ignored) {
+                    // 删除失败（如仍被占用）交由退出清理兜底
+                }
             }
         }
     }
