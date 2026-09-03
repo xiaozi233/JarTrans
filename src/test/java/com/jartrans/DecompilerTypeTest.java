@@ -1,5 +1,6 @@
 package com.jartrans;
 
+import com.jartrans.core.Settings;
 import com.jartrans.core.java.DecompilerManager;
 import com.jartrans.core.java.DecompilerType;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -92,5 +94,20 @@ class DecompilerTypeTest {
         // 目录不存在 / null 一律返回空索引（调用方按无缓存处理）
         assertTrue(DecompilerManager.buildFileIndex(tmp.resolve("nope")).isEmpty());
         assertTrue(DecompilerManager.buildFileIndex(null).isEmpty());
+    }
+
+    @Test
+    void currentDecompilerRespectsExplicitChoice() {
+        DecompilerManager.ensureBundledAll(); // 保证 tools/ 三种引擎都在（setQuiet 不落盘）
+        Settings settings = new Settings();
+
+        settings.setQuiet("decompiler_type", "cfr");
+        DecompilerManager.Selection sel = DecompilerManager.currentDecompiler(settings);
+        assertNotNull(sel, "tools/ 有内置引擎时应总能选到");
+        assertEquals(DecompilerType.CFR, sel.type(), "首选项显式选择的引擎应优先");
+
+        settings.setQuiet("decompiler_type", "");
+        assertEquals(DecompilerType.VINEFLOWER,
+                DecompilerManager.currentDecompiler(settings).type(), "未选择时回退默认优先级");
     }
 }
