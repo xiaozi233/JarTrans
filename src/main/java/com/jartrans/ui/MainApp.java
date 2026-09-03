@@ -28,7 +28,6 @@ import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
 import javafx.scene.layout.HBox;
-import javafx.scene.paint.Color;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
@@ -63,9 +62,7 @@ public class MainApp extends javafx.application.Application {
     // 类树节点信息
     private static final String TYPE_ROOT = "root";
     private static final String TYPE_DIR = "dir";
-    private static final String TYPE_CLASS = "class";
-
-    private Settings settings;
+    private static final String TYPE_CLASS = "class";    private Settings settings;
     private Theme theme;
     private Project project;
     private Stage stage;
@@ -126,8 +123,7 @@ public class MainApp extends javafx.application.Application {
     private final Map<String, TreeItem<String>> classNodes = new HashMap<>();
     private final Map<TreeItem<String>, String[]> nodeInfo = new HashMap<>(); // type / path / cls
 
-    // 图例控件
-    private final Map<String, Label> legendLabels = new HashMap<>();
+    // 图例控件（圆点走 CSS 状态类，无代码上色）
 
     @Override
     public void start(Stage stage) throws Exception {
@@ -229,21 +225,18 @@ public class MainApp extends javafx.application.Application {
         setStatus("请先打开一个 jar 文件");
     }
 
-    /** 填充类状态图例：彩色圆点 + 文字（圆点颜色记录在 legendLabels 供主题切换刷新）。 */
+    /** 填充类状态图例：彩色圆点 + 文字。圆点与树节点/编辑器状态点共用 CSS 状态类，
+        颜色由主题 .state-dot.cell-state-* 提供（代码不上色，避免被 CSS 脉冲覆盖）。 */
     private void buildLegend() {
         legendBox.getChildren().clear();
-        legendLabels.clear();
         legendBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
         for (String st : List.of("todo", "doing", "done", "ignore", "empty")) {
-            Label dot = new Label("●");
-            dot.setTextFill(Color.web(theme.stateColor(st)));
-            dot.setStyle("-fx-font-size: 9px;");
+            javafx.scene.shape.Circle dot = new javafx.scene.shape.Circle(4);
+            dot.getStyleClass().addAll("state-dot", "cell-state-" + st);
             Label text = new Label(STATE_LABEL.get(st));
-            text.setTextFill(Color.web(theme.color("fg_muted")));
             text.setStyle("-fx-font-size: 11px;");
             HBox pair = new HBox(3, dot, text);
             pair.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-            legendLabels.put(st, dot);
             legendBox.getChildren().add(pair);
         }
     }
