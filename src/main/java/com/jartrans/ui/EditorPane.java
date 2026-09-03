@@ -258,6 +258,7 @@ public class EditorPane extends BorderPane {
             case "已忽略" -> "ignore";
             default -> null;
         };
+        app.recordClassMark(currentClass, app.project().classStatus().get(currentClass), state);
         try {
             app.project().setClassStatus(currentClass, state);
         } catch (Exception ignored) {
@@ -411,7 +412,10 @@ public class EditorPane extends BorderPane {
         String orig = editingOrig;
         String trans = editor.getText();
         Project p = app.project();
+        String beforeEff = p.effective(currentClass).getOrDefault(orig, "");
         p.setTranslation(currentClass, orig, trans);
+        String afterEff = p.effective(currentClass).getOrDefault(orig, "");
+        app.recordTranslation(currentClass, orig, beforeEff, afterEff);
         if (saveDict.isSelected() && !trans.isEmpty() && !trans.equals(orig)) {
             p.dictionary().add(orig, trans);
             try {
@@ -429,7 +433,9 @@ public class EditorPane extends BorderPane {
         if (currentClass == null || editingOrig == null || editingLocked() || app == null) {
             return;
         }
+        String beforeEff = app.project().effective(currentClass).getOrDefault(editingOrig, "");
         app.project().setTranslation(currentClass, editingOrig, "");
+        app.recordTranslation(currentClass, editingOrig, beforeEff, "");
         showClass(currentClass);
         selectRow(editingOrig);
         app.onTranslationChanged();
@@ -491,8 +497,11 @@ public class EditorPane extends BorderPane {
     }
 
     private void toggleSkip(String orig) {
+        boolean before = app.project().isSkipped(orig);
+        boolean after = !before;
+        app.recordSkip(orig, before, after);
         try {
-            app.project().setTextSkipped(orig, !app.project().isSkipped(orig));
+            app.project().setTextSkipped(orig, after);
         } catch (Exception ignored) {
             // 写盘失败不阻断
         }

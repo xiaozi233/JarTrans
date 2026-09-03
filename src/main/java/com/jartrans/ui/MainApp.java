@@ -141,6 +141,17 @@ public class MainApp extends javafx.application.Application {
         stage.setMinHeight(620);
         Scene scene = new Scene(root, 1320, 840);
         theme.attach(scene);
+        // Ctrl+Z 撤销 / Ctrl+Y、Ctrl+Shift+Z 重做（翻译、不翻译、类状态）
+        scene.getAccelerators().put(
+                new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.Z,
+                        javafx.scene.input.KeyCombination.CONTROL_DOWN), this::undoAction);
+        scene.getAccelerators().put(
+                new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.Y,
+                        javafx.scene.input.KeyCombination.CONTROL_DOWN), this::redoAction);
+        scene.getAccelerators().put(
+                new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.Z,
+                        javafx.scene.input.KeyCombination.CONTROL_DOWN,
+                        javafx.scene.input.KeyCombination.SHIFT_DOWN), this::redoAction);
         stage.setScene(scene);
         stage.show();
         stage.setOnCloseRequest(e -> onClose());
@@ -667,11 +678,18 @@ public class MainApp extends javafx.application.Application {
     }
 
     private void mark(List<String> classes, String state) {
+        Map<String, String> olds = new HashMap<>();
+        for (String cls : classes) {
+            olds.put(cls, project.classStatus().get(cls));
+        }
         try {
             project.setClassStatusBulk(classes, state);
         } catch (Exception exc) {
             Dialogs.warn("提示", exc.getMessage());
             return;
+        }
+        for (String cls : classes) {
+            recordClassMark(cls, olds.get(cls), state);
         }
         refreshClassNodes();
         updateStats();
@@ -1231,6 +1249,93 @@ public class MainApp extends javafx.application.Application {
     public void onTranslationChanged() {
         refreshClassNodes();
         updateStats();
+    }
+
+    // ---------- 撤销 / 重做（翻译 · 不翻译 · 类状态） ----------
+
+    /** 一条可撤销操作。kind: trans(译文)/skip(不翻译)/mark(类状态)。 */
+    private record Hist(String kind, String cls, String orig, String before, String after) {
+    }
+
+    private static final String AUTO = "*auto";
+    private static final int HIST_LIMIT = 200;
+    private final java.util.ArrayDeque<Hist> undoStack = new java.util.ArrayDeque<>();
+    private final java.util.ArrayDeque<Hist> redoStack = new java.util.ArrayDeque<>();
+
+    private void pushHist(Hist h) {
+        undoStack.addFirst(h);
+        if (undoStack.size() > HIST_LIMIT) {
+            undoStack.removeLast();
+        }
+        redoStack.clear();
+    }
+
+    /** 记录一次译文变更（EditorPane 保存/清空后按生效值调用）。 */
+    void recordTranslation(String cls, String orig, String before, String after) {
+        if (before.equals(after)) {
+            return;
+        }
+        pushHist(new Hist("trans", cls, orig, before, after));
+    }
+
+    /** 记录「不翻译」切换。 */
+    void recordSkip(String orig, boolean before, boolean after) {
+        if (before == after) {
+            return;
+        }
+        pushHist(new Hist("skip", null, orig, before ? "1" : "0", after ? "1" : "0"));
+    }
+
+    /** 记录类状态手动标记（null 视为自动）。 */
+    void recordClassMark(String cls, String beforeManual, String afterManual) {
+        String b = beforeManual == null ? AUTO : beforeManual;
+        String a = afterManual == null ? AUTO : afterManual;
+        if (b.equals(a)) {
+            return;
+        }
+        pushHist(new Hist("mark", cls, null, b, a));
+    }
+
+    private void undoAction() {
+        if (undoStack.isEmpty()) {
+            return;
+        }
+        Hist h = undoStack.removeFirst();
+        applyHist(h, h.before());
+        redoStack.addFirst(h);
+    }
+
+    private void redoAction() {
+        if (redoStack.isEmpty()) {
+            return;
+        }
+        Hist h = redoStack.removeFirst();
+        applyHist(h, h.after());
+        undoStack.addFirst(h);
+    }
+
+    private void applyHist(Hist h, String target) {
+        try {
+            switch (h.kind()) {
+                case "trans" -> project.setTranslation(h.cls(), h.orig(), target);
+                case "skip" -> project.setTextSkipped(h.orig(), "1".equals(target));
+                case "mark" -> project.setClassStatus(h.cls(), AUTO.equals(target) ? null : target);
+                default -> {
+                    return;
+                }
+            }
+        } catch (Exception exc) {
+            return; // 写盘失败等不回滚界面
+        }
+        refreshClassNodes();
+        updateStats();
+        if (project.hasJar()) {
+            String keepOrig = h.orig();
+            editor.refreshRows();
+            if (keepOrig != null) {
+                editor.selectRow(keepOrig);
+            }
+        }
     }
 
     public void setStatus(String text) {
