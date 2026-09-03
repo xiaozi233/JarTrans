@@ -92,7 +92,7 @@
                 </Menu>
             </MenuBar>
             <ToolBar>
-                <Button text="打开 Jar" onAction="#onOpenJar"/>
+                <Button text="打开 Jar" onAction="#onOpenJar" styleClass="accent"/>
                 <Button text="导出汉化 Jar" onAction="#onExportJar"/>
                 <Separator orientation="VERTICAL"/>
                 <Button text="导入语言包" onAction="#onImportPack"/>
@@ -156,7 +156,7 @@
     <bottom>
         <VBox>
             <Separator/>
-            <HBox spacing="10" alignment="CENTER_LEFT">
+            <HBox spacing="10" alignment="CENTER_LEFT" styleClass="status-bar">
                 <padding>
                     <Insets top="4" right="10" bottom="4" left="10"/>
                 </padding>

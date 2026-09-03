@@ -71,7 +71,8 @@ public class DecompilerManagerDialog extends Stage {
         initOwner(app.stage());
 
         BorderPane root = new BorderPane();
-        root.setPadding(new Insets(8));
+        root.setPadding(new Insets(10));
+        root.getStyleClass().add("root-pane");
 
         // ---- 左侧分类树 ----
         rootItem.getChildren().addAll(implItem, javaItem);

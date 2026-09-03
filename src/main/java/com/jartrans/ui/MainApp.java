@@ -227,9 +227,29 @@ public class MainApp extends javafx.application.Application {
         sourcePanel.refreshTheme();
 
         // 初始状态
+        buildLegend();
         refreshClassNodes();
         updateStats();
         setStatus("请先打开一个 jar 文件");
+    }
+
+    /** 填充类状态图例：彩色圆点 + 文字（圆点颜色记录在 legendLabels 供主题切换刷新）。 */
+    private void buildLegend() {
+        legendBox.getChildren().clear();
+        legendLabels.clear();
+        legendBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        for (String st : List.of("todo", "doing", "done", "ignore", "empty")) {
+            Label dot = new Label("●");
+            dot.setTextFill(Color.web(theme.stateColor(st)));
+            dot.setStyle("-fx-font-size: 9px;");
+            Label text = new Label(STATE_LABEL.get(st));
+            text.setTextFill(Color.web(theme.color("fg_muted")));
+            text.setStyle("-fx-font-size: 11px;");
+            HBox pair = new HBox(3, dot, text);
+            pair.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+            legendLabels.put(st, dot);
+            legendBox.getChildren().add(pair);
+        }
     }
 
     private void setThemeSelections(String mode) {
@@ -239,13 +259,8 @@ public class MainApp extends javafx.application.Application {
     }
 
     private void onThemeChanged() {
-        // 图例颜色
-        for (String st : List.of("todo", "doing", "done", "ignore", "empty")) {
-            Label l = legendLabels.get(st);
-            if (l != null) {
-                l.setTextFill(Color.web(theme.stateColor(st)));
-            }
-        }
+        // 图例颜色（圆点 + 文字随主题重建）
+        buildLegend();
         refreshClassNodes();
         if (sourcePanel != null) {
             sourcePanel.refreshTheme();
@@ -917,6 +932,7 @@ public class MainApp extends javafx.application.Application {
         win.initModality(javafx.stage.Modality.NONE);
         javafx.scene.layout.VBox vbox = new javafx.scene.layout.VBox(6);
         vbox.setPadding(new Insets(6));
+        vbox.getStyleClass().add("root-pane");
         javafx.scene.control.TableView<LangPack.MissingEntry> table =
                 new javafx.scene.control.TableView<>();
         javafx.scene.layout.VBox.setVgrow(table, javafx.scene.layout.Priority.ALWAYS);

@@ -40,7 +40,8 @@ public class DictDialog extends Stage {
         initOwner(app.stage());
 
         BorderPane root = new BorderPane();
-        root.setPadding(new Insets(8));
+        root.setPadding(new Insets(10));
+        root.getStyleClass().add("root-pane");
 
         HBox top = new HBox(8);
         top.setPadding(new Insets(0, 0, 6, 0));

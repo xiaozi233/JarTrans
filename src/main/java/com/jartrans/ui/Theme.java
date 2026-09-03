@@ -29,23 +29,23 @@ public final class Theme {
     public static final Map<String, String> LABELS = Map.of(
             MODE_SYSTEM, "跟随系统", MODE_LIGHT, "浅色", MODE_DARK, "深色");
 
-    // ---------- 浅色配色 ----------
+    // ---------- 浅色配色（与 light.css 令牌一致） ----------
     public static final Map<String, String> LIGHT = palette(
-            "#f4f6f9", "#ffffff", "#e8ecf1", "#eef1f6", "#ffffff",
-            "#1f2430", "#5f6672", "#ccd3dc", "#2f6feb", "#ffffff",
-            "#c9dcff", "#1f2430", "#9aa1ad", "#e4e8ee", "#fafbfd",
-            "#c0392b", "#b26b00", "#1e8e3e", "#7a828e", "#9aa1ad",
-            "#c0392b", "#1e8e3e", "#1565c0", "#8a919c",
-            "#8a2a8f", "#0b7a3b", "#6b7480", "#a13d2d", "#ffe9a8", "#ffb74d", "#9a5b00");
+            "#eef1f6", "#ffffff", "#f0f3f8", "#f6f8fb", "#ffffff",
+            "#23272f", "#69707e", "#d6dbe4", "#3b6ef0", "#ffffff",
+            "#d9e4ff", "#23272f", "#a4aab5", "#e7ebf2", "#f6f8fb",
+            "#c93c37", "#b57708", "#1f9d4d", "#8b93a1", "#a4aab5",
+            "#c93c37", "#1f9d4d", "#2f6de0", "#8b93a1",
+            "#7c3aed", "#0d7d3f", "#8a919c", "#b3541e", "#fff0b3", "#ffe08a", "#8a5a00");
 
-    // ---------- 深色配色 ----------
+    // ---------- 深色配色（与 dark.css 令牌一致） ----------
     public static final Map<String, String> DARK = palette(
-            "#191c21", "#22262d", "#2a2f37", "#272c34", "#14171b",
-            "#e3e7ee", "#98a1b0", "#363d47", "#4d8dff", "#ffffff",
-            "#2f4d7d", "#ffffff", "#6b7280", "#22262d", "#1d2127",
-            "#ff7b72", "#ffb454", "#57d776", "#7d8590", "#6e7681",
-            "#ff7b72", "#57d776", "#79c0ff", "#7d8590",
-            "#569cd6", "#ce9178", "#6a9955", "#b5cea8", "#5c4b12", "#8a6d1f", "#e2a03f");
+            "#14161b", "#1d2129", "#262c37", "#191d24", "#101319",
+            "#e5e9f2", "#98a1b3", "#333a48", "#6e93ff", "#ffffff",
+            "#31415e", "#ffffff", "#6d7484", "#10141b", "#20252e",
+            "#ff6b66", "#ffb454", "#5fd97f", "#7d8590", "#6e7681",
+            "#ff6b66", "#5fd97f", "#79b8ff", "#7d8590",
+            "#569cd6", "#ce9178", "#6a9955", "#b5cea8", "#3d3a12", "#665918", "#e8b04b");
 
     private static Map<String, String> palette(String bg, String surface, String surfaceAlt,
                                                String headerBg, String fieldBg,

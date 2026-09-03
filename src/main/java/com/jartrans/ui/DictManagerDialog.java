@@ -41,7 +41,8 @@ public class DictManagerDialog extends Stage {
         initOwner(app.stage());
 
         BorderPane root = new BorderPane();
-        root.setPadding(new Insets(8));
+        root.setPadding(new Insets(10));
+        root.getStyleClass().add("root-pane");
 
         TableColumn<DictRow, String> colName = new TableColumn<>("名称");
         colName.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().name()));

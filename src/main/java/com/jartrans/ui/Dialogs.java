@@ -1,8 +1,11 @@
 package com.jartrans.ui;
 
+import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.DialogPane;
 import javafx.scene.control.TextInputDialog;
+import javafx.stage.Window;
 
 import java.util.Optional;
 
@@ -17,6 +20,7 @@ public final class Dialogs {
         alert.setTitle(title);
         alert.setHeaderText(null);
         alert.setContentText(message);
+        applyTheme(alert.getDialogPane());
         alert.showAndWait();
     }
 
@@ -25,6 +29,7 @@ public final class Dialogs {
         alert.setTitle(title);
         alert.setHeaderText(null);
         alert.setContentText(message);
+        applyTheme(alert.getDialogPane());
         alert.showAndWait();
     }
 
@@ -33,6 +38,7 @@ public final class Dialogs {
         alert.setTitle(title);
         alert.setHeaderText(null);
         alert.setContentText(message);
+        applyTheme(alert.getDialogPane());
         alert.showAndWait();
     }
 
@@ -41,6 +47,7 @@ public final class Dialogs {
         alert.setTitle(title);
         alert.setHeaderText(null);
         alert.setContentText(message);
+        applyTheme(alert.getDialogPane());
         return alert.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK;
     }
 
@@ -50,7 +57,19 @@ public final class Dialogs {
         dialog.setTitle(title);
         dialog.setHeaderText(null);
         dialog.setContentText(message);
+        applyTheme(dialog.getDialogPane());
         Optional<String> result = dialog.showAndWait();
         return result.orElse(null);
+    }
+
+    /** 从任一已显示窗口复制主题样式表，让系统对话框与应用主题一致。 */
+    private static void applyTheme(DialogPane pane) {
+        for (Window w : Window.getWindows()) {
+            Scene s = w.getScene();
+            if (s != null && !s.getStylesheets().isEmpty()) {
+                pane.getStylesheets().setAll(s.getStylesheets());
+                return;
+            }
+        }
     }
 }

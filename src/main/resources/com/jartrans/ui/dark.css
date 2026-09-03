@@ -1,197 +1,544 @@
-/* JarTrans 深色主题 */
-.root-pane {
-    -jr-bg: #191c21;
-    -jr-surface: #22262d;
-    -jr-surface-alt: #2a2f37;
-    -jr-header-bg: #272c34;
-    -jr-field-bg: #14171b;
-    -jr-fg: #e3e7ee;
-    -jr-muted: #98a1b0;
-    -jr-border: #363d47;
-    -jr-accent: #4d8dff;
-    -jr-select-bg: #2f4d7d;
+/* ==========================================================================
+   JarTrans 深色主题
+   设计方向：现代桌面 IDE 风 —— 蓝灰中性底 + 靛蓝主色，卡片化面板，
+   8px 圆角 / 8px 间距栅格 / 全控件 hover·focus·disabled 态。
+   令牌定义在 .root（JavaFX 自动挂在场景根节点），弹窗/对话框同源生效。
+   ========================================================================== */
+.root {
+    /* ---- 色板令牌 ---- */
+    -jr-bg: #14161b;            /* 窗口底 */
+    -jr-surface: #1d2129;       /* 卡片/面板 */
+    -jr-surface-alt: #262c37;   /* 按钮/表头/悬停层 */
+    -jr-header-bg: #191d24;     /* 菜单栏/状态栏 */
+    -jr-field-bg: #101319;      /* 输入框凹陷底 */
+    -jr-fg: #e5e9f2;            /* 主文字 */
+    -jr-muted: #98a1b3;         /* 次要文字 */
+    -jr-border: #333a48;        /* 细边框 */
+    -jr-border-strong: #454e60; /* hover 边框 */
+    -jr-accent: #6e93ff;        /* 靛蓝主色 */
+    -jr-accent-hover: #87a6ff;
+    -jr-accent-soft: rgba(110, 147, 255, 0.16);  /* 主色淡底（hover/选中提示） */
+    -jr-accent-fg: #ffffff;
+    -jr-select-bg: #31415e;     /* 选中底 */
     -jr-select-fg: #ffffff;
-    -jr-disabled: #6b7280;
-    -jr-sunken: #22262d;
+    -jr-disabled: #6d7484;
+    -jr-sunken: #10141b;        /* 进度条轨道等凹陷处 */
+    -jr-stripe: #20252e;        /* 表格斑马纹 */
+    -jr-shadow: rgba(0, 0, 0, 0.5);
 
-    -fx-background-color: -jr-bg;
-    -fx-font-family: "Microsoft YaHei UI", "PingFang SC", sans-serif;
+    /* ---- 全局字体与焦点 ---- */
+    -fx-font-family: "Microsoft YaHei UI", "PingFang SC", "Segoe UI", sans-serif;
     -fx-font-size: 13px;
     -fx-text-fill: -jr-fg;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+    -fx-accent: -jr-accent;
+    -fx-selection-bar: -jr-select-bg;
+    -fx-selection-bar-text: -jr-select-fg;
+    -fx-selection-bar-non-focused: derive(-jr-select-bg, -20%);
 }
 
-.root-pane .label {
+/* ---------- 基底 ---------- */
+.root-pane {
+    -fx-background-color: -jr-bg;
+}
+.label {
     -fx-text-fill: -jr-fg;
 }
 
-.root-pane .button {
-    -fx-background-color: -jr-surface;
+/* ---------- 按钮 ---------- */
+.button {
+    -fx-background-color: -jr-surface-alt;
     -fx-text-fill: -jr-fg;
     -fx-border-color: -jr-border;
-    -fx-border-radius: 3;
-    -fx-background-radius: 3;
-    -fx-padding: 4 10 4 10;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-padding: 5 12 5 12;
     -fx-cursor: hand;
 }
-.root-pane .button:hover {
-    -fx-background-color: -jr-surface-alt;
+.button:hover {
+    -fx-background-color: derive(-jr-surface-alt, 14%);
+    -fx-border-color: -jr-border-strong;
 }
-.root-pane .button:pressed {
-    -fx-background-color: -jr-select-bg;
+.button:pressed {
+    -fx-background-color: derive(-jr-surface-alt, -12%);
+}
+.button:focused {
+    -fx-border-color: -jr-accent;
+}
+.button:disabled {
+    -fx-opacity: 0.45;
+}
+/* 主按钮：accent 填充 */
+.button.accent,
+.button:default {
+    -fx-background-color: -jr-accent;
+    -fx-text-fill: -jr-accent-fg;
+    -fx-border-color: transparent;
+}
+.button.accent:hover,
+.button:default:hover {
+    -fx-background-color: -jr-accent-hover;
+}
+.button.accent:pressed,
+.button:default:pressed {
+    -fx-background-color: derive(-jr-accent, -18%);
+}
+.button.accent:disabled,
+.button:default:disabled {
+    -fx-background-color: -jr-accent;
+    -fx-opacity: 0.4;
 }
 
-.root-pane .text-field {
+/* ---------- 文本输入 ---------- */
+.text-field {
     -fx-background-color: -jr-field-bg;
     -fx-text-fill: -jr-fg;
     -fx-prompt-text-fill: -jr-disabled;
     -fx-border-color: -jr-border;
-    -fx-border-radius: 3;
-    -fx-background-radius: 3;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-padding: 6 10 6 10;
+}
+.text-field:hover {
+    -fx-border-color: -jr-border-strong;
+}
+.text-field:focused {
+    -fx-border-color: -jr-accent;
 }
 
-.root-pane .combo-box {
+.text-area {
+    -fx-background-color: -jr-field-bg;
+    -fx-text-fill: -jr-fg;
+    -fx-prompt-text-fill: -jr-disabled;
+    -fx-border-color: -jr-border;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-background-insets: 0;
+}
+.text-area:hover {
+    -fx-border-color: -jr-border-strong;
+}
+.text-area:focused {
+    -fx-border-color: -jr-accent;
+}
+.text-area .content {
+    -fx-background-color: -jr-field-bg;
+    -fx-background-radius: 0 0 6 6;
+}
+
+/* ---------- 下拉框 ---------- */
+.combo-box-base {
     -fx-background-color: -jr-field-bg;
     -fx-border-color: -jr-border;
-    -fx-background-radius: 3;
-    -fx-border-radius: 3;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-padding: 4 6 4 10;
 }
-.root-pane .combo-box .list-cell {
-    -fx-text-fill: -jr-fg;
-    -fx-background-color: -jr-field-bg;
+.combo-box-base:hover {
+    -fx-border-color: -jr-border-strong;
 }
-.root-pane .combo-box-popup .list-view {
-    -fx-background-color: -jr-field-bg;
-    -fx-border-color: -jr-border;
+.combo-box-base:focused {
+    -fx-border-color: -jr-accent;
 }
-.root-pane .combo-box-popup .list-cell {
-    -fx-text-fill: -jr-fg;
-    -fx-background-color: -jr-field-bg;
+.combo-box-base .arrow-button {
+    -fx-background-color: transparent;
 }
-.root-pane .combo-box-popup .list-cell:filled:hover {
-    -fx-background-color: -jr-select-bg;
+.combo-box-base .arrow {
+    -fx-background-color: -jr-muted;
 }
-
-.root-pane .tree-view {
-    -fx-background-color: -jr-field-bg;
-    -fx-border-color: -jr-border;
-}
-.root-pane .tree-cell {
-    -fx-text-fill: -jr-fg;
-    -fx-padding: 2 4 2 4;
-}
-.root-pane .tree-cell:filled:selected {
-    -fx-background-color: -jr-select-bg;
-    -fx-text-fill: -jr-select-fg;
-}
-
-.root-pane .table-view {
-    -fx-background-color: -jr-field-bg;
-    -fx-border-color: -jr-border;
-}
-.root-pane .table-view .column-header-background {
-    -fx-background-color: -jr-header-bg;
-}
-.root-pane .table-view .column-header .label {
+.combo-box .list-cell {
+    -fx-background-color: transparent;
     -fx-text-fill: -jr-fg;
 }
-.root-pane .table-row-cell {
-    -fx-background-color: -jr-field-bg;
-    -fx-border-color: -jr-bg transparent transparent transparent;
-}
-.root-pane .table-row-cell:filled:hover {
-    -fx-background-color: -jr-surface-alt;
-}
-.root-pane .table-row-cell:filled:selected {
-    -fx-background-color: -jr-select-bg;
-}
-
-.root-pane .list-view {
-    -fx-background-color: -jr-field-bg;
-    -fx-border-color: -jr-border;
-}
-.root-pane .list-cell {
-    -fx-padding: 0 4 0 4;
-}
-.root-pane .list-cell:filled:selected {
-    -fx-background-color: -jr-select-bg;
-}
-
-.root-pane .titled-pane > .title {
-    -fx-background-color: -jr-header-bg;
-}
-.root-pane .titled-pane > .title > .text {
-    -fx-fill: -jr-fg;
-}
-.root-pane .titled-pane > .content {
-    -fx-background-color: -jr-bg;
-    -fx-border-color: -jr-border;
-}
-
-.root-pane .tab-pane > .tab-header-area {
-    -fx-background-color: -jr-bg;
-}
-.root-pane .tab-pane > .tab-header-area .tab-header-background {
-    -fx-background-color: -jr-surface-alt;
-}
-.root-pane .tab .tab-label {
-    -fx-text-fill: -jr-muted;
-}
-.root-pane .tab:selected .tab-label {
-    -fx-text-fill: -jr-fg;
-}
-.root-pane .tab {
-    -fx-background-color: -jr-surface-alt;
-    -fx-background-radius: 4 4 0 0;
-}
-.root-pane .tab:selected {
-    -fx-background-color: -jr-field-bg;
-}
-
-.root-pane .menu-bar {
-    -fx-background-color: -jr-header-bg;
-}
-.root-pane .menu-bar .label {
-    -fx-text-fill: -jr-fg;
-}
-.root-pane .menu-item .label {
-    -fx-text-fill: -jr-fg;
-}
-.root-pane .menu-item:hover {
-    -fx-background-color: -jr-select-bg;
-}
-.root-pane .menu-item:focused {
-    -fx-background-color: -jr-select-bg;
-}
-.root-pane .context-menu {
+.combo-box-popup .list-view {
     -fx-background-color: -jr-surface;
     -fx-border-color: -jr-border;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 4;
+    -fx-effect: dropshadow(gaussian, -jr-shadow, 16, 0, 0, 4);
+}
+.combo-box-popup .list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: -jr-fg;
+    -fx-background-radius: 6;
+    -fx-padding: 6 10 6 10;
+}
+.combo-box-popup .list-cell:filled:hover,
+.combo-box-popup .list-cell:filled:selected {
+    -fx-background-color: -jr-accent-soft;
+    -fx-text-fill: -jr-fg;
 }
 
-.root-pane .tool-bar {
-    -fx-background-color: -jr-bg;
+/* ---------- 复选框 ---------- */
+.check-box {
+    -fx-text-fill: -jr-fg;
+}
+.check-box > .text {
+    -fx-fill: -jr-fg;
+}
+.check-box .box {
+    -fx-background-color: -jr-field-bg;
+    -fx-border-color: -jr-border;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+}
+.check-box:hover .box {
+    -fx-border-color: -jr-border-strong;
+}
+.check-box:selected .box {
+    -fx-background-color: -jr-accent;
+    -fx-border-color: -jr-accent;
+}
+.check-box:selected .mark {
+    -fx-background-color: -jr-accent-fg;
+}
+
+/* ---------- 树 / 表 / 列表容器 ---------- */
+.tree-view,
+.table-view,
+.list-view {
+    -fx-background-color: -jr-surface;
+    -fx-border-color: -jr-border;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-background-insets: 0;
+}
+.virtual-flow > .corner {
+    -fx-background-color: -jr-surface;
+}
+
+/* 树 */
+.tree-cell {
+    -fx-text-fill: -jr-fg;
+    -fx-background-color: transparent;
+    -fx-padding: 5 8 5 8;
+}
+.tree-cell:filled:hover {
+    -fx-background-color: -jr-accent-soft;
+}
+.tree-cell:filled:selected {
+    -fx-background-color: -jr-select-bg;
+}
+.tree-cell:filled:selected:hover {
+    -fx-background-color: -jr-select-bg;
+}
+.tree-cell > .tree-disclosure-node > .arrow {
+    -fx-background-color: -jr-muted;
+}
+.tree-cell:filled:selected > .tree-disclosure-node > .arrow {
+    -fx-background-color: -jr-select-fg;
+}
+
+/* 表格 */
+.table-view .column-header-background {
+    -fx-background-color: -jr-surface-alt;
+    -fx-background-radius: 8 8 0 0;
     -fx-border-color: transparent transparent -jr-border transparent;
 }
-
-.root-pane .separator .line {
-    -fx-border-color: -jr-border;
+.table-view .column-header-background .filler {
+    -fx-background-color: transparent;
+}
+.table-view .column-header {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent -jr-border transparent transparent;
+    -fx-border-width: 0 1 0 0;
+    -fx-size: 32;
+}
+.table-view .column-header .label {
+    -fx-text-fill: -jr-muted;
+    -fx-font-weight: bold;
+    -fx-font-size: 12px;
+}
+.table-view .column-resize-line {
+    -fx-background-color: -jr-border;
+}
+.table-view .filler {
+    -fx-background-color: -jr-surface;
+}
+.table-row-cell {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-cell-size: 30px;
+    -fx-text-fill: -jr-fg;
+}
+.table-row-cell:odd {
+    -fx-background-color: -jr-stripe;
+}
+.table-row-cell:filled:hover {
+    -fx-background-color: -jr-accent-soft;
+}
+.table-row-cell:filled:selected,
+.table-row-cell:filled:selected:hover {
+    -fx-background-color: -jr-select-bg;
+}
+.table-cell {
+    -fx-border-color: transparent;
+    -fx-padding: 4 8 4 8;
+    -fx-alignment: CENTER-LEFT;
 }
 
-.root-pane .scroll-pane {
+/* 列表（源码视图等） */
+.list-cell {
+    -fx-text-fill: -jr-fg;
+    -fx-background-color: transparent;
+    -fx-padding: 3 8 3 8;
+}
+.list-cell:odd,
+.list-cell:even {
+    -fx-background-color: transparent;
+}
+.list-cell:filled:hover {
+    -fx-background-color: -jr-accent-soft;
+}
+.list-cell:filled:selected {
+    -fx-background-color: -jr-select-bg;
+}
+
+/* ---------- 页签 ---------- */
+.tab-pane > .tab-header-area {
+    -fx-padding: 4 8 0 8;
+    -fx-background-color: -jr-header-bg;
+}
+.tab-pane > .tab-header-area > .tab-header-background {
+    -fx-background-color: -jr-header-bg;
+}
+.tab-pane .tab {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 7 16 7 16;
+    -fx-border-color: transparent transparent transparent transparent;
+    -fx-border-width: 0 0 2 0;
+}
+.tab-pane .tab .tab-label {
+    -fx-text-fill: -jr-muted;
+    -fx-padding: 0;
+}
+.tab-pane .tab:hover .tab-label {
+    -fx-text-fill: -jr-fg;
+}
+.tab-pane .tab:selected {
+    -fx-border-color: transparent transparent -jr-accent transparent;
+}
+.tab-pane .tab:selected .tab-label {
+    -fx-text-fill: -jr-fg;
+    -fx-font-weight: bold;
+}
+.tab-pane .tab .focus-indicator {
+    -fx-focus-color: transparent;
+}
+.tab-pane .tab-down-button {
+    -fx-background-color: -jr-header-bg;
+}
+.tab-pane .tab-down-button .arrow {
+    -fx-background-color: -jr-muted;
+}
+.tab-pane > .tab-content-area {
     -fx-background-color: -jr-bg;
+    -fx-background-insets: 0;
+    -fx-padding: 4;
 }
 
-.root-pane .text-area {
-    -fx-background-color: -jr-field-bg;
+/* ---------- 标题面板（卡片） ---------- */
+.titled-pane {
     -fx-text-fill: -jr-fg;
     -fx-border-color: -jr-border;
+    -fx-border-radius: 8;
+    -fx-background-color: transparent;
 }
-.root-pane .text-area .content {
-    -fx-background-color: -jr-field-bg;
+.titled-pane > .title {
+    -fx-background-color: -jr-surface-alt;
+    -fx-background-radius: 7 7 0 0;
+    -fx-background-insets: 0;
+    -fx-padding: 7 12 7 12;
+    -fx-border-color: transparent transparent -jr-border transparent;
+}
+.titled-pane > .title > .text {
+    -fx-fill: -jr-muted;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+.titled-pane > .title > .arrow-button .arrow {
+    -fx-background-color: -jr-muted;
+}
+.titled-pane > .content {
+    -fx-background-color: -jr-surface;
+    -fx-background-radius: 0 0 7 7;
+    -fx-border-color: transparent;
 }
 
-.root-pane .progress-bar > .track {
-    -fx-background-color: -jr-sunken;
+/* ---------- 菜单 ---------- */
+.menu-bar {
+    -fx-background-color: -jr-header-bg;
+    -fx-padding: 2 4 2 4;
 }
-.root-pane .progress-bar > .bar {
+.menu-bar > .container > .menu-button {
+    -fx-background-radius: 6;
+    -fx-padding: 5 10 5 10;
+}
+.menu-bar > .container > .menu-button:hover,
+.menu-bar > .container > .menu-button:showing {
+    -fx-background-color: -jr-accent-soft;
+}
+.menu-bar .label {
+    -fx-text-fill: -jr-fg;
+}
+.context-menu {
+    -fx-background-color: -jr-surface;
+    -fx-border-color: -jr-border;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 4;
+    -fx-effect: dropshadow(gaussian, -jr-shadow, 16, 0, 0, 4);
+}
+.menu-item {
+    -fx-background-radius: 6;
+    -fx-padding: 6 14 6 14;
+}
+.menu-item .label {
+    -fx-text-fill: -jr-fg;
+}
+.menu-item:focused {
+    -fx-background-color: -jr-accent-soft;
+}
+.menu-item:disabled .label {
+    -fx-text-fill: -jr-disabled;
+}
+.menu .arrow {
+    -fx-background-color: -jr-muted;
+}
+.menu-up-arrow,
+.menu-down-arrow {
+    -fx-background-color: -jr-muted;
+}
+.check-menu-item:checked > .left-container > .check-mark,
+.radio-menu-item:checked > .left-container > .radio {
     -fx-background-color: -jr-accent;
+}
+.separator-menu-item .separator .line {
+    -fx-border-color: -jr-border;
+}
+
+/* ---------- 工具栏 / 状态栏 ---------- */
+.tool-bar {
+    -fx-background-color: -jr-bg;
+    -fx-padding: 6 8 6 8;
+    -fx-spacing: 6;
+    -fx-border-color: transparent transparent -jr-border transparent;
+}
+.status-bar {
+    -fx-background-color: -jr-header-bg;
+    -fx-border-color: -jr-border transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+}
+.status-bar .label {
+    -fx-text-fill: -jr-muted;
+}
+.tool-bar > .tool-bar-overflow-button > .arrow {
+    -fx-background-color: -jr-muted;
+}
+
+/* ---------- 分隔线 ---------- */
+.separator .line {
+    -fx-border-color: -jr-border;
+}
+
+/* ---------- 滚动面板 / 滚动条 ---------- */
+.scroll-pane {
+    -fx-background-color: -jr-bg;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+.scroll-pane > .viewport {
+    -fx-background-color: -jr-bg;
+}
+.scroll-pane .corner {
+    -fx-background-color: transparent;
+}
+.scroll-bar {
+    -fx-background-color: transparent;
+    -fx-padding: 2;
+}
+.scroll-bar:vertical {
+    -fx-pref-width: 10;
+}
+.scroll-bar:horizontal {
+    -fx-pref-height: 10;
+}
+.scroll-bar .track {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+.scroll-bar .thumb {
+    -fx-background-color: #3a4250;
+    -fx-background-radius: 8;
+}
+.scroll-bar .thumb:hover {
+    -fx-background-color: #4a5468;
+}
+.scroll-bar .thumb:pressed {
+    -fx-background-color: -jr-accent;
+}
+.scroll-bar .increment-button,
+.scroll-bar .decrement-button {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+.scroll-bar .increment-arrow,
+.scroll-bar .decrement-arrow {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+    -fx-shape: " ";
+}
+
+/* ---------- 进度条 ---------- */
+.progress-bar {
+    -fx-background-color: transparent;
+}
+.progress-bar > .track {
+    -fx-background-color: -jr-sunken;
+    -fx-background-radius: 6;
+    -fx-background-insets: 0;
+}
+.progress-bar > .bar {
+    -fx-background-color: -jr-accent;
+    -fx-background-radius: 6;
+    -fx-background-insets: 1;
+    -fx-padding: 4;
+}
+.progress-bar:indeterminate > .bar {
+    -fx-background-color: -jr-accent;
+}
+
+/* ---------- 提示气泡 ---------- */
+.tooltip {
+    -fx-background-color: -jr-surface-alt;
+    -fx-text-fill: -jr-fg;
+    -fx-border-color: -jr-border;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-padding: 6 10 6 10;
+    -fx-effect: dropshadow(gaussian, -jr-shadow, 10, 0, 0, 2);
+}
+
+/* ---------- 系统对话框（Alert / TextInputDialog） ---------- */
+.dialog-pane {
+    -fx-background-color: -jr-surface;
+}
+.dialog-pane > .content.label,
+.dialog-pane > .content {
+    -fx-text-fill: -jr-fg;
+}
+.dialog-pane > .button-bar > .container {
+    -fx-background-color: -jr-surface;
+}
+.dialog-pane .header-panel {
+    -fx-background-color: -jr-surface-alt;
+}
+.dialog-pane .header-panel .label {
+    -fx-text-fill: -jr-fg;
+}
+.dialog-pane .button-bar .details-button {
+    -fx-text-fill: -jr-muted;
 }

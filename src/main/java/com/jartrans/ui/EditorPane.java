@@ -144,6 +144,7 @@ public class EditorPane extends BorderPane {
         buttons.setPadding(new Insets(4, 6, 2, 6));
         buttons.setAlignment(Pos.CENTER_LEFT);
         Button saveBtn = new Button("保存译文 (Ctrl+S)");
+        saveBtn.getStyleClass().add("accent");
         saveBtn.setOnAction(e -> saveTranslation());
         Button useDictBtn = new Button("使用词典译文");
         useDictBtn.setOnAction(e -> useDictionary());
