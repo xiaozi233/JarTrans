@@ -23,6 +23,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 
+import java.util.List;
 import java.util.Map;
 
 /** 中间的字符串表格 + 底部多行编辑区（对应 gui/editor.py）。 */
@@ -103,26 +104,29 @@ public class EditorPane extends BorderPane {
         // ---- 表格 ----
         TableColumn<Row, String> colOrig = new TableColumn<>("原字符串");
         colOrig.setCellValueFactory(d -> new SimpleStringProperty(Texts.displayText(d.getValue().orig)));
-        colOrig.setPrefWidth(360);
+        colOrig.setPrefWidth(340);
         TableColumn<Row, String> colTrans = new TableColumn<>("译文");
         colTrans.setCellValueFactory(d -> new SimpleStringProperty(Texts.displayText(d.getValue().trans)));
         colTrans.setPrefWidth(260);
         TableColumn<Row, String> colStatus = new TableColumn<>("状态");
         colStatus.setCellValueFactory(d -> new SimpleStringProperty(STATUS_TEXT.get(d.getValue().statusKey)));
-        colStatus.setPrefWidth(80);
+        colStatus.setPrefWidth(70);
         colStatus.setStyle("-fx-alignment: CENTER;");
         TableColumn<Row, String> colCount = new TableColumn<>("次数");
         colCount.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().count));
-        colCount.setPrefWidth(50);
+        colCount.setPrefWidth(42);
         colCount.setStyle("-fx-alignment: CENTER;");
         TableColumn<Row, String> colMethods = new TableColumn<>("所在方法");
         colMethods.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().methods));
-        colMethods.setPrefWidth(170);
+        colMethods.setPrefWidth(130);
 
+        List<TableColumn<Row, String>> allCols =
+                List.of(colOrig, colTrans, colStatus, colCount, colMethods);
         //noinspection unchecked
-        table.getColumns().addAll(colOrig, colTrans, colStatus, colCount, colMethods);
-        // 列宽随窗口自适应伸缩（保持初始比例）
-        table.setColumnResizePolicy(javafx.scene.control.TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
+        table.getColumns().addAll(allCols);
+        // 拖列宽只动相邻右列（不影响左侧栏目的宽度，总宽不变）
+        table.setColumnResizePolicy(
+                javafx.scene.control.TableView.CONSTRAINED_RESIZE_POLICY_NEXT_COLUMN);
         table.setRowFactory(tv -> new javafx.scene.control.TableRow<>() {
             @Override
             protected void updateItem(Row item, boolean empty) {
@@ -139,10 +143,37 @@ public class EditorPane extends BorderPane {
                 viewInSource();
             }
         });
-        BorderPane.setMargin(table, new Insets(0, 0, 6, 0));
-        setCenter(table);
 
-        // ---- 编辑区 ----
+        // ---- 右键显示/隐藏列 ----
+        javafx.scene.control.ContextMenu colMenu = new javafx.scene.control.ContextMenu();
+        table.setOnContextMenuRequested(e -> {
+            long visible = allCols.stream().filter(TableColumn::isVisible).count();
+            colMenu.getItems().clear();
+            for (TableColumn<Row, String> c : allCols) {
+                javafx.scene.control.CheckMenuItem mi =
+                        new javafx.scene.control.CheckMenuItem(c.getText());
+                mi.setSelected(c.isVisible());
+                mi.setDisable(c.isVisible() && visible == 1); // 至少保留一列
+                mi.setOnAction(ev -> {
+                    if (mi.isSelected()) {
+                        c.setVisible(true);
+                    } else if (visible > 1) {
+                        c.setVisible(false);
+                    } else {
+                        mi.setSelected(true);
+                    }
+                });
+                colMenu.getItems().add(mi);
+            }
+            colMenu.show(table, e.getScreenX(), e.getScreenY());
+        });
+
+        // ---- 表格(上) 与 编辑区(下) 之间的可拖动分栏 ----
+        javafx.scene.control.SplitPane vSplit = new javafx.scene.control.SplitPane();
+        vSplit.setOrientation(javafx.geometry.Orientation.VERTICAL);
+        vSplit.setDividerPositions(0.62);
+        vSplit.getItems().add(table);
+
         HBox buttons = new HBox(6);
         buttons.setPadding(new Insets(4, 6, 2, 6));
         buttons.setAlignment(Pos.CENTER_LEFT);
@@ -162,13 +193,20 @@ public class EditorPane extends BorderPane {
         VBox editBox = new VBox(buttons, editor);
         editBox.setPadding(new Insets(0, 6, 6, 6));
         VBox.setVgrow(editor, Priority.ALWAYS);
-        editor.setPrefRowCount(6);
+        editor.setPrefRowCount(4);
+        editor.setMinHeight(72);
         editor.setWrapText(true);
         editor.setStyle("-fx-font-family: 'Microsoft YaHei UI', monospace;");
 
-        TitledPane editPane = new TitledPane("编辑区", editBox);
-        editPane.setCollapsible(false);
-        setBottom(editPane);
+        javafx.scene.layout.BorderPane editPanel = new javafx.scene.layout.BorderPane();
+        Label editHeader = new Label("编辑区");
+        editHeader.getStyleClass().add("pane-header");
+        editPanel.setTop(editHeader);
+        editPanel.setCenter(editBox);
+        vSplit.getItems().add(editPanel);
+
+        BorderPane.setMargin(vSplit, new Insets(0, 0, 4, 0));
+        setCenter(vSplit);
 
         editor.setOnKeyPressed(e -> {
             if (new KeyCodeCombination(KeyCode.S, KeyCombination.CONTROL_DOWN).match(e)

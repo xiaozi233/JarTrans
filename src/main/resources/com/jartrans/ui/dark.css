@@ -599,9 +599,13 @@
     -fx-background-color: transparent;
     -fx-padding: 0;
 }
-.split-pane > .split-pane-divider {
+.split-pane:horizontal > .split-pane-divider {
     -fx-background-color: transparent;
     -fx-padding: 0 3 0 3;
+}
+.split-pane:vertical > .split-pane-divider {
+    -fx-background-color: transparent;
+    -fx-padding: 3 0 3 0;
 }
 .split-pane > .split-pane-divider:hover,
 .split-pane > .split-pane-divider:pressed {
@@ -616,3 +620,10 @@
 .split-pane > .split-pane-divider > .vertical-grabber {
     -fx-background-radius: 1;
 }
+
+/* 图例文字颜色（与圆点同规则） */
+.legend-txt.cell-state-todo { -fx-text-fill: -jr-state-todo; }
+.legend-txt.cell-state-doing { -fx-text-fill: -jr-state-doing; }
+.legend-txt.cell-state-done { -fx-text-fill: -jr-state-done; }
+.legend-txt.cell-state-ignore { -fx-text-fill: -jr-state-ignore; }
+.legend-txt.cell-state-empty { -fx-text-fill: -jr-state-empty; }

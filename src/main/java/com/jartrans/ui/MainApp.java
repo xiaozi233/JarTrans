@@ -99,7 +99,7 @@ public class MainApp extends javafx.application.Application {
     @FXML
     private CheckBox hideEmptyCheck;
     @FXML
-    private javafx.scene.layout.HBox legendBox;
+    private javafx.scene.layout.FlowPane legendBox;
     @FXML
     private TreeView<String> classTree;
     @FXML
@@ -225,15 +225,45 @@ public class MainApp extends javafx.application.Application {
         setStatus("请先打开一个 jar 文件");
     }
 
-    /** 填充类状态图例：彩色圆点 + 文字。圆点与树节点/编辑器状态点共用 CSS 状态类，
-        颜色由主题 .state-dot.cell-state-* 提供（代码不上色，避免被 CSS 脉冲覆盖）。 */
+    private boolean isLegendCompact() {
+        try {
+            return settings.getBool("legend_compact");
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    /** 填充类状态图例。详细模式 = 彩色文字+圆点；精简模式 = 只留彩色圆点。
+        颜色全部由 CSS（.state-dot/.legend-txt 的 cell-state-* 类）提供。 */
     private void buildLegend() {
         legendBox.getChildren().clear();
         legendBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        final boolean compact = isLegendCompact();
+        // 精简/详细切换按钮，置于最前
+        Button toggle = new Button(compact ? "详细" : "精简");
+        toggle.setStyle("-fx-font-size: 11px; -fx-padding: 1 8 1 8;");
+        toggle.setTooltip(new javafx.scene.control.Tooltip(compact
+                ? "图例仅圆点，点击显示文字说明" : "图例精简：只保留彩色圆点"));
+        toggle.setOnAction(e -> {
+            try {
+                settings.set("legend_compact", !compact);
+            } catch (Exception ignored) {
+                // 写盘失败不阻断
+            }
+            buildLegend();
+        });
+        legendBox.getChildren().add(toggle);
         for (String st : List.of("todo", "doing", "done", "ignore", "empty")) {
             javafx.scene.shape.Circle dot = new javafx.scene.shape.Circle(4);
             dot.getStyleClass().addAll("state-dot", "cell-state-" + st);
+            javafx.scene.control.Tooltip.install(dot,
+                    new javafx.scene.control.Tooltip(STATE_LABEL.get(st)));
+            if (compact) {
+                legendBox.getChildren().add(dot);
+                continue;
+            }
             Label text = new Label(STATE_LABEL.get(st));
+            text.getStyleClass().addAll("legend-txt", "cell-state-" + st);
             text.setStyle("-fx-font-size: 11px;");
             HBox pair = new HBox(3, dot, text);
             pair.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
