@@ -460,7 +460,7 @@ public class MainApp extends javafx.application.Application {
                 + "不改动、不移动任何原有常量和字节码结构。\n"
                 + "写回前会自动做结构校验，确保 class 文件可被 JVM 正常加载。\n\n"
                 + "支持浅色/深色/跟随系统主题、多词典切换、类状态标记与过滤、\n"
-                + "内置 Vineflower 反编译器（CFR / Procyon 可联网下载）。");
+                + "内置 Vineflower / CFR / Procyon 三种反编译器，开箱即用。");
     }
 
     @FXML
@@ -1157,12 +1157,9 @@ public class MainApp extends javafx.application.Application {
 
     /** 取当前反编译器（内置 Vineflower 自动兜底）。 */
     private Object[] currentTool() {
-        Object[] dec = DecompilerManager.currentDecompiler(settings);
-        if (dec == null) {
-            DecompilerManager.ensureBundledDecompiler();
-            dec = DecompilerManager.currentDecompiler(settings);
-        }
-        return dec;
+        // 三种反编译器均内置：缺失时自动释放，保证有可用引擎
+        DecompilerManager.ensureBundledAll();
+        return DecompilerManager.currentDecompiler(settings);
     }
 
     /** class 内部名（UI 里类键带 .class 后缀，反编译器需要去掉）。 */

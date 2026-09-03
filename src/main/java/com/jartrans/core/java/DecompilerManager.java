@@ -32,9 +32,15 @@ public final class DecompilerManager {
     public static final Path CACHE_ROOT =
             Paths.get(System.getProperty("java.io.tmpdir"), "jartrans_decomp");
 
-    /** 随应用内置的 Vineflower（Apache-2.0），首次需要时自动释放到 tools/，无需联网下载。 */
-    public static final String BUNDLED_RESOURCE = "/com/jartrans/bundled/vineflower.jar";
-    public static final String BUNDLED_FILENAME = "vineflower.jar";
+    /** 内置反编译器 jar 的资源路径模板（Vineflower/CFR/Procyon 均随应用分发，
+        首次需要时自动释放到 tools/，无需联网下载）。 */
+    public static String bundledResource(DecompilerType type) {
+        return "/com/jartrans/bundled/" + type.key + ".jar";
+    }
+
+    public static String bundledFileName(DecompilerType type) {
+        return type.key + ".jar";
+    }
 
     private static final AtomicReference<Process> ACTIVE_PROCESS = new AtomicReference<>();
 
@@ -97,17 +103,22 @@ public final class DecompilerManager {
             return new Object[]{type != null ? type : DecompilerType.VINEFLOWER, configured};
         }
         List<ToolEntry> scan = scanTools();
-        if (!scan.isEmpty()) {
-            ToolEntry first = scan.get(0);
-            return new Object[]{first.type(), first.path().toString()};
+        // 默认优先级：Vineflower > CFR > Procyon
+        for (DecompilerType preferred : List.of(DecompilerType.VINEFLOWER,
+                DecompilerType.CFR, DecompilerType.PROCYON)) {
+            for (ToolEntry entry : scan) {
+                if (entry.type() == preferred) {
+                    return new Object[]{entry.type(), entry.path().toString()};
+                }
+            }
         }
         return null;
     }
 
-    /** tools/ 中是否已有可用的 Vineflower。 */
-    public static boolean hasVineflower() {
+    /** tools/ 中是否已有指定类型的反编译器。 */
+    public static boolean hasTool(DecompilerType type) {
         for (ToolEntry entry : scanTools()) {
-            if (entry.type() == DecompilerType.VINEFLOWER) {
+            if (entry.type() == type) {
                 return true;
             }
         }
@@ -115,19 +126,19 @@ public final class DecompilerManager {
     }
 
     /**
-     * 确保 Vineflower 可用：tools/ 中缺失时，把随应用内置的 jar 释放过去。
+     * 确保指定反编译器可用：tools/ 中缺失时，把随应用内置的 jar 释放过去。
      * 成功后无需联网与配置即可被 scanTools/currentDecompiler 发现。
      */
-    public static boolean ensureBundledDecompiler() {
-        if (hasVineflower()) {
+    public static boolean ensureBundled(DecompilerType type) {
+        if (hasTool(type)) {
             return true;
         }
         try {
             Path dir = toolsDir();
             Files.createDirectories(dir);
-            Path target = dir.resolve(BUNDLED_FILENAME);
+            Path target = dir.resolve(bundledFileName(type));
             if (!Files.isRegularFile(target)) {
-                try (InputStream in = DecompilerManager.class.getResourceAsStream(BUNDLED_RESOURCE)) {
+                try (InputStream in = DecompilerManager.class.getResourceAsStream(bundledResource(type))) {
                     if (in == null) {
                         return false;
                     }
@@ -138,6 +149,18 @@ public final class DecompilerManager {
         } catch (IOException e) {
             return false;
         }
+    }
+
+    /** 确保三种反编译器均可用（Vineflower/CFR/Procyon 全部内置）。 */
+    public static void ensureBundledAll() {
+        for (DecompilerType type : DecompilerType.values()) {
+            ensureBundled(type);
+        }
+    }
+
+    /** 兼容旧入口：确保内置 Vineflower 可用。 */
+    public static boolean ensureBundledDecompiler() {
+        return ensureBundled(DecompilerType.VINEFLOWER);
     }
 
     public static Path cacheDir(String jarSha256) {
@@ -207,32 +230,117 @@ public final class DecompilerManager {
         } catch (IOException exc) {
             throw new DecompileException("无法创建输出目录：" + exc.getMessage());
         }
-        // 输入：只放目标类与它们的内部类（保持包路径），其余引用缺失由引擎尽力而为
-        Path inRoot;
+        // 输入：只含目标类与内部类的临时 jar（Vineflower/CFR/Procyon 三种引擎都认 jar）
+        Path input;
+        int found = 0;
         try {
-            inRoot = Files.createTempDirectory(CACHE_ROOT.getParent(), "jartrans_in_");
+            input = Files.createTempFile(CACHE_ROOT.getParent(), "jartrans_in_", ".jar");
         } catch (IOException exc) {
-            throw new DecompileException("无法创建临时输入目录：" + exc.getMessage());
+            throw new DecompileException("无法创建临时输入 jar：" + exc.getMessage());
         }
         try {
             JarReader jr = new JarReader(Paths.get(jarPath));
-            for (String name : classNames) {
-                byte[] bytes = jr.readEntry(name + ".class");
-                if (bytes == null) {
-                    continue;
+            try (var jos = new java.util.jar.JarOutputStream(Files.newOutputStream(input))) {
+                for (String name : classNames) {
+                    byte[] bytes = jr.readEntry(name + ".class");
+                    if (bytes == null) {
+                        continue;
+                    }
+                    jos.putNextEntry(new java.util.zip.ZipEntry(name + ".class"));
+                    jos.write(bytes);
+                    jos.closeEntry();
+                    found++;
                 }
-                Path dest = inRoot.resolve(name + ".class");
-                Files.createDirectories(dest.getParent());
-                Files.write(dest, bytes);
             }
         } catch (JarReader.JarFileException exc) {
             throw new DecompileException("读取 jar 类失败：" + exc.getMessage());
         } catch (IOException exc) {
-            throw new DecompileException("复制类字节失败：" + exc.getMessage());
+            throw new DecompileException("构造临时输入 jar 失败：" + exc.getMessage());
         }
+        if (found == 0) {
+            try {
+                Files.deleteIfExists(input);
+            } catch (IOException ignored) {
+                // 忽略
+            }
+            throw new DecompileException("jar 中未找到指定类：" + classNames);
+        }
+        try {
+            if (type == DecompilerType.VINEFLOWER) {
+                // Vineflower 已随应用以库形式打入 classpath：进程内反编译，无子进程
+                runVineflowerInProcess(out, input);
+                return producedFor(out, classNames);
+            }
+            return runWithInput(out, javaPath, decompilerPath, type,
+                    input, classNames, log, cancelCheck);
+        } finally {
+            try {
+                Files.deleteIfExists(input);
+            } catch (IOException ignored) {
+                // 清理失败忽略
+            }
+        }
+    }
 
+    /** 进程内调用内置 Vineflower（ConsoleDecompiler），输出直接写 out 目录。 */
+    private static void runVineflowerInProcess(Path out, Path inJar)
+            throws DecompileException {
+        try {
+            Class<?> cls = Class.forName(
+                    "org.jetbrains.java.decompiler.main.decompiler.ConsoleDecompiler");
+            Class<?> loggerCls = Class.forName(
+                    "org.jetbrains.java.decompiler.main.extern.IFernflowerLogger");
+            java.util.Map<String, Object> options = new java.util.LinkedHashMap<>();
+            options.put("log_level", "error");
+            // 静默日志：用框架自带的 NO_OP 实例
+            Object logger = loggerCls.getField("NO_OP").get(null);
+            java.lang.reflect.Constructor<?> ctor = cls.getDeclaredConstructor(
+                    java.io.File.class, java.util.Map.class, loggerCls);
+            ctor.setAccessible(true);
+            Object decomp = ctor.newInstance(out.toFile(), options, logger);
+            cls.getMethod("addSource", java.io.File.class).invoke(decomp, inJar.toFile());
+            cls.getMethod("decompileContext").invoke(decomp);
+            // 进程内模式可能把结果打成 <输入名>.jar：把里面的 .java 解包到 out 根目录
+            unwrapArchives(out);
+        } catch (Exception exc) {
+            throw new DecompileException("进程内 Vineflower 反编译失败：" + exc);
+        }
+    }
+
+    private static void unwrapArchives(Path out) throws IOException {
+        List<Path> archives = new ArrayList<>();
+        try (DirectoryStream<Path> ds = Files.newDirectoryStream(out, "*.jar")) {
+            for (Path p : ds) {
+                archives.add(p);
+            }
+        }
+        for (Path archive : archives) {
+            try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(archive.toFile())) {
+                var entries = zf.entries();
+                while (entries.hasMoreElements()) {
+                    var entry = entries.nextElement();
+                    if (entry.isDirectory() || !entry.getName().endsWith(".java")) {
+                        continue;
+                    }
+                    Path dest = out.resolve(entry.getName());
+                    Files.createDirectories(dest.getParent());
+                    try (InputStream in = zf.getInputStream(entry)) {
+                        Files.copy(in, dest, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    }
+                }
+            } finally {
+                Files.deleteIfExists(archive);
+            }
+        }
+    }
+
+    private static List<Path> runWithInput(Path out, String javaPath, String decompilerPath,
+                                           DecompilerType type, Path inJar,
+                                           java.util.Collection<String> classNames,
+                                           LogSink log, CancelCheck cancelCheck)
+            throws DecompileException {
         List<String> cmd = type.buildCommand(javaPath, decompilerPath,
-                inRoot.toString(), out.toString());
+                inJar.toString(), out.toString());
         int code;
         try {
             ProcessBuilder pb = new ProcessBuilder(cmd);
@@ -272,24 +380,16 @@ public final class DecompilerManager {
             throw new DecompileException("已取消");
         } finally {
             ACTIVE_PROCESS.set(null);
-            try {
-                Files.walk(inRoot).sorted(Comparator.reverseOrder())
-                        .forEach(p -> {
-                            try {
-                                Files.deleteIfExists(p);
-                            } catch (IOException ignored) {
-                                // 忽略
-                            }
-                        });
-            } catch (IOException ignored) {
-                // 清理失败忽略
-            }
         }
 
         if (code != 0) {
             throw new DecompileException("反编译器退出码 " + code + "，详见输出日志");
         }
-        // 只返回与本次请求类相关的产物（其它类累积产物不在此列）
+        return producedFor(out, classNames);
+    }
+
+    /** 只返回与本次请求类相关的产物（其它类累积产物不在此列）。 */
+    private static List<Path> producedFor(Path out, java.util.Collection<String> classNames) {
         List<String> relOf = classNames.stream().map(n -> n + ".java").toList();
         List<Path> produced = new ArrayList<>();
         try (Stream<Path> walk = Files.walk(out)) {

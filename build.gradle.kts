@@ -28,6 +28,8 @@ dependencies {
     testImplementation(platform("org.junit:junit-bom:5.11.4"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    // 内置 Vineflower 以库形式参与进程内反编译（与资源里的 jar 同源，避免重复下载）
+    implementation(files("src/main/resources/com/jartrans/bundled/vineflower.jar"))
 }
 
 application {

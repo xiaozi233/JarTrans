@@ -12,7 +12,7 @@
 - **语言包**：导入/导出 JSON 语言包（含目标 jar 的 SHA-256 校验，不匹配会提示），失效条目可一键回收进词典
 - **多词典**：词典管理（新建/重命名/删除/导入/导出/切换），保存译文可自动记入词典，支持词典一键填充未翻译条目
 - **类状态管理**：未开始 / 翻译中 / 已完成 / 已忽略，按状态过滤、批量标记、进度统计
-- **源码对照**：内置字节码反汇编视图；**Vineflower 反编译器随应用内置**（首次查看源码自动就绪，无需联网下载），另可下载/接入 CFR / Procyon，源码与翻译表格双向跳转
+- **源码对照**：内置字节码反汇编视图；**Vineflower / CFR / Procyon 三种反编译器均随应用内置**（首次查看源码自动就绪，无需联网下载；管理器内可升级到上游最新版），源码与翻译表格双向跳转
 - **全局搜索**：跨类搜索原字符串/译文，双击直达
 - **主题**：浅色 / 深色 / 跟随系统
 
@@ -54,7 +54,11 @@ src/main/java/com/jartrans/
 
 ## 内置组件
 
-- [Vineflower](https://github.com/Vineflower/Vineflower)（Apache-2.0）— 反编译器，打包于应用资源中，首次使用自动释放。
+- [Vineflower](https://github.com/Vineflower/Vineflower)（Apache-2.0）
+- [CFR](https://github.com/leibnitz27/CFR)（MIT）
+- [Procyon](https://github.com/mstrobel/procyon)（Apache-2.0）
+
+三者均为反编译器，打包于应用资源中，首次使用自动释放到本地，无需联网下载。
 
 ## 协议
 

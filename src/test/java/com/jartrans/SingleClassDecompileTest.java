@@ -54,7 +54,7 @@ class SingleClassDecompileTest {
                 jar.toString(), "-C", tmp.resolve("classes").toString(), ".").start();
         jarTool.waitFor();
 
-        assertTrue(DecompilerManager.ensureBundledDecompiler());
+        DecompilerManager.ensureBundledAll(); // 三种反编译器都应内置可用
         Object[] dec = DecompilerManager.currentDecompiler(new com.jartrans.core.Settings());
         String javaExe = Path.of(home, "bin", "java.exe").toString();
         String sha = sha16(jar);
@@ -83,5 +83,18 @@ class SingleClassDecompileTest {
         assertFalse(alphaFiles.isEmpty());
         // 无整 jar .ok 标记（不能误导“整 jar 已完成”判断）
         assertFalse(Files.exists(DecompilerManager.cacheDir(sha).resolve(".ok")));
+
+        // CFR 与 Procyon 同样内置可用（临时 jar 输入通吃三种引擎）
+        for (DecompilerType engine : List.of(DecompilerType.CFR, DecompilerType.PROCYON)) {
+            assertTrue(DecompilerManager.ensureBundled(engine), engine + " 应内置");
+            Path tool = DecompilerManager.toolsDir().resolve(engine.key + ".jar");
+            assertTrue(Files.isRegularFile(tool), engine + " jar 应存在");
+            List<Path> files = DecompilerManager.decompileClasses(jar.toString(), sha,
+                    List.of("p/Alpha"), javaExe, tool.toString(), engine, l -> {
+                    }, () -> false);
+            System.out.println("[single] " + engine + " files="
+                    + files.stream().map(p -> p.getFileName().toString()).toList());
+            assertFalse(files.isEmpty(), engine + " 应能反编译单类");
+        }
     }
 }

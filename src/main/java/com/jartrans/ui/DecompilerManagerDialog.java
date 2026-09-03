@@ -125,8 +125,8 @@ public class DecompilerManagerDialog extends Stage {
 
         setScene(new Scene(root));
         app.theme().attach(getScene());
-        // 内置 Vineflower 自动就绪（首次打开即从应用资源释放到 tools/）
-        DecompilerManager.ensureBundledDecompiler();
+        // 三种内置反编译器自动就绪（首次打开即从应用资源释放到 tools/）
+        DecompilerManager.ensureBundledAll();
         refreshJava(false);
         refreshDetail();
     }
@@ -143,7 +143,7 @@ public class DecompilerManagerDialog extends Stage {
     }
 
     private Label hintLabel() {
-        Label hint = new Label("Vineflower 已随应用内置，首次打开即自动就绪；CFR / Procyon 也可点击「下载」。\n"
+        Label hint = new Label("Vineflower / CFR / Procyon 三种反编译器均已随应用内置，首次打开即自动就绪；\n点击「下载」可升级到上游最新版。"
                 + "也可手动下载 jar（GitHub Releases 页）后放入：\n"
                 + DecompilerManager.toolsDir()
                 + "\n文件名含 vineflower / procyon / cfr 即可被自动识别。");
