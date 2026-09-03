@@ -83,6 +83,14 @@ public class EditorPane extends BorderPane {
     private String findKeyword = "";   // 查找关键词（小写，空 = 不过滤）
     private String findScope = "both"; // orig / trans / both
 
+    // ---------- 译文自动保存（输入停顿或切换行/类时落库） ----------
+    private final javafx.animation.PauseTransition autoSave =
+            new javafx.animation.PauseTransition(javafx.util.Duration.millis(700));
+    /** 编辑区文本是否已被用户改过（尚未落库）。 */
+    private boolean editDirty;
+    /** 程序化加载文本（setEditor/回显）时抑制“视为用户修改”。 */
+    private boolean loadingEditor;
+
     public EditorPane() {
         buildUi();
     }
@@ -177,7 +185,8 @@ public class EditorPane extends BorderPane {
             }
         });
         table.setOnMouseClicked(e -> {
-            if (e.getClickCount() == 2) {
+            if (e.getClickCount() == 2 && app != null
+                    && app.settings().getBool("dblclick_source")) {
                 viewInSource();
             }
         });
@@ -250,6 +259,31 @@ public class EditorPane extends BorderPane {
         BorderPane.setMargin(vSplit, new Insets(0, 0, 4, 0));
         setCenter(vSplit);
         // 保存译文快捷键统一由主窗口（可重新绑定）处理，此处不再本地拦截
+
+        // ---- 译文自动保存：输入停顿 700ms 落库；失焦立即落库 ----
+        autoSave.setOnFinished(x -> flushEdit());
+        editor.textProperty().addListener((o, ov, nv) -> {
+            if (loadingEditor || editingInternal || editingOrig == null || app == null) {
+                return;
+            }
+            if (editingLocked()) {
+                editDirty = false;
+                return;
+            }
+            if (!app.settings().getBool("auto_save_translation")) {
+                editDirty = false;
+                return;
+            }
+            editDirty = true;
+            autoSave.stop();
+            autoSave.playFromStart();
+        });
+        editor.focusedProperty().addListener((o, ov, focused) -> {
+            if (!focused) {
+                autoSave.stop();
+                flushEdit();
+            }
+        });
     }
 
     // ---------- 类内查找 / 替换 ----------
@@ -468,6 +502,7 @@ public class EditorPane extends BorderPane {
 
     /** 替换当前选中的匹配行译文，然后跳到下一个。 */
     public void replaceCurrent() {
+        flushEdit();
         if (currentClass == null || app == null) {
             return;
         }
@@ -505,6 +540,7 @@ public class EditorPane extends BorderPane {
 
     /** 替换当前可见（匹配查找条件）的全部可编辑行译文。 */
     public void replaceAll() {
+        flushEdit();
         if (currentClass == null || app == null) {
             return;
         }
@@ -616,6 +652,7 @@ public class EditorPane extends BorderPane {
     // ---------- 展示 ----------
 
     public void showClass(String cls) {
+        flushEdit(); // 先落库上一行/上一类未保存的输入
         currentClass = cls;
         allRows.clear();
         rows.clear();
@@ -677,6 +714,7 @@ public class EditorPane extends BorderPane {
     // ---------- 编辑 ----------
 
     private void onSelect() {
+        flushEdit(); // 切行前自动保存上一行输入
         Row row = table.getSelectionModel().getSelectedItem();
         if (row == null) {
             return;
@@ -685,30 +723,64 @@ public class EditorPane extends BorderPane {
     }
 
     private void setEditor(String orig, boolean internal) {
-        editingOrig = orig;
-        editingInternal = internal;
-        editor.setEditable(true);
-        editor.setText("");
-        hint.setText("");
-        if (orig == null) {
+        autoSave.stop();
+        editDirty = false;
+        loadingEditor = true;
+        try {
+            editingOrig = orig;
+            editingInternal = internal;
+            editor.setEditable(true);
+            editor.setText("");
+            hint.setText("");
+            if (orig == null) {
+                return;
+            }
+            if (internal) {
+                editor.setText(orig);
+                editor.setEditable(false);
+                hint.setText("内部 UTF8 条目（类名/方法签名等），修改会破坏字节码，已禁止");
+                return;
+            }
+            Project p = app.project();
+            if (p.isSkipped(orig)) {
+                editor.setText(orig);
+                editor.setEditable(false);
+                hint.setText("该文本已被标记「不翻译」：导出/导入/词典填充都会保留原文。右键可恢复。");
+                return;
+            }
+            editor.setText(p.effective(currentClass).getOrDefault(orig, ""));
+            String suggestion = p.dictionary().get(orig);
+            hint.setText(suggestion != null ? "词典建议：" + Texts.displayText(suggestion) : "");
+        } finally {
+            loadingEditor = false;
+        }
+    }
+
+    /** 把编辑区当前文本写入工程（自动保存/切行/切类/关窗前调用）。幂等。 */
+    public void flushEdit() {
+        if (app == null || !editDirty) {
             return;
         }
-        if (internal) {
-            editor.setText(orig);
-            editor.setEditable(false);
-            hint.setText("内部 UTF8 条目（类名/方法签名等），修改会破坏字节码，已禁止");
+        autoSave.stop();
+        if (editingOrig == null || editingInternal || editingLocked()) {
+            editDirty = false;
             return;
         }
-        Project p = app.project();
-        if (p.isSkipped(orig)) {
-            editor.setText(orig);
-            editor.setEditable(false);
-            hint.setText("该文本已被标记「不翻译」：导出/导入/词典填充都会保留原文。右键可恢复。");
+        String trans = editor.getText();
+        String beforeEff = app.project().effective(currentClass).getOrDefault(editingOrig, "");
+        if (trans.equals(beforeEff)) {
+            editDirty = false;
             return;
         }
-        editor.setText(p.effective(currentClass).getOrDefault(orig, ""));
-        String suggestion = p.dictionary().get(orig);
-        hint.setText(suggestion != null ? "词典建议：" + Texts.displayText(suggestion) : "");
+        try {
+            app.project().setTranslation(currentClass, editingOrig, trans);
+        } catch (Exception ignored) {
+            // 写盘失败保留脏标记，等待下次尝试
+            return;
+        }
+        app.recordTranslation(currentClass, editingOrig, beforeEff, trans);
+        editDirty = false;
+        app.onTranslationChanged();
     }
 
     public void saveTranslation() {
@@ -718,6 +790,7 @@ public class EditorPane extends BorderPane {
         if (editingLocked()) {
             return;
         }
+        flushEdit(); // 未等自动保存的输入先落库，统一走同一条记录
         String orig = editingOrig;
         String trans = editor.getText();
         Project p = app.project();
@@ -742,6 +815,7 @@ public class EditorPane extends BorderPane {
         if (currentClass == null || editingOrig == null || editingLocked() || app == null) {
             return;
         }
+        flushEdit(); // 先落库未保存输入，再清空，避免被后续重建覆盖
         String beforeEff = app.project().effective(currentClass).getOrDefault(editingOrig, "");
         app.project().setTranslation(currentClass, editingOrig, "");
         app.recordTranslation(currentClass, editingOrig, beforeEff, "");
@@ -760,7 +834,7 @@ public class EditorPane extends BorderPane {
             return;
         }
         editor.setText(trans);
-        hint.setText("已填入词典译文，点击「保存译文」生效");
+        hint.setText("已填入词典译文（切换行/类时自动保存，或点「保存译文」立即生效）");
     }
 
     private void viewInSource() {

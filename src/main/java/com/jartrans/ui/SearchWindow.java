@@ -44,8 +44,14 @@ public class SearchWindow extends Stage {
     private record Project2Row(String cls, String orig, String trans, String statusKey) {
     }
 
-    private static final Map<String, String> SCOPE_MAP = new LinkedHashMap<>(Map.of(
-            "原字符串和译文", "both", "仅原字符串", "orig", "仅译文", "trans"));
+    private static final Map<String, String> SCOPE_MAP = new LinkedHashMap<>();
+
+    static {
+        // 显式插入顺序：默认首项为「原字符串和译文」（Map.of 迭代顺序不稳定）
+        SCOPE_MAP.put("原字符串和译文", "both");
+        SCOPE_MAP.put("仅原字符串", "orig");
+        SCOPE_MAP.put("仅译文", "trans");
+    }
 
     public SearchWindow(MainApp app, String initial) {
         this.app = app;

@@ -273,43 +273,25 @@ public class MainApp extends javafx.application.Application {
         setStatus("请先打开一个 jar 文件");
     }
 
-    private boolean isLegendCompact() {
-        try {
-            return settings.getBool("legend_compact");
-        } catch (Exception ignored) {
-            return false;
-        }
-    }
-
-    /** 填充类状态图例。详细模式 = 彩色文字+圆点；精简模式 = 只留彩色圆点。
-        颜色全部由 CSS（.state-dot/.legend-txt 的 cell-state-* 类）提供。 */
+    /** 填充类状态图例。始终保留一个「显示/隐藏」开关按钮；开启时附带彩色圆点+文字。 */
     private void buildLegend() {
         legendBox.getChildren().clear();
         legendBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-        final boolean compact = isLegendCompact();
-        // 精简/详细切换按钮，置于最前
-        Button toggle = new Button(compact ? "详细" : "精简");
+        final boolean visible = legendVisible();
+        Button toggle = new Button(visible ? "隐藏图例" : "显示图例");
         toggle.setStyle("-fx-font-size: 11px; -fx-padding: 1 8 1 8;");
-        toggle.setTooltip(new javafx.scene.control.Tooltip(compact
-                ? "图例仅圆点，点击显示文字说明" : "图例精简：只保留彩色圆点"));
-        toggle.setOnAction(e -> {
-            try {
-                settings.set("legend_compact", !compact);
-            } catch (Exception ignored) {
-                // 写盘失败不阻断
-            }
-            buildLegend();
-        });
+        toggle.setTooltip(new javafx.scene.control.Tooltip(
+                visible ? "收起类状态图例" : "展开类状态图例（彩色圆点+说明）"));
+        toggle.setOnAction(e -> applyLegendVisible(!legendVisible()));
         legendBox.getChildren().add(toggle);
+        if (!visible) {
+            return;
+        }
         for (String st : List.of("todo", "doing", "done", "ignore", "empty")) {
             javafx.scene.shape.Circle dot = new javafx.scene.shape.Circle(4);
             dot.getStyleClass().addAll("state-dot", "cell-state-" + st);
             javafx.scene.control.Tooltip.install(dot,
                     new javafx.scene.control.Tooltip(STATE_LABEL.get(st)));
-            if (compact) {
-                legendBox.getChildren().add(dot);
-                continue;
-            }
             Label text = new Label(STATE_LABEL.get(st));
             text.getStyleClass().addAll("legend-txt", "cell-state-" + st);
             text.setStyle("-fx-font-size: 11px;");
@@ -1895,13 +1877,13 @@ public class MainApp extends javafx.application.Application {
         onFilterChanged(null);
     }
 
-    public boolean legendCompact() {
-        return isLegendCompact();
+    public boolean legendVisible() {
+        return settings.getBool("legend_visible");
     }
 
-    public void applyLegendCompact(boolean v) {
+    public void applyLegendVisible(boolean v) {
         try {
-            settings.set("legend_compact", v);
+            settings.set("legend_visible", v);
         } catch (Exception ignored) {
             // 写盘失败不阻断
         }
@@ -1926,6 +1908,12 @@ public class MainApp extends javafx.application.Application {
             settings.set("theme", theme.mode());
         } catch (Exception ignored) {
             // 写盘失败不阻断
+        }
+        // 译文自动保存：退出前冲刷编辑区未落库内容
+        try {
+            editor.flushEdit();
+        } catch (Exception ignored) {
+            // 忽略
         }
         cancelDecompile();
         DecompilerManager.cleanupOnExit();

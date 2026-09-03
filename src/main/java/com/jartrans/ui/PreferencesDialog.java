@@ -31,11 +31,13 @@ public class PreferencesDialog extends Stage {
     private final RadioButton themeSystem = new RadioButton("跟随系统");
     private final RadioButton themeLight = new RadioButton("浅色");
     private final RadioButton themeDark = new RadioButton("深色");
-    private final CheckBox legendCompact = new CheckBox("图例使用精简模式（只显示彩色圆点）");
+    private final CheckBox legendVisible = new CheckBox("显示类状态图例（彩色圆点+说明）");
     private final CheckBox hideEmpty = new CheckBox("隐藏无可翻译字符串的类");
     private final ComboBox<String> statusFilterBox = new ComboBox<>();
     private final CheckBox onlyUntranslated = new CheckBox("翻译表格只看未翻译");
     private final CheckBox saveToDict = new CheckBox("保存译文时自动记入词典");
+    private final CheckBox autoSaveTrans = new CheckBox("译文自动保存（输入停顿或切换行/类时自动写入）");
+    private final CheckBox dblclickSource = new CheckBox("双击翻译行跳转到源码");
     private final ObservableList<ShortcutRow> shortcutRows = FXCollections.observableArrayList();
     private final TableView<ShortcutRow> shortcutTable = new TableView<>(shortcutRows);
     private final Label hintLabel = new Label("");
@@ -66,8 +68,8 @@ public class PreferencesDialog extends Stage {
         themeDark.setToggleGroup(themeGroup);
         HBox themeRow = new HBox(10, new Label("主题："), themeSystem, themeLight, themeDark);
         themeRow.setAlignment(Pos.CENTER_LEFT);
-        legendCompact.setSelected(app.legendCompact());
-        legendCompact.setOnAction(e -> app.applyLegendCompact(legendCompact.isSelected()));
+        legendVisible.setSelected(app.legendVisible());
+        legendVisible.setOnAction(e -> app.applyLegendVisible(legendVisible.isSelected()));
         hideEmpty.setSelected(app.hideEmptyEnabled());
         hideEmpty.setOnAction(e -> app.applyHideEmpty(hideEmpty.isSelected()));
         statusFilterBox.getItems().setAll(
@@ -94,6 +96,10 @@ public class PreferencesDialog extends Stage {
         onlyUntranslated.setOnAction(e -> app.editor().applyOnlyUntranslated(onlyUntranslated.isSelected()));
         saveToDict.setSelected(app.settings().getBool("save_to_dict"));
         saveToDict.setOnAction(e -> app.editor().applySaveDict(saveToDict.isSelected()));
+        autoSaveTrans.setSelected(app.settings().getBool("auto_save_translation"));
+        autoSaveTrans.setOnAction(e -> setSetting("auto_save_translation", autoSaveTrans.isSelected()));
+        dblclickSource.setSelected(app.settings().getBool("dblclick_source"));
+        dblclickSource.setOnAction(e -> setSetting("dblclick_source", dblclickSource.isSelected()));
 
         // ---------- 快捷键 ----------
         Label secShortcut = section("快捷键（点击组合可修改）");
@@ -136,8 +142,9 @@ public class PreferencesDialog extends Stage {
         shortcutButtons.setAlignment(Pos.CENTER_LEFT);
 
         // ---------- 组装 ----------
-        VBox body = new VBox(10, secAppearance, themeRow, legendCompact, hideEmpty,
-                statusRow, secTranslate, onlyUntranslated, saveToDict, secShortcut,
+        VBox body = new VBox(10, secAppearance, themeRow, legendVisible, hideEmpty,
+                statusRow, secTranslate, onlyUntranslated, saveToDict,
+                autoSaveTrans, dblclickSource, secShortcut,
                 shortcutTable, shortcutButtons, hintLabel);
         body.setPadding(new Insets(0, 0, 0, 0));
         VBox.setVgrow(shortcutTable, Priority.ALWAYS);
@@ -177,6 +184,14 @@ public class PreferencesDialog extends Stage {
 
     private void status(String text) {
         hintLabel.setText(text);
+    }
+
+    private void setSetting(String key, boolean value) {
+        try {
+            app.settings().set(key, value);
+        } catch (Exception ignored) {
+            // 写盘失败不阻断
+        }
     }
 
     private void applyTheme(String mode) {

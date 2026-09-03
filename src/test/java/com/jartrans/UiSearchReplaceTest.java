@@ -101,6 +101,44 @@ class UiSearchReplaceTest {
             PreferencesDialog pref = app.preferencesDialog();
             assertTrue(pref != null);
             pref.hide();
+
+            // --- 图例：显示开关（默认开，可关可开） ---
+            assertTrue(app.legendVisible(), "图例默认应显示");
+            app.applyLegendVisible(false);
+            assertFalse(app.legendVisible(), "图例可隐藏");
+            app.applyLegendVisible(true);
+            assertTrue(app.legendVisible(), "图例可再次显示");
+
+            // --- 译文自动保存：输入后 flush/切换即落库 ---
+            assertTrue(app.settings().getBool("auto_save_translation"), "自动保存默认应开启");
+            java.lang.reflect.Field f = EditorPane.class.getDeclaredField("editor");
+            f.setAccessible(true);
+            javafx.scene.control.TextArea ta = (javafx.scene.control.TextArea) f.get(ed);
+            String rowOrig = ed.selectedOrig();
+            assertTrue(rowOrig != null && !rowOrig.isEmpty());
+            ed.selectRow(rowOrig); // 保证编辑区为该行
+            ta.setText("自动保存测试译文");
+            ed.flushEdit();
+            assertEquals("自动保存测试译文",
+                    app.project().effective(cls).getOrDefault(rowOrig, ""),
+                    "flushEdit 应把编辑区文本写入工程");
+            ta.setText("切换行自动保存");
+            ed.showClass(cls); // 模拟切行/切类 → 自动落库
+            assertEquals("切换行自动保存",
+                    app.project().effective(cls).getOrDefault(rowOrig, ""),
+                    "切换行/类前应自动保存译文");
+            // 自动保存开关关闭时不再落库
+            app.settings().set("auto_save_translation", false);
+            ed.selectRow(rowOrig);
+            ta.setText("不应保存的内容");
+            ed.showClass(cls);
+            assertEquals("切换行自动保存",
+                    app.project().effective(cls).getOrDefault(rowOrig, ""),
+                    "关闭自动保存后切换不应落库");
+            app.settings().set("auto_save_translation", true);
+
+            // --- 双击跳源码默认开启 ---
+            assertTrue(app.settings().getBool("dblclick_source"), "双击跳转默认应开启");
         });
     }
 }

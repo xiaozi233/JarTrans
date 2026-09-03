@@ -35,6 +35,9 @@ public final class Settings {
         d.put("status_filter", "all");      // 类列表状态筛选
         d.put("only_untranslated", Boolean.FALSE); // 翻译表格只看未翻译
         d.put("save_to_dict", Boolean.TRUE);       // 保存译文时记入词典
+        d.put("legend_visible", Boolean.TRUE);     // 左栏显示类状态图例
+        d.put("dblclick_source", Boolean.TRUE);    // 翻译表双击跳源码
+        d.put("auto_save_translation", Boolean.TRUE); // 译文自动保存
         return d;
     }
 
