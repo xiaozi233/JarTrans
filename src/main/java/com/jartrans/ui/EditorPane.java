@@ -190,6 +190,7 @@ public class EditorPane extends BorderPane {
         HBox buttons = new HBox(6);
         buttons.setPadding(new Insets(4, 6, 2, 6));
         buttons.setAlignment(Pos.CENTER_LEFT);
+        buttons.getStyleClass().add("edit-toolbar");
         Button saveBtn = new Button("保存译文 (Ctrl+S)");
         saveBtn.getStyleClass().add("accent");
         saveBtn.setOnAction(e -> saveTranslation());
@@ -211,12 +212,7 @@ public class EditorPane extends BorderPane {
         editor.setWrapText(true);
         editor.setStyle("-fx-font-family: 'Microsoft YaHei UI', monospace;");
 
-        javafx.scene.layout.BorderPane editPanel = new javafx.scene.layout.BorderPane();
-        Label editHeader = new Label("编辑区");
-        editHeader.getStyleClass().add("pane-header");
-        editPanel.setTop(editHeader);
-        editPanel.setCenter(editBox);
-        vSplit.getItems().add(editPanel);
+        vSplit.getItems().add(editBox);
 
         BorderPane.setMargin(vSplit, new Insets(0, 0, 4, 0));
         setCenter(vSplit);
