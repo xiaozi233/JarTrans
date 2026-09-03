@@ -53,14 +53,13 @@ public final class LangPack {
     }
 
     public static Map<String, Object> buildPack(String jarName, String jarSha256,
-                                                String language, String author,
+                                                String author,
                                                 Map<String, Map<String, String>> entries,
                                                 Map<String, String> classStatus) {
         Map<String, Object> pack = new LinkedHashMap<>();
         pack.put("format_version", (long) FORMAT_VERSION);
         pack.put("target_jar", jarName);
         pack.put("target_jar_sha256", jarSha256);
-        pack.put("language", language);
         pack.put("author", author);
         pack.put("entries", entries);
         if (classStatus != null && !classStatus.isEmpty()) {

@@ -13,6 +13,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.RadioButton;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
+import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
@@ -38,6 +39,7 @@ public class PreferencesDialog extends Stage {
     private final CheckBox saveToDict = new CheckBox("保存译文时自动记入词典");
     private final CheckBox autoSaveTrans = new CheckBox("译文自动保存（输入停顿或切换行/类时自动写入）");
     private final CheckBox dblclickSource = new CheckBox("双击翻译行跳转到源码");
+    private final TextField authorField = new TextField();
     private final ObservableList<ShortcutRow> shortcutRows = FXCollections.observableArrayList();
     private final TableView<ShortcutRow> shortcutTable = new TableView<>(shortcutRows);
     private final Label hintLabel = new Label("");
@@ -101,6 +103,20 @@ public class PreferencesDialog extends Stage {
         dblclickSource.setSelected(app.settings().getBool("dblclick_source"));
         dblclickSource.setOnAction(e -> setSetting("dblclick_source", dblclickSource.isSelected()));
 
+        // ---------- 语言包 ----------
+        Label secPack = section("语言包");
+        authorField.setText(app.settings().getString("pack_author"));
+        authorField.setPromptText("导出语言包时写入 author 字段（可留空）");
+        authorField.setPrefWidth(260);
+        authorField.setOnAction(e -> applyAuthor());
+        authorField.focusedProperty().addListener((o, ov, focused) -> {
+            if (!focused) {
+                applyAuthor();
+            }
+        });
+        HBox authorRow = new HBox(8, new Label("导出作者（默认值）："), authorField);
+        authorRow.setAlignment(Pos.CENTER_LEFT);
+
         // ---------- 快捷键 ----------
         Label secShortcut = section("快捷键（点击组合可修改）");
         TableColumn<ShortcutRow, String> colName = new TableColumn<>("功能");
@@ -144,7 +160,7 @@ public class PreferencesDialog extends Stage {
         // ---------- 组装 ----------
         VBox body = new VBox(10, secAppearance, themeRow, legendVisible, hideEmpty,
                 statusRow, secTranslate, onlyUntranslated, saveToDict,
-                autoSaveTrans, dblclickSource, secShortcut,
+                autoSaveTrans, dblclickSource, secPack, authorRow, secShortcut,
                 shortcutTable, shortcutButtons, hintLabel);
         body.setPadding(new Insets(0, 0, 0, 0));
         VBox.setVgrow(shortcutTable, Priority.ALWAYS);
@@ -189,6 +205,15 @@ public class PreferencesDialog extends Stage {
     private void setSetting(String key, boolean value) {
         try {
             app.settings().set(key, value);
+        } catch (Exception ignored) {
+            // 写盘失败不阻断
+        }
+    }
+
+    private void applyAuthor() {
+        String v = authorField.getText().trim();
+        try {
+            app.settings().set("pack_author", v);
         } catch (Exception ignored) {
             // 写盘失败不阻断
         }

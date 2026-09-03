@@ -51,7 +51,7 @@ public class EditorPane extends BorderPane {
     public static final Map<String, String> STATUS_TEXT = Map.of(
             "untranslated", "未翻译",
             "translated", "已翻译",
-            "auto", "自动填充",
+            "auto", "自动",
             "internal", "内部·只读",
             "skipped", "不翻译");
 

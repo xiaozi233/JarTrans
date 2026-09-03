@@ -74,7 +74,7 @@ class SkipTextTest {
         p.setTranslation(CLS, B, "按开始");
         p.setTextSkipped(B, true);
         Path packFile = tmp.resolve("lang.json");
-        p.exportPack(packFile, "zh_CN", "tester");
+        p.exportPack(packFile, "tester");
 
         Map<String, Object> pack = LangPack.readPack(packFile);
         assertTrue(pack.containsKey("skip_texts"), "语言包应携带 skip_texts");

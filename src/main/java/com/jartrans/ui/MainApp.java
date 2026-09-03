@@ -1189,7 +1189,7 @@ public class MainApp extends javafx.application.Application {
         refreshClassNodes();
         updateStats();
         editor.refreshRows();
-        Dialogs.info("完成", "词典自动填充了 " + count + " 条未翻译字符串（标记为\"自动填充" + "）。");
+        Dialogs.info("完成", "词典自动填充了 " + count + " 条未翻译字符串（标记为\"自动" + "）。");
     }
 
     private void fillClassFromDictionary() {
@@ -1325,14 +1325,6 @@ public class MainApp extends javafx.application.Application {
         if (!requireJar()) {
             return;
         }
-        String language = Dialogs.ask("导出语言包", "语言代码（如 zh_CN）：", "zh_CN");
-        if (language == null) {
-            return;
-        }
-        String author = Dialogs.ask("导出语言包", "作者：", "");
-        if (author == null) {
-            return;
-        }
         FileChooser chooser = new FileChooser();
         chooser.setTitle("导出语言包");
         chooser.setInitialFileName("langpack.json");
@@ -1341,10 +1333,12 @@ public class MainApp extends javafx.application.Application {
         if (file == null) {
             return;
         }
+        // 作者取首选项默认值（settings.pack_author），不再每次弹窗询问
+        String author = settings.getString("pack_author").trim();
         try {
-            project.exportPack(file.toPath(), language.isBlank() ? "zh_CN" : language,
-                    author.isBlank() ? "" : author);
+            project.exportPack(file.toPath(), author);
             Dialogs.info("完成", "语言包已导出到：\n" + file.toPath()
+                    + "\n作者：" + (author.isEmpty() ? "（未设置，可在首选项中填写）" : author)
                     + "\n（含 " + project.classStatus().size() + " 个类的手动状态标记）");
         } catch (Exception exc) {
             Dialogs.error("错误", "导出失败：\n" + exc.getMessage());

@@ -45,7 +45,7 @@ class ProjectTest {
         dict.save();
 
         Path packPath = tmp.resolve("pack.json");
-        p.exportPack(packPath, "zh_CN", "tester");
+        p.exportPack(packPath, "tester");
         Path zhJar = tmp.resolve("zh.jar");
         assertEquals(1, p.exportJar(zhJar, true));
 
@@ -87,7 +87,7 @@ class ProjectTest {
         Project p = new Project(tmp.resolve("d1.json"));
         p.openJar(jarPath);
         Path packPath = tmp.resolve("pack2.json");
-        p.exportPack(packPath, "zh_CN", "tester");
+        p.exportPack(packPath, "tester");
 
         Map<String, Object> pack = LangPack.readPack(packPath);
         assertEquals(p.jarSha256(), pack.get("target_jar_sha256"));

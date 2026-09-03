@@ -407,7 +407,7 @@ public final class Project {
         return total;
     }
 
-    public void exportPack(Path path, String language, String author) throws IOException {
+    public void exportPack(Path path, String author) throws IOException {
         Map<String, Map<String, String>> entries = new LinkedHashMap<>();
         for (String cls : classOrder) {
             if (isIgnored(cls)) {
@@ -418,7 +418,7 @@ public final class Project {
                 entries.put(cls, eff);
             }
         }
-        Map<String, Object> pack = LangPack.buildPack(jarName(), jarSha256(), language,
+        Map<String, Object> pack = LangPack.buildPack(jarName(), jarSha256(),
                 author, entries, classStatus);
         if (!skipTexts.isEmpty()) {
             List<String> sorted = new ArrayList<>(skipTexts);
