@@ -26,3 +26,6 @@ settings.json
 class_status.json
 dictionaries/
 tools/
+
+# WorkBuddy 工具数据（记忆/会话状态，非项目源码）
+.workbuddy/

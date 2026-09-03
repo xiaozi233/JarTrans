@@ -49,7 +49,7 @@ src/main/java/com/jartrans/
 │   ├── Bytecode.java    #   字节码指令扫描（字符串引用定位）
 │   ├── Project.java     #   工程状态：翻译/词典/类状态/语言包
 │   ├── jar/             #   jar 读取与重打包
-│   ├── java/            #   反编译器下载/管理/缓存
+│   ├── java/            #   反编译器：内置释放/进程内执行/产物与缓存管理
 │   └── json/            #   自研 JSON 读写
 └── ui/                  # JavaFX 界面（FXML + CSS 双主题）
 ```
