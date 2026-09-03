@@ -62,10 +62,12 @@ public class EditorPane extends BorderPane {
     private final TableView<Row> table = new TableView<>(rows);
     private final TextArea editor = new TextArea();
     private final Label hint = new Label("");
-    private final Label stateDot = new Label("●");
+    private final javafx.scene.shape.Circle stateDot = new javafx.scene.shape.Circle(4);
     private final ComboBox<String> classStateBox = new ComboBox<>();
     private final CheckBox onlyUntranslated = new CheckBox("只看未翻译");
     private final CheckBox saveDict = new CheckBox("保存时记入词典");
+    /** 程序化同步下拉选中值时置位，避免 valueProperty 监听误触发写状态。 */
+    private boolean syncingState;
 
     public EditorPane() {
         buildUi();
@@ -88,7 +90,7 @@ public class EditorPane extends BorderPane {
         classStateBox.setPrefWidth(112);
         classStateBox.getSelectionModel().selectFirst();
         classStateBox.valueProperty().addListener((o, ov, nv) -> onClassStateBox());
-        stateDot.setStyle("-fx-font-size: 14px;");
+        stateDot.getStyleClass().add("state-dot");
         head.getChildren().addAll(new Label("类状态："), classStateBox, stateDot,
                 new Separator(), onlyUntranslated);
         onlyUntranslated.setOnAction(e -> {
@@ -193,7 +195,7 @@ public class EditorPane extends BorderPane {
     // ---------- 类状态控件 ----------
 
     private void onClassStateBox() {
-        if (currentClass == null || app == null) {
+        if (currentClass == null || app == null || syncingState) {
             return;
         }
         String label = classStateBox.getValue();
@@ -226,10 +228,10 @@ public class EditorPane extends BorderPane {
     }
 
     void refreshClassStateUi() {
+        // 状态点颜色由 CSS（.state-dot.cell-state-*）驱动，这里只负责换状态类
+        stateDot.getStyleClass().removeIf(c -> c.startsWith("cell-state-"));
         if (currentClass == null || app == null) {
             classStateBox.getSelectionModel().selectFirst();
-            stateDot.setTextFill(javafx.scene.paint.Color.web(app != null
-                    ? app.theme().color("fg") : "#000000"));
             return;
         }
         String key = currentStateKey();
@@ -237,9 +239,19 @@ public class EditorPane extends BorderPane {
                 "todo", "未开始", "doing", "翻译中", "done", "已完成",
                 "ignore", "已忽略", "empty", "无字符串");
         String label = mapping.get(key);
-        classStateBox.getSelectionModel().select(label != null ? label : "自动");
-        stateDot.setTextFill(javafx.scene.paint.Color.web(
-                app.theme().stateColor(key != null ? key : "empty")));
+        // 「无字符串」不是可选手动状态：下拉保持「自动」，仅状态点标灰
+        if (label == null || !classStateBox.getItems().contains(label)) {
+            label = "自动";
+        }
+        syncingState = true;
+        try {
+            classStateBox.getSelectionModel().select(label);
+        } finally {
+            syncingState = false;
+        }
+        if (key != null) {
+            stateDot.getStyleClass().add("cell-state-" + key);
+        }
     }
 
     // ---------- 展示 ----------

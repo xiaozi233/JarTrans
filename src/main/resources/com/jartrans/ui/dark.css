@@ -45,6 +45,11 @@
     -fx-text-base-color: -jr-fg;
     -fx-control-inner-background: -jr-field-bg;
     -fx-control-inner-background-alt: derive(-jr-field-bg, -3%);
+    -jr-state-todo: #ff6b66;
+    -jr-state-doing: #ffb454;
+    -jr-state-done: #5fd97f;
+    -jr-state-ignore: #7d8590;
+    -jr-state-empty: #6e7681;
 }
 
 /* ---------- 基底 ---------- */
@@ -552,3 +557,28 @@
 .dialog-pane .button-bar .details-button {
     -fx-text-fill: -jr-muted;
 }
+
+/* ---------- 类状态着色（选中/未选中同色，杜绝 CSS 脉冲覆盖代码色） ---------- */
+.state-dot {
+    -fx-fill: -jr-muted;
+}
+.state-dot.cell-state-todo { -fx-fill: -jr-state-todo; }
+.state-dot.cell-state-doing { -fx-fill: -jr-state-doing; }
+.state-dot.cell-state-done { -fx-fill: -jr-state-done; }
+.state-dot.cell-state-ignore { -fx-fill: -jr-state-ignore; }
+.state-dot.cell-state-empty { -fx-fill: -jr-state-empty; }
+
+.tree-cell:filled { -fx-text-fill: -jr-fg; }
+.tree-cell:filled:selected { -fx-text-fill: -jr-fg; }
+.tree-cell.cell-dir:filled,
+.tree-cell.cell-dir:filled:selected { -fx-text-fill: -jr-muted; }
+.tree-cell.cell-state-todo:filled,
+.tree-cell.cell-state-todo:filled:selected { -fx-text-fill: -jr-state-todo; }
+.tree-cell.cell-state-doing:filled,
+.tree-cell.cell-state-doing:filled:selected { -fx-text-fill: -jr-state-doing; }
+.tree-cell.cell-state-done:filled,
+.tree-cell.cell-state-done:filled:selected { -fx-text-fill: -jr-state-done; }
+.tree-cell.cell-state-ignore:filled,
+.tree-cell.cell-state-ignore:filled:selected { -fx-text-fill: -jr-state-ignore; }
+.tree-cell.cell-state-empty:filled,
+.tree-cell.cell-state-empty:filled:selected { -fx-text-fill: -jr-state-empty; }

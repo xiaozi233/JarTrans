@@ -192,21 +192,20 @@ public class MainApp extends javafx.application.Application {
                     return;
                 }
                 setText(item);
+                // 颜色全部走 CSS 状态类：选中/未选中/主题切换都由 CSS 统一重算，
+                // 避免代码 setTextFill 被 CSS 脉冲覆盖导致色值漂移（dot 与文字必同步）
+                getStyleClass().removeIf(c -> c.startsWith("cell-state-") || c.equals("cell-dir"));
+                setGraphic(null);
                 String[] info = nodeInfo.get(getTreeItem());
                 if (info != null && TYPE_CLASS.equals(info[0])) {
                     String st = project.classState(info[1]);
-                    Color stateColor = Color.web(theme.stateColor(st));
-                    setTextFill(stateColor);
-                    // 彩色状态圆点：未开始/翻译中/已完成/已忽略/无字符串 一眼可辨
+                    getStyleClass().add("cell-state-" + st);
+                    // 彩色状态圆点：与文字同规则（.state-dot.cell-state-*）
                     javafx.scene.shape.Circle dot = new javafx.scene.shape.Circle(3.5);
-                    dot.setFill(stateColor);
+                    dot.getStyleClass().addAll("state-dot", "cell-state-" + st);
                     setGraphic(dot);
                 } else if (info != null && TYPE_DIR.equals(info[0])) {
-                    setTextFill(Color.web(theme.color("fg_muted")));
-                    setGraphic(null);
-                } else {
-                    setTextFill(Color.web(theme.color("fg")));
-                    setGraphic(null);
+                    getStyleClass().add("cell-dir");
                 }
             }
         });
