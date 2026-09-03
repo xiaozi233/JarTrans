@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckMenuItem?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Menu?>
+<?import javafx.scene.control.MenuBar?>
+<?import javafx.scene.control.MenuItem?>
+<?import javafx.scene.control.ProgressBar?>
+<?import javafx.scene.control.RadioMenuItem?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.SeparatorMenuItem?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TabPane?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.ToggleGroup?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.ToolBar?>
+<?import javafx.scene.control.TreeView?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+<?import com.jartrans.ui.EditorPane?>
+<?import com.jartrans.ui.SourcePanel?>
+<?import javafx.scene.control.TitledPane?>
+<!--
+  主窗口骨架。控制器为 com.jartrans.ui.MainApp（FXMLLoader.setController 注入），
+  动态内容（图例、上下文菜单、对话框等）在代码中构建。
+-->
+<BorderPane xmlns:fx="http://javafx.com/fxml" styleClass="root-pane">
+    <top>
+        <VBox>
+            <MenuBar>
+                <Menu text="文件">
+                    <MenuItem text="打开 Jar..." onAction="#onOpenJar"/>
+                    <MenuItem text="导出汉化 Jar..." onAction="#onExportJar"/>
+                    <SeparatorMenuItem/>
+                    <MenuItem text="退出" onAction="#onExit"/>
+                </Menu>
+                <Menu text="语言包">
+                    <MenuItem text="导入语言包..." onAction="#onImportPack"/>
+                    <MenuItem text="导出语言包..." onAction="#onExportPack"/>
+                    <SeparatorMenuItem/>
+                    <MenuItem text="查看失效条目" onAction="#onShowMissing"/>
+                </Menu>
+                <Menu text="词典">
+                    <MenuItem text="编辑词典条目..." onAction="#onManageDictionary"/>
+                    <MenuItem text="管理多个词典..." onAction="#onManageDictionaries"/>
+                    <SeparatorMenuItem/>
+                    <MenuItem text="用词典填充当前类" onAction="#onFillClassFromDictionary"/>
+                    <MenuItem text="用词典填充全部未翻译" onAction="#onFillFromDictionary"/>
+                </Menu>
+                <Menu text="类状态">
+                    <MenuItem text="把当前类标为「未开始」" onAction="#onMarkTodo"/>
+                    <MenuItem text="把当前类标为「翻译中」" onAction="#onMarkDoing"/>
+                    <MenuItem text="把当前类标为「已完成」" onAction="#onMarkDone"/>
+                    <MenuItem text="把当前类标为「已忽略」" onAction="#onMarkIgnore"/>
+                    <MenuItem text="恢复自动判定" onAction="#onMarkAuto"/>
+                    <SeparatorMenuItem/>
+                    <MenuItem text="折叠全部" onAction="#onCollapseAll"/>
+                    <MenuItem text="展开全部" onAction="#onExpandAll"/>
+                </Menu>
+                <Menu text="查看">
+                    <CheckMenuItem fx:id="showInternalItem" text="显示内部 UTF8 条目（只读）"
+                                   onAction="#onToggleInternal"/>
+                    <CheckMenuItem fx:id="hideEmptyItem" text="隐藏无可翻译字符串的类"
+                                   onAction="#onFilterChanged"/>
+                    <SeparatorMenuItem/>
+                    <Menu text="主题">
+                        <fx:define>
+                            <ToggleGroup fx:id="themeGroup"/>
+                        </fx:define>
+                        <RadioMenuItem fx:id="themeSystemItem" text="跟随系统"
+                                       toggleGroup="$themeGroup" onAction="#onThemeSystem"/>
+                        <RadioMenuItem fx:id="themeLightItem" text="浅色"
+                                       toggleGroup="$themeGroup" onAction="#onThemeLight"/>
+                        <RadioMenuItem fx:id="themeDarkItem" text="深色"
+                                       toggleGroup="$themeGroup" onAction="#onThemeDark"/>
+                    </Menu>
+                </Menu>
+                <Menu text="源码">
+                    <MenuItem text="查看当前类源码" onAction="#onViewCurrentSource"/>
+                    <MenuItem text="反编译管理器…" onAction="#onOpenDecompilerManager"/>
+                    <SeparatorMenuItem/>
+                    <MenuItem text="清理反编译缓存" onAction="#onClearDecompileCache"/>
+                </Menu>
+                <Menu text="帮助">
+                    <MenuItem text="关于" onAction="#onAbout"/>
+                </Menu>
+            </MenuBar>
+            <ToolBar>
+                <Button text="打开 Jar" onAction="#onOpenJar"/>
+                <Button text="导出汉化 Jar" onAction="#onExportJar"/>
+                <Separator orientation="VERTICAL"/>
+                <Button text="导入语言包" onAction="#onImportPack"/>
+                <Button text="导出语言包" onAction="#onExportPack"/>
+                <Separator orientation="VERTICAL"/>
+                <Label text="词典："/>
+                <ComboBox fx:id="dictBox" prefWidth="170"/>
+                <Button text="管理…" onAction="#onManageDictionaries"/>
+                <Separator orientation="VERTICAL"/>
+                <TextField fx:id="searchField" promptText="全局搜索" prefWidth="220"
+                           onAction="#onOpenSearch"/>
+                <Button text="全局搜索" onAction="#onOpenSearch"/>
+                <Separator orientation="VERTICAL"/>
+                <Label text="主题："/>
+                <ComboBox fx:id="themeBox" prefWidth="100"/>
+                <Separator orientation="VERTICAL"/>
+                <Button text="反编译管理器…" onAction="#onOpenDecompilerManager"/>
+            </ToolBar>
+        </VBox>
+    </top>
+
+    <center>
+        <HBox>
+            <padding>
+                <Insets top="6" right="8" bottom="6" left="8"/>
+            </padding>
+            <TitledPane text="类列表" collapsible="false" HBox.hgrow="ALWAYS" maxWidth="460">
+                <VBox spacing="6">
+                    <padding>
+                        <Insets top="4" right="6" bottom="6" left="6"/>
+                    </padding>
+                    <HBox spacing="6" alignment="CENTER_LEFT">
+                        <Label text="过滤："/>
+                        <TextField fx:id="filterField" HBox.hgrow="ALWAYS"
+                                   onAction="#onFilterChanged"/>
+                        <Button text="清除" onAction="#onClearFilter"/>
+                    </HBox>
+                    <HBox spacing="8" alignment="CENTER_LEFT">
+                        <CheckBox fx:id="hideEmptyCheck" text="隐藏无字符串的类"
+                                  onAction="#onFilterChanged"/>
+                        <Label text="状态："/>
+                        <ComboBox fx:id="statusBox" prefWidth="90"/>
+                    </HBox>
+                    <HBox fx:id="legendBox" spacing="10"/>
+                    <TreeView fx:id="classTree" VBox.vgrow="ALWAYS"/>
+                </VBox>
+            </TitledPane>
+            <TabPane fx:id="tabPane" tabClosingPolicy="UNAVAILABLE" HBox.hgrow="ALWAYS">
+                <Tab text="  翻译  " fx:id="editorTab">
+                    <ScrollPane fitToWidth="true" fitToHeight="true">
+                        <EditorPane fx:id="editor"/>
+                    </ScrollPane>
+                </Tab>
+                <Tab text="  源码  " fx:id="sourceTab">
+                    <SourcePanel fx:id="sourcePanel"/>
+                </Tab>
+            </TabPane>
+        </HBox>
+    </center>
+
+    <bottom>
+        <VBox>
+            <Separator/>
+            <HBox spacing="10" alignment="CENTER_LEFT">
+                <padding>
+                    <Insets top="4" right="10" bottom="4" left="10"/>
+                </padding>
+                <Label fx:id="statusLabel" HBox.hgrow="ALWAYS" maxWidth="Infinity"/>
+                <ProgressBar fx:id="progressBar" prefWidth="140" progress="0"/>
+                <Label fx:id="statsLabel"/>
+            </HBox>
+        </VBox>
+    </bottom>
+</BorderPane>

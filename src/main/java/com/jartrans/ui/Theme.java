@@ -1,0 +1,262 @@
+package com.jartrans.ui;
+
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
+import javafx.scene.Scene;
+import javafx.util.Duration;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * 主题管理：浅色 / 深色 / 跟随系统。
+ * 通过切换 scene 的 stylesheet 实现（CSS 驱动），配色值供代码绘制（状态色、语法色）。
+ * 「跟随系统」轮询系统设置，变化时自动切换。
+ */
+public final class Theme {
+
+    public static final String MODE_SYSTEM = "system";
+    public static final String MODE_LIGHT = "light";
+    public static final String MODE_DARK = "dark";
+    public static final List<String> MODES = List.of(MODE_SYSTEM, MODE_LIGHT, MODE_DARK);
+    public static final Map<String, String> LABELS = Map.of(
+            MODE_SYSTEM, "跟随系统", MODE_LIGHT, "浅色", MODE_DARK, "深色");
+
+    // ---------- 浅色配色 ----------
+    public static final Map<String, String> LIGHT = palette(
+            "#f4f6f9", "#ffffff", "#e8ecf1", "#eef1f6", "#ffffff",
+            "#1f2430", "#5f6672", "#ccd3dc", "#2f6feb", "#ffffff",
+            "#c9dcff", "#1f2430", "#9aa1ad", "#e4e8ee", "#fafbfd",
+            "#c0392b", "#b26b00", "#1e8e3e", "#7a828e", "#9aa1ad",
+            "#c0392b", "#1e8e3e", "#1565c0", "#8a919c",
+            "#8a2a8f", "#0b7a3b", "#6b7480", "#a13d2d", "#ffe9a8", "#ffb74d", "#9a5b00");
+
+    // ---------- 深色配色 ----------
+    public static final Map<String, String> DARK = palette(
+            "#191c21", "#22262d", "#2a2f37", "#272c34", "#14171b",
+            "#e3e7ee", "#98a1b0", "#363d47", "#4d8dff", "#ffffff",
+            "#2f4d7d", "#ffffff", "#6b7280", "#22262d", "#1d2127",
+            "#ff7b72", "#ffb454", "#57d776", "#7d8590", "#6e7681",
+            "#ff7b72", "#57d776", "#79c0ff", "#7d8590",
+            "#569cd6", "#ce9178", "#6a9955", "#b5cea8", "#5c4b12", "#8a6d1f", "#e2a03f");
+
+    private static Map<String, String> palette(String bg, String surface, String surfaceAlt,
+                                               String headerBg, String fieldBg,
+                                               String fg, String fgMuted, String border,
+                                               String accent, String accentFg,
+                                               String selectBg, String selectFg,
+                                               String disabledFg, String sunken, String stripe,
+                                               String todo, String doing, String done,
+                                               String ignore, String empty,
+                                               String untranslated, String translated,
+                                               String auto, String internal,
+                                               String kw, String str, String cmt,
+                                               String num, String hl, String cur, String banner) {
+        Map<String, String> m = new LinkedHashMap<>();
+        m.put("bg", bg);
+        m.put("surface", surface);
+        m.put("surface_alt", surfaceAlt);
+        m.put("header_bg", headerBg);
+        m.put("field_bg", fieldBg);
+        m.put("fg", fg);
+        m.put("fg_muted", fgMuted);
+        m.put("border", border);
+        m.put("accent", accent);
+        m.put("accent_fg", accentFg);
+        m.put("select_bg", selectBg);
+        m.put("select_fg", selectFg);
+        m.put("disabled_fg", disabledFg);
+        m.put("sunken", sunken);
+        m.put("stripe", stripe);
+        // 类状态
+        m.put("state_todo", todo);
+        m.put("state_doing", doing);
+        m.put("state_done", done);
+        m.put("state_ignore", ignore);
+        m.put("state_empty", empty);
+        // 字符串条目状态
+        m.put("status_untranslated", untranslated);
+        m.put("status_translated", translated);
+        m.put("status_auto", auto);
+        m.put("status_internal", internal);
+        // 源码着色
+        m.put("syntax_kw", kw);
+        m.put("syntax_str", str);
+        m.put("syntax_cmt", cmt);
+        m.put("syntax_num", num);
+        m.put("syntax_hl", hl);
+        m.put("syntax_cur", cur);
+        m.put("syntax_banner", banner);
+        return m;
+    }
+
+    private String mode;
+    private boolean systemDark;
+    private Map<String, String> palette = LIGHT;
+    private final List<Runnable> listeners = new ArrayList<>();
+    private final List<Scene> scenes = new ArrayList<>();
+    private Timeline watcher;
+
+    public Theme(String mode) {
+        this.mode = MODES.contains(mode) ? mode : MODE_SYSTEM;
+        this.systemDark = systemPrefersDark();
+        apply();
+        startWatch();
+    }
+
+    // ---------- 模式 ----------
+
+    public String mode() {
+        return mode;
+    }
+
+    public Map<String, String> palette() {
+        return palette;
+    }
+
+    public boolean dark() {
+        return palette == DARK;
+    }
+
+    public String color(String key) {
+        return palette.get(key);
+    }
+
+    public String stateColor(String state) {
+        return palette.getOrDefault("state_" + state, palette.get("fg"));
+    }
+
+    public String statusColor(String status) {
+        return palette.getOrDefault("status_" + status, palette.get("fg"));
+    }
+
+    public void setMode(String newMode) {
+        String m = MODES.contains(newMode) ? newMode : MODE_SYSTEM;
+        if (m.equals(mode)) {
+            return;
+        }
+        mode = m;
+        if (m.equals(MODE_SYSTEM)) {
+            systemDark = systemPrefersDark();
+        }
+        apply();
+    }
+
+    // ---------- 注册 ----------
+
+    public void onChange(Runnable callback) {
+        listeners.add(callback);
+        callback.run();
+    }
+
+    public void attach(Scene scene) {
+        scenes.add(scene);
+        scene.getStylesheets().setAll(stylesheetUrl());
+    }
+
+    private String stylesheetUrl() {
+        String name = dark() ? "dark.css" : "light.css";
+        return Theme.class.getResource(name).toExternalForm();
+    }
+
+    // ---------- 应用 ----------
+
+    private void apply() {
+        palette = (mode.equals(MODE_DARK) || (mode.equals(MODE_SYSTEM) && systemDark))
+                ? DARK : LIGHT;
+        String url = stylesheetUrl();
+        for (Scene scene : scenes) {
+            scene.getStylesheets().setAll(url);
+            scene.getRoot().applyCss();
+        }
+        for (Runnable cb : List.copyOf(listeners)) {
+            cb.run();
+        }
+    }
+
+    // ---------- 系统主题探测 ----------
+
+    /** 探测系统是否处于深色模式。失败时保守返回 false。 */
+    public static boolean systemPrefersDark() {
+        String os = System.getProperty("os.name", "").toLowerCase();
+        try {
+            if (os.contains("win")) {
+                Path out = Files.createTempFile("jartrans_reg", ".txt");
+                try {
+                    Process proc = new ProcessBuilder("reg", "query",
+                            "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+                            "/v", "AppsUseLightTheme")
+                            .redirectOutput(out.toFile())
+                            .redirectErrorStream(true)
+                            .start();
+                    proc.waitFor(3, TimeUnit.SECONDS);
+                    String text = Files.readString(out, StandardCharsets.UTF_16LE);
+                    if (!text.contains("0x0")) {
+                        text = Files.readString(out, StandardCharsets.UTF_8);
+                    }
+                    return text.trim().endsWith("0x0");
+                } finally {
+                    Files.deleteIfExists(out);
+                }
+            }
+            if (os.contains("mac")) {
+                Process proc = new ProcessBuilder("defaults", "read", "-g",
+                        "AppleInterfaceStyle")
+                        .redirectErrorStream(true)
+                        .start();
+                proc.waitFor(3, TimeUnit.SECONDS);
+                String text = new String(proc.getInputStream().readAllBytes(),
+                        StandardCharsets.UTF_8);
+                return text.contains("Dark");
+            }
+            if (os.contains("linux")) {
+                String gtkTheme = System.getenv("GTK_THEME");
+                if (gtkTheme != null && (gtkTheme.contains(":dark") || gtkTheme.endsWith("-dark"))) {
+                    return true;
+                }
+                Process proc = new ProcessBuilder("gsettings", "get",
+                        "org.gnome.desktop.interface", "color-scheme")
+                        .redirectErrorStream(true)
+                        .start();
+                proc.waitFor(3, TimeUnit.SECONDS);
+                String text = new String(proc.getInputStream().readAllBytes(),
+                        StandardCharsets.UTF_8).toLowerCase();
+                return text.contains("dark");
+            }
+        } catch (Exception ignored) {
+            // 探测失败一律当作浅色
+            return false;
+        }
+        return false;
+    }
+
+    private void startWatch() {
+        watcher = new Timeline(new KeyFrame(Duration.millis(1500), e -> tick()));
+        watcher.setCycleCount(Timeline.INDEFINITE);
+        watcher.play();
+    }
+
+    private void tick() {
+        if (!mode.equals(MODE_SYSTEM)) {
+            return;
+        }
+        boolean dark = systemPrefersDark();
+        if (dark != systemDark) {
+            systemDark = dark;
+            apply();
+        }
+    }
+
+    public void stop() {
+        if (watcher != null) {
+            watcher.stop();
+        }
+    }
+}

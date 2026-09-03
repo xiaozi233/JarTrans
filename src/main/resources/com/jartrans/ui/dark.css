@@ -1,0 +1,197 @@
+/* JarTrans 深色主题 */
+.root-pane {
+    -jr-bg: #191c21;
+    -jr-surface: #22262d;
+    -jr-surface-alt: #2a2f37;
+    -jr-header-bg: #272c34;
+    -jr-field-bg: #14171b;
+    -jr-fg: #e3e7ee;
+    -jr-muted: #98a1b0;
+    -jr-border: #363d47;
+    -jr-accent: #4d8dff;
+    -jr-select-bg: #2f4d7d;
+    -jr-select-fg: #ffffff;
+    -jr-disabled: #6b7280;
+    -jr-sunken: #22262d;
+
+    -fx-background-color: -jr-bg;
+    -fx-font-family: "Microsoft YaHei UI", "PingFang SC", sans-serif;
+    -fx-font-size: 13px;
+    -fx-text-fill: -jr-fg;
+}
+
+.root-pane .label {
+    -fx-text-fill: -jr-fg;
+}
+
+.root-pane .button {
+    -fx-background-color: -jr-surface;
+    -fx-text-fill: -jr-fg;
+    -fx-border-color: -jr-border;
+    -fx-border-radius: 3;
+    -fx-background-radius: 3;
+    -fx-padding: 4 10 4 10;
+    -fx-cursor: hand;
+}
+.root-pane .button:hover {
+    -fx-background-color: -jr-surface-alt;
+}
+.root-pane .button:pressed {
+    -fx-background-color: -jr-select-bg;
+}
+
+.root-pane .text-field {
+    -fx-background-color: -jr-field-bg;
+    -fx-text-fill: -jr-fg;
+    -fx-prompt-text-fill: -jr-disabled;
+    -fx-border-color: -jr-border;
+    -fx-border-radius: 3;
+    -fx-background-radius: 3;
+}
+
+.root-pane .combo-box {
+    -fx-background-color: -jr-field-bg;
+    -fx-border-color: -jr-border;
+    -fx-background-radius: 3;
+    -fx-border-radius: 3;
+}
+.root-pane .combo-box .list-cell {
+    -fx-text-fill: -jr-fg;
+    -fx-background-color: -jr-field-bg;
+}
+.root-pane .combo-box-popup .list-view {
+    -fx-background-color: -jr-field-bg;
+    -fx-border-color: -jr-border;
+}
+.root-pane .combo-box-popup .list-cell {
+    -fx-text-fill: -jr-fg;
+    -fx-background-color: -jr-field-bg;
+}
+.root-pane .combo-box-popup .list-cell:filled:hover {
+    -fx-background-color: -jr-select-bg;
+}
+
+.root-pane .tree-view {
+    -fx-background-color: -jr-field-bg;
+    -fx-border-color: -jr-border;
+}
+.root-pane .tree-cell {
+    -fx-text-fill: -jr-fg;
+    -fx-padding: 2 4 2 4;
+}
+.root-pane .tree-cell:filled:selected {
+    -fx-background-color: -jr-select-bg;
+    -fx-text-fill: -jr-select-fg;
+}
+
+.root-pane .table-view {
+    -fx-background-color: -jr-field-bg;
+    -fx-border-color: -jr-border;
+}
+.root-pane .table-view .column-header-background {
+    -fx-background-color: -jr-header-bg;
+}
+.root-pane .table-view .column-header .label {
+    -fx-text-fill: -jr-fg;
+}
+.root-pane .table-row-cell {
+    -fx-background-color: -jr-field-bg;
+    -fx-border-color: -jr-bg transparent transparent transparent;
+}
+.root-pane .table-row-cell:filled:hover {
+    -fx-background-color: -jr-surface-alt;
+}
+.root-pane .table-row-cell:filled:selected {
+    -fx-background-color: -jr-select-bg;
+}
+
+.root-pane .list-view {
+    -fx-background-color: -jr-field-bg;
+    -fx-border-color: -jr-border;
+}
+.root-pane .list-cell {
+    -fx-padding: 0 4 0 4;
+}
+.root-pane .list-cell:filled:selected {
+    -fx-background-color: -jr-select-bg;
+}
+
+.root-pane .titled-pane > .title {
+    -fx-background-color: -jr-header-bg;
+}
+.root-pane .titled-pane > .title > .text {
+    -fx-fill: -jr-fg;
+}
+.root-pane .titled-pane > .content {
+    -fx-background-color: -jr-bg;
+    -fx-border-color: -jr-border;
+}
+
+.root-pane .tab-pane > .tab-header-area {
+    -fx-background-color: -jr-bg;
+}
+.root-pane .tab-pane > .tab-header-area .tab-header-background {
+    -fx-background-color: -jr-surface-alt;
+}
+.root-pane .tab .tab-label {
+    -fx-text-fill: -jr-muted;
+}
+.root-pane .tab:selected .tab-label {
+    -fx-text-fill: -jr-fg;
+}
+.root-pane .tab {
+    -fx-background-color: -jr-surface-alt;
+    -fx-background-radius: 4 4 0 0;
+}
+.root-pane .tab:selected {
+    -fx-background-color: -jr-field-bg;
+}
+
+.root-pane .menu-bar {
+    -fx-background-color: -jr-header-bg;
+}
+.root-pane .menu-bar .label {
+    -fx-text-fill: -jr-fg;
+}
+.root-pane .menu-item .label {
+    -fx-text-fill: -jr-fg;
+}
+.root-pane .menu-item:hover {
+    -fx-background-color: -jr-select-bg;
+}
+.root-pane .menu-item:focused {
+    -fx-background-color: -jr-select-bg;
+}
+.root-pane .context-menu {
+    -fx-background-color: -jr-surface;
+    -fx-border-color: -jr-border;
+}
+
+.root-pane .tool-bar {
+    -fx-background-color: -jr-bg;
+    -fx-border-color: transparent transparent -jr-border transparent;
+}
+
+.root-pane .separator .line {
+    -fx-border-color: -jr-border;
+}
+
+.root-pane .scroll-pane {
+    -fx-background-color: -jr-bg;
+}
+
+.root-pane .text-area {
+    -fx-background-color: -jr-field-bg;
+    -fx-text-fill: -jr-fg;
+    -fx-border-color: -jr-border;
+}
+.root-pane .text-area .content {
+    -fx-background-color: -jr-field-bg;
+}
+
+.root-pane .progress-bar > .track {
+    -fx-background-color: -jr-sunken;
+}
+.root-pane .progress-bar > .bar {
+    -fx-background-color: -jr-accent;
+}
