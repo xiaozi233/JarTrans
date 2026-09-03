@@ -53,6 +53,14 @@ tasks.jar {
     enabled = false
 }
 
+// 运行与打包都走 fat jar / gradlew run，application 插件的
+// 启动脚本与 tar/zip 分发产物不需要，禁用以免与 shadowJar 产物冲突
+listOf("startScripts", "distTar", "distZip", "installDist").forEach { name ->
+    tasks.named(name) {
+        enabled = false
+    }
+}
+
 tasks.shadowJar {
     archiveClassifier.set("")          // 直接命名为 jartrans-<version>.jar
     mergeServiceFiles()
