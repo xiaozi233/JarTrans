@@ -86,6 +86,45 @@ class MinThumbScrollBarSkinTest {
         });
     }
 
+    /** 水平滚动条同样保底且滚到最右不越出右缘。 */
+    @Test
+    void horizontalLongLineKeepsThumbInside() throws Exception {
+        System.setProperty("jartrans.dir", tmp.resolve("hbar").toString());
+        FxSupport.runFx(() -> {
+            ScrollBar hb = new ScrollBar();
+            hb.setOrientation(Orientation.HORIZONTAL);
+            hb.setMin(0);
+            hb.setMax(1000);
+            hb.setVisibleAmount(20); // 可视占比小 → 滑块按比例会缩到保底长度以下
+            hb.setPrefWidth(300);
+            hb.setPrefHeight(12);
+
+            Scene scene = new Scene(new StackPane(hb), 320, 40);
+            new Theme("dark").attach(scene);
+            scene.getRoot().applyCss();
+            scene.getRoot().layout();
+
+            assertTrue(hb.getSkin() instanceof MinThumbScrollBarSkin,
+                    "水平滚动条应换用 MinThumbScrollBarSkin（实际 " + hb.getSkin() + "）");
+
+            // 最右端：滑块保底且不越出右缘
+            hb.setValue(hb.getMax());
+            scene.getRoot().layout();
+            Region thumb = (Region) hb.lookup(".thumb");
+            assertNotNull(thumb, "应能找到水平滑块");
+            double len = thumb.getWidth();
+            assertTrue(len >= MinThumbScrollBarSkin.MIN_THUMB_LENGTH - 0.5,
+                    "水平滑块长度应保底 " + MinThumbScrollBarSkin.MIN_THUMB_LENGTH
+                            + "px（实际 " + len + "）");
+            Bounds b = thumb.getBoundsInParent();
+            assertTrue(b.getMaxX() <= hb.getWidth() + 0.5,
+                    "最右时滑块不应越出右缘（maxX=" + b.getMaxX()
+                            + "，条宽=" + hb.getWidth() + "）");
+            assertTrue(b.getMinX() >= -0.5,
+                    "滑块左端不应越出左缘（minX=" + b.getMinX() + "）");
+        });
+    }
+
     private static void assertThumbLongEnough(Region thumb, String when) {
         assertNotNull(thumb);
         double len = thumb.getHeight();
