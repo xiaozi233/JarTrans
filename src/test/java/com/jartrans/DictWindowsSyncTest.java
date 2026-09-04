@@ -126,6 +126,14 @@ class DictWindowsSyncTest {
             assertTrue(rowsText(tableOf(mgr)).contains("count=1"),
                     "添加词条后管理窗口的词条数列应更新");
 
+            // 主窗顶部下拉切换 → 管理窗口激活标记同样跟随
+            ComboBox<String> mainBox = mainComboOf(app);
+            mainBox.setValue("测试词典");
+            assertEquals("测试词典", app.project().dicts().activeName());
+            assertTrue(rowsText(tableOf(mgr)).contains("✓ 测试词典"),
+                    "主窗下拉切换后管理窗口应同步激活标记");
+            assertEquals("测试词典", comboOf(dd).getValue(), "条目窗口下拉也应跟随");
+
             dd.close();
             mgr.close();
             assertEquals(0, listenersOf(app).size(), "窗口关闭后应注销词典监听器");
@@ -221,6 +229,13 @@ class DictWindowsSyncTest {
         Field f = DictDialog.class.getDeclaredField("dictBox");
         f.setAccessible(true);
         return (ComboBox<String>) f.get(dlg);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ComboBox<String> mainComboOf(MainApp app) throws Exception {
+        Field f = MainApp.class.getDeclaredField("dictBox");
+        f.setAccessible(true);
+        return (ComboBox<String>) f.get(app);
     }
 
     @SuppressWarnings("unchecked")
