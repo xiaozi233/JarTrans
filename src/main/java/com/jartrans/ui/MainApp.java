@@ -35,6 +35,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.RadioMenuItem;
+import javafx.scene.control.SelectionMode;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
@@ -212,6 +213,8 @@ public class MainApp extends Application {
 
         // 类树
         classTree.setShowRoot(false);
+        // 多选：右键菜单可对选中的多个类批量标记/填充/复制路径
+        classTree.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         classTree.setCellFactory(tv -> new TreeCell<>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -727,7 +730,7 @@ public class MainApp extends Application {
     }
 
     private void showTreeMenu(TreeItem<String> node, double x, double y) {
-        List<String> targets = treeModel.targetsFor(node);
+        List<String> targets = menuTargets(node);
         if (targets.isEmpty()) {
             return;
         }
@@ -760,6 +763,21 @@ public class MainApp extends Application {
                 expandItem, collapseItem);
         lastTreeMenu = menu;
         menu.show(classTree, x, y);
+    }
+
+    /** 右键菜单的目标类集合：多选时取选中的全部类节点，单选按节点类型派生。 */
+    private List<String> menuTargets(TreeItem<String> rightClicked) {
+        List<TreeItem<String>> selected = classTree.getSelectionModel().getSelectedItems();
+        if (selected != null && selected.size() > 1) {
+            List<String> classes = new ArrayList<>();
+            for (TreeItem<String> item : selected) {
+                if (ClassTreeModel.TYPE_CLASS.equals(treeModel.kindOf(item))) {
+                    classes.add(treeModel.targetOf(item));
+                }
+            }
+            return classes;
+        }
+        return treeModel.targetsFor(rightClicked);
     }
 
     private void mark(List<String> classes, String state) {

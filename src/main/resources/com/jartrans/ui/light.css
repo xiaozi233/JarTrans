@@ -487,21 +487,21 @@
     -fx-padding: 2;
 }
 .scroll-bar:vertical {
-    -fx-pref-width: 10;
+    -fx-pref-width: 12;
 }
 .scroll-bar:horizontal {
-    -fx-pref-height: 10;
+    -fx-pref-height: 12;
 }
 .scroll-bar .track {
     -fx-background-color: transparent;
     -fx-border-color: transparent;
 }
 .scroll-bar .thumb {
-    -fx-background-color: #c3c9d4;
+    -fx-background-color: #a8b0bf;
     -fx-background-radius: 8;
 }
 .scroll-bar .thumb:hover {
-    -fx-background-color: #aab2c0;
+    -fx-background-color: #8f99ab;
 }
 .scroll-bar .thumb:pressed {
     -fx-background-color: -jr-accent;

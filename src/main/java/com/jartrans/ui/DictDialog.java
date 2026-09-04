@@ -1,6 +1,8 @@
 package com.jartrans.ui;
 
 import com.jartrans.core.Dictionary;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.geometry.Insets;
@@ -9,6 +11,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.SelectionMode;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
@@ -87,6 +90,8 @@ public class DictDialog extends Stage {
         //noinspection unchecked
         table.getColumns().addAll(colOrig, colTrans);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
+        // 多选：删除按钮可批量删除选中词条
+        table.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         table.getSelectionModel().selectedItemProperty().addListener((o, ov, nv) -> {
             if (nv != null) {
                 origField.setText(nv.getKey());
@@ -172,13 +177,20 @@ public class DictDialog extends Stage {
     }
 
     private void deleteEntry() {
-        Map.Entry<String, String> selected = table.getSelectionModel().getSelectedItem();
-        if (selected == null) {
+        List<Map.Entry<String, String>> selected =
+                new ArrayList<>(table.getSelectionModel().getSelectedItems());
+        if (selected.isEmpty()) {
             return;
         }
-        String orig = selected.getKey();
-        if (Dialogs.confirm("确认", "删除该词条？\n\n" + Texts.displayText(orig).substring(0, Math.min(100, orig.length())))) {
-            app.project().dictionary().remove(orig);
+        String preview = Texts.displayText(selected.get(0).getKey())
+                .substring(0, Math.min(100, selected.get(0).getKey().length()));
+        String message = selected.size() == 1
+                ? "删除该词条？\n\n" + preview
+                : "删除选中的 " + selected.size() + " 条词条？\n\n" + preview + "\n…";
+        if (Dialogs.confirm("确认", message)) {
+            for (Map.Entry<String, String> entry : selected) {
+                app.project().dictionary().remove(entry.getKey());
+            }
             try {
                 app.project().dictionary().save();
             } catch (Exception ignored) {
