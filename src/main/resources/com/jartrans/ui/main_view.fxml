@@ -10,7 +10,6 @@
 <?import javafx.scene.control.MenuItem?>
 <?import javafx.scene.control.ProgressBar?>
 <?import javafx.scene.control.RadioMenuItem?>
-<?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.SeparatorMenuItem?>
 <?import javafx.scene.control.SplitPane?>
@@ -149,9 +148,7 @@
             </BorderPane>
             <TabPane fx:id="tabPane" tabClosingPolicy="UNAVAILABLE">
                 <Tab text="  翻译  " fx:id="editorTab">
-                    <ScrollPane fitToWidth="true" fitToHeight="true">
-                        <EditorPane fx:id="editor"/>
-                    </ScrollPane>
+                    <EditorPane fx:id="editor"/>
                 </Tab>
                 <Tab text="  源码  " fx:id="sourceTab">
                     <SourcePanel fx:id="sourcePanel"/>

@@ -259,7 +259,7 @@ public class EditorPane extends BorderPane {
         vSplit.getItems().add(table);
 
         HBox buttons = new HBox(6);
-        buttons.setPadding(new Insets(4, 6, 2, 6));
+        buttons.setPadding(new Insets(4, 0, 2, 0));
         buttons.setAlignment(Pos.CENTER_LEFT);
         buttons.getStyleClass().add("edit-toolbar");
         Button saveBtn = new Button("保存译文 (Ctrl+S)");
@@ -274,7 +274,9 @@ public class EditorPane extends BorderPane {
         saveDict.setOnAction(e -> setQuiet("save_to_dict", saveDict.isSelected()));
 
         VBox editBox = new VBox(buttons, editor);
-        editBox.setPadding(new Insets(0, 6, 6, 6));
+        // 左右不留内缩：让编辑框与上方表格同宽（表格即 vSplit 全宽）；
+        // 底部内距与 EditorPane padding 合计 ≈8px，和左侧类列表的底边距一致
+        editBox.setPadding(new Insets(0, 0, 4, 0));
         VBox.setVgrow(editor, Priority.ALWAYS);
         editor.setPrefRowCount(4);
         editor.setMinHeight(72);
@@ -283,7 +285,6 @@ public class EditorPane extends BorderPane {
 
         vSplit.getItems().add(editBox);
 
-        BorderPane.setMargin(vSplit, new Insets(0, 0, 4, 0));
         setCenter(vSplit);
         // 保存译文快捷键统一由主窗口（可重新绑定）处理，此处不再本地拦截
 
