@@ -904,11 +904,12 @@ public class MainApp extends Application {
         } catch (Exception ignored) {
             // 写盘失败不阻断
         }
-        updateStats();
         setStatus("已切换到词典「" + name + "」（" + project.dictionary().size() + " 条）");
         if (editor.currentClass() != null) {
             editor.refreshRows();
         }
+        // 已打开的词典条目/管理窗口一起同步激活词典
+        notifyDictsChanged();
     }
 
     void manageDictionaries() {
