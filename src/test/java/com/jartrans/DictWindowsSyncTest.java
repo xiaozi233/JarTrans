@@ -97,6 +97,41 @@ class DictWindowsSyncTest {
         });
     }
 
+    /** 反向同步：条目窗口内切换词典 / 增删词条，管理窗口的激活标记与词条数必须跟随。 */
+    @Test
+    void dictEntryChangesRefreshManagerWindow() throws Exception {
+        System.setProperty("jartrans.dir", tmp.resolve("appdir-c").toString());
+        FxSupport.runFx(() -> {
+            MainApp app = new MainApp();
+            app.start(new Stage());
+
+            DictDialog dd = new DictDialog(app);
+            dd.show();
+            DictManagerDialog mgr = new DictManagerDialog(app);
+            mgr.show();
+
+            // 先在管理窗口新建「测试词典」（自动成为激活词典）
+            createNewDictViaUi(mgr);
+            assertTrue(rowsText(tableOf(mgr)).contains("✓ 测试词典"));
+            assertEquals("测试词典", comboOf(dd).getValue(), "条目窗口应已切到新词典");
+
+            // 在条目窗口下拉切回「默认词典」→ 管理窗口的激活标记应跟随
+            comboOf(dd).setValue("默认词典");
+            assertEquals("默认词典", app.project().dicts().activeName());
+            assertTrue(rowsText(tableOf(mgr)).contains("✓ 默认词典"),
+                    "切回默认词典后管理窗口应更新激活标记");
+
+            // 在条目窗口添加一条词条 → 管理窗口该行词条数应 +1
+            addEntryViaUi(dd, "hello", "你好");
+            assertTrue(rowsText(tableOf(mgr)).contains("count=1"),
+                    "添加词条后管理窗口的词条数列应更新");
+
+            dd.close();
+            mgr.close();
+            assertEquals(0, listenersOf(app).size(), "窗口关闭后应注销词典监听器");
+        });
+    }
+
     // ---------- 辅助 ----------
 
     private static void createNewDictViaUi(DictManagerDialog mgr) throws Exception {
@@ -149,6 +184,19 @@ class DictWindowsSyncTest {
             }
         }
         return false;
+    }
+
+    /** 在词典条目窗口表单里填原/译文并点「添加 / 更新」。 */
+    private static void addEntryViaUi(DictDialog dlg, String orig, String trans) throws Exception {
+        Field fo = DictDialog.class.getDeclaredField("origField");
+        fo.setAccessible(true);
+        Field ft = DictDialog.class.getDeclaredField("transField");
+        ft.setAccessible(true);
+        ((TextField) fo.get(dlg)).setText(orig);
+        ((TextField) ft.get(dlg)).setText(trans);
+        Button saveBtn = findButton(dlg, "添加 / 更新");
+        assertNotNull(saveBtn, "应找到「添加 / 更新」按钮");
+        saveBtn.fire();
     }
 
     private static DictManagerDialog findManagerWindow(MainApp app) {
