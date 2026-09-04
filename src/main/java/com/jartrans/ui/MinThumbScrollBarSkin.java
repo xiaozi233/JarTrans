@@ -6,20 +6,23 @@ import javafx.scene.control.skin.ScrollBarSkin;
 import javafx.scene.layout.Region;
 
 /**
- * 滚动条皮肤：强制滑块（thumb）保底最小长度。
+ * 滚动条皮肤：强制滑块（thumb）保底最小长度且不越出轨道。
  *
  * <p>JavaFX 默认 ScrollBarSkin 的滑块最小长度由内部常量硬编码（约 1.5 倍滚动条
  * 粗细，12px 宽时仅 18px 上下），CSS 无属性可调；当条目非常多时滑块按比例会缩成
- * 几乎看不见的细线。本皮肤在每次布局后把滑块校正到 {@link #MIN_THUMB_LENGTH}
- * （内容足够多时）并按当前 value 重新定位，保证长列表滚动条始终可见、可点。</p>
+ * 几乎看不见的细线。</p>
+ *
+ * <p>实现要点：默认皮肤对滑块尺寸与位置是分开管理的——布局时按内部小长度
+ * resize 滑块，滚动/拖动时用 {@code setTranslate} 移动滑块（内部缓存的小长度做
+ * 滑程，位置与滑块实际尺寸脱节）。本皮肤在每次布局以及 value/max 变化
+ * （拖动、滚轮、赋值）后：①把滑块 resize 到 ≥ {@link #MIN_THUMB_LENGTH}；
+ * ②用 {@code setTranslate} 按「实际滑块尺寸 + 当前 value」重新定位到轨道范围内，
+ * 覆盖默认内部位置（监听注册在父构造之后，晚于默认监听，最终生效）。</p>
  *
  * <p>挂载方式（注意不能代码里 setSkin——UA 样式表的 -fx-skin 会在每次 CSS
  * pass 把它还原成默认皮肤）：由 resources 的 scrollbar-skin.css 通过
  * {@code .scroll-bar { -fx-skin: "com.jartrans.ui.MinThumbScrollBarSkin"; } }
  * 以 author 样式覆盖（author &gt; UA），随 Theme.attach 全场景生效。</p>
- *
- * <p>说明：ScrollBarSkin 取自公开 API 包 javafx.scene.control.skin（JavaFX 17+
- * 已公开），无需 --add-exports。</p>
  */
 public class MinThumbScrollBarSkin extends ScrollBarSkin {
 
@@ -28,11 +31,20 @@ public class MinThumbScrollBarSkin extends ScrollBarSkin {
 
     public MinThumbScrollBarSkin(ScrollBar scrollBar) {
         super(scrollBar);
+        // 默认皮肤只在布局时算滑块尺寸、滚动时只 setTranslate 位置；
+        // 这些监听注册在父构造之后 → 每次变化我们都最后校正，保证不越界
+        scrollBar.valueProperty().addListener((o, ov, nv) -> fixThumb());
+        scrollBar.maxProperty().addListener((o, ov, nv) -> fixThumb());
     }
 
     @Override
     protected void layoutChildren(double x, double y, double w, double h) {
         super.layoutChildren(x, y, w, h);
+        fixThumb();
+    }
+
+    /** 放大滑块到保底长度，并按 value 重定位到轨道内。 */
+    private void fixThumb() {
         ScrollBar bar = (ScrollBar) getSkinnable();
         Region track = (Region) bar.lookup(".track");
         Region thumb = (Region) bar.lookup(".thumb");
@@ -40,21 +52,29 @@ public class MinThumbScrollBarSkin extends ScrollBarSkin {
             return;
         }
         if (bar.getOrientation() == Orientation.VERTICAL) {
+            double trackLen = track.getHeight();
+            if (trackLen <= 0) {
+                return;
+            }
             double len = thumb.getHeight();
-            double newLen = Math.min(Math.max(len, MIN_THUMB_LENGTH), track.getHeight());
+            double newLen = Math.min(Math.max(len, MIN_THUMB_LENGTH), trackLen);
             if (newLen > len) {
                 thumb.resize(thumb.getWidth(), newLen);
-                thumb.relocate(thumb.getLayoutX(), position(track.getLayoutY(),
-                        track.getHeight(), newLen, bar));
             }
+            double y = position(track.getLayoutY(), trackLen, thumb.getHeight(), bar);
+            thumb.setTranslateY(y - thumb.getLayoutY());
         } else {
+            double trackLen = track.getWidth();
+            if (trackLen <= 0) {
+                return;
+            }
             double len = thumb.getWidth();
-            double newLen = Math.min(Math.max(len, MIN_THUMB_LENGTH), track.getWidth());
+            double newLen = Math.min(Math.max(len, MIN_THUMB_LENGTH), trackLen);
             if (newLen > len) {
                 thumb.resize(newLen, thumb.getHeight());
-                thumb.relocate(position(track.getLayoutX(), track.getWidth(), newLen, bar),
-                        thumb.getLayoutY());
             }
+            double x = position(track.getLayoutX(), trackLen, thumb.getWidth(), bar);
+            thumb.setTranslateX(x - thumb.getLayoutX());
         }
     }
 
