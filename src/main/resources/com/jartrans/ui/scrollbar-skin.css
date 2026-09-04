@@ -1,0 +1,5 @@
+/* 统一滚动条皮肤：保证滑块最短长度（见 MinThumbScrollBarSkin）。
+   author 样式覆盖 UA 的 -fx-skin，随主题一起挂到所有场景。 */
+.scroll-bar {
+    -fx-skin: "com.jartrans.ui.MinThumbScrollBarSkin";
+}

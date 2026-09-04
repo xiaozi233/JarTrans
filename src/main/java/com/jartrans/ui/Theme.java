@@ -153,8 +153,12 @@ public final class Theme {
 
     public void attach(Scene scene) {
         scenes.add(scene);
-        scene.getStylesheets().setAll(stylesheetUrl());
+        scene.getStylesheets().setAll(stylesheetUrl(), SCROLLBAR_SKIN_URL);
     }
+
+    /** 滚动条皮肤样式：.scroll-bar 换用 MinThumbScrollBarSkin（保证滑块最短长度）。 */
+    private static final String SCROLLBAR_SKIN_URL =
+            Theme.class.getResource("scrollbar-skin.css").toExternalForm();
 
     private String stylesheetUrl() {
         String name = dark() ? "dark.css" : "light.css";
@@ -172,7 +176,7 @@ public final class Theme {
                 ? DARK : LIGHT;
         String url = stylesheetUrl();
         for (Scene scene : scenes) {
-            scene.getStylesheets().setAll(url);
+            scene.getStylesheets().setAll(url, SCROLLBAR_SKIN_URL);
             scene.getRoot().applyCss();
         }
         for (Runnable cb : List.copyOf(listeners)) {

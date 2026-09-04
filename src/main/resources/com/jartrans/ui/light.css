@@ -493,8 +493,9 @@
     -fx-pref-height: 12;
 }
 .scroll-bar .track {
-    -fx-background-color: transparent;
+    -fx-background-color: #00000014;
     -fx-border-color: transparent;
+    -fx-background-radius: 8;
 }
 .scroll-bar .thumb {
     -fx-background-color: #a8b0bf;
