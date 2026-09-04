@@ -154,12 +154,11 @@ public class DictDialog extends Stage {
         } catch (Exception ignored) {
             // 设置写盘失败不阻断
         }
-        app.syncDictBox();
-        app.updateStats();
         if (app.editor().currentClass() != null) {
             app.editor().refreshRows();
         }
-        refresh();
+        // 主窗下拉/统计与所有词典窗口（含本窗口、管理窗口）一起同步
+        app.notifyDictsChanged();
     }
 
     private void refresh() {
@@ -189,6 +188,8 @@ public class DictDialog extends Stage {
             // 写盘失败不阻断
         }
         refresh();
+        // 词条数变化 → 管理窗口「词条数」列与主窗统计跟随刷新
+        app.notifyDictsChanged();
     }
 
     private void deleteEntry() {
@@ -212,6 +213,8 @@ public class DictDialog extends Stage {
                 // 写盘失败不阻断
             }
             refresh();
+            // 词条数变化 → 管理窗口「词条数」列与主窗统计跟随刷新
+            app.notifyDictsChanged();
         }
     }
 
