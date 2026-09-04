@@ -95,6 +95,8 @@ public class MainApp extends Application {
     private Map<String, Path> indexCache;
     /** 已按单类反编译过的类 → 产出的 .java 文件（本会话内复用）。 */
     private final Map<String, List<Path>> singleClassFiles = new HashMap<>();
+    /** 词典结构/激活词典变化时需要同步的窗口回调（词典条目窗口、词典管理窗口多实例）。 */
+    private final List<Runnable> dictsListeners = new ArrayList<>();
     private boolean javaPrompted;
 
     // ---------- FXML 控件 ----------
@@ -868,6 +870,27 @@ public class MainApp extends Application {
         dictBox.setDisable(false);
         dictBox.getItems().setAll(project.dicts().names());
         dictBox.setValue(project.dicts().activeName());
+    }
+
+    /** 注册词典变化回调（词典条目/管理窗口在构造时调用，窗口隐藏时注销）。 */
+    public void addDictsListener(Runnable listener) {
+        dictsListeners.add(listener);
+    }
+
+    public void removeDictsListener(Runnable listener) {
+        dictsListeners.remove(listener);
+    }
+
+    /**
+     * 词典结构（新建/删除/重命名/导入）或激活词典变化后统一刷新：
+     * 主窗下拉与统计 + 所有已打开的词典相关窗口。
+     */
+    void notifyDictsChanged() {
+        syncDictBox();
+        updateStats();
+        for (Runnable r : new ArrayList<>(dictsListeners)) {
+            r.run();
+        }
     }
 
     private void onDictSelected(String name) {

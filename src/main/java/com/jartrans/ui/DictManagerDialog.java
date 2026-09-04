@@ -27,6 +27,8 @@ public class DictManagerDialog extends Stage {
     private final DictionaryManager dicts;
     private final TableView<DictRow> table = new TableView<>();
     private final Label infoLabel = new Label("");
+    /** 词典结构/激活变化时刷新本窗口列表（多实例窗口保持同步）。 */
+    private final Runnable dictsListener = this::refresh;
 
     private record DictRow(String name, int count, String file) {
     }
@@ -100,34 +102,42 @@ public class DictManagerDialog extends Stage {
 
         setScene(new Scene(root));
         app.theme().attach(getScene());
+        app.addDictsListener(dictsListener);
+        setOnHidden(e -> app.removeDictsListener(dictsListener));
         refresh();
     }
 
     private String selectedName() {
         DictRow row = table.getSelectionModel().getSelectedItem();
-        return row == null ? null : row.name();
+        if (row == null) {
+            return null;
+        }
+        // 行名带当前词典的「✓ 」前缀，比较时剥掉
+        String raw = row.name();
+        return raw.startsWith("✓ ") ? raw.substring(2) : raw;
     }
 
     private void refresh() {
         String sel = selectedName();
         table.getItems().clear();
+        int index = 0;
         for (String name : dicts.names()) {
             Path path = dicts.pathOf(name);
             String mark = name.equals(dicts.activeName()) ? "✓ " : "";
             table.getItems().add(new DictRow(mark + name, dicts.count(name),
                     path == null ? "" : path.getFileName().toString()));
             if (name.equals(sel)) {
-                table.getSelectionModel().selectLast();
+                table.getSelectionModel().select(index);
             }
+            index += 1;
         }
         infoLabel.setText("共 " + dicts.names().size() + " 个词典，当前：" + dicts.activeName()
                 + "（" + dicts.count(dicts.activeName()) + " 条）");
     }
 
     private void syncApp() {
-        app.syncDictBox();
-        app.updateStats();
-        refresh();
+        // 刷新主窗下拉/统计，并通知所有已打开的词典窗口（含本窗口）同步列表
+        app.notifyDictsChanged();
     }
 
     private void create() {
@@ -135,14 +145,19 @@ public class DictManagerDialog extends Stage {
         if (name == null || name.isBlank()) {
             return;
         }
+        name = name.trim();
         try {
-            dicts.create(name.trim());
-            dicts.setActive(name.trim());
-            app.project().useDictionary(name.trim());
-            app.settings().set("dictionary", name.trim());
+            dicts.create(name);
+            dicts.setActive(name);
         } catch (Exception exc) {
             Dialogs.warn("提示", exc.getMessage());
             return;
+        }
+        try {
+            app.project().useDictionary(name);
+            app.settings().set("dictionary", name);
+        } catch (Exception ignored) {
+            // 切换/设置写盘失败不阻断：词典已创建成功，界面必须照常刷新
         }
         if (app.editor().currentClass() != null) {
             app.editor().refreshRows();

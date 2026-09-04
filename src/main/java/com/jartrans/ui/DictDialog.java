@@ -33,9 +33,20 @@ public class DictDialog extends Stage {
     private final TextField origField = new TextField();
     private final TextField transField = new TextField();
     private final Label countLabel = new Label("");
+    /** 词典结构/激活变化（如在「管理多个词典」里新建）后同步本窗口的下拉与内容。 */
+    private final Runnable dictsListener;
 
     public DictDialog(MainApp app) {
         this.app = app;
+        dictsListener = () -> {
+            if (app.project().dicts() == null) {
+                return;
+            }
+            String active = app.project().dicts().activeName();
+            dictBox.getItems().setAll(app.project().dicts().names());
+            dictBox.setValue(active);
+            refresh();
+        };
         setTitle("词典条目");
         setWidth(820);
         setHeight(560);
@@ -124,6 +135,10 @@ public class DictDialog extends Stage {
         setOnCloseRequest(e -> closeAndSave());
         setScene(new Scene(root));
         app.theme().attach(getScene());
+        if (app.project().dicts() != null) {
+            app.addDictsListener(dictsListener);
+            setOnHidden(e -> app.removeDictsListener(dictsListener));
+        }
         refresh();
     }
 
