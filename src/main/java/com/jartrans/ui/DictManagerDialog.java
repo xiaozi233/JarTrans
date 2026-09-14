@@ -1,12 +1,11 @@
 package com.jartrans.ui;
 
 import com.jartrans.core.DictionaryManager;
+import java.io.File;
 import java.nio.file.Path;
-import javafx.beans.property.SimpleStringProperty;
 import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
-import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.Separator;
@@ -18,12 +17,10 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
-import javafx.stage.Stage;
 
 /** 多词典管理：新建 / 重命名 / 删除 / 导入 / 导出 / 切换当前词典。对应 dict_manager_dialog.py。 */
-public class DictManagerDialog extends Stage {
+public class DictManagerDialog extends AppWindow {
 
-    private final MainApp app;
     private final DictionaryManager dicts;
     private final TableView<DictRow> table = new TableView<>();
     private final Label infoLabel = new Label("");
@@ -34,30 +31,17 @@ public class DictManagerDialog extends Stage {
     }
 
     public DictManagerDialog(MainApp app) {
-        this.app = app;
+        super(app, "管理多个词典", 760, 470, 620, 400, Modality.NONE);
         this.dicts = app.project().dicts();
-        setTitle("管理多个词典");
-        setWidth(760);
-        setHeight(470);
-        initModality(Modality.NONE);
-        initOwner(app.stage());
-        setResizable(true);
-        setMinWidth(620);
-        setMinHeight(400);
 
-        BorderPane root = new BorderPane();
-        root.setPadding(new Insets(10));
-        root.getStyleClass().add("root-pane");
+        BorderPane root = rootPane();
 
-        TableColumn<DictRow, String> colName = new TableColumn<>("名称");
-        colName.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().name()));
-        colName.setPrefWidth(200);
-        TableColumn<DictRow, String> colCount = new TableColumn<>("词条数");
-        colCount.setCellValueFactory(d -> new SimpleStringProperty(String.valueOf(d.getValue().count())));
-        colCount.setPrefWidth(80);
-        TableColumn<DictRow, String> colFile = new TableColumn<>("文件");
-        colFile.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().file()));
-        colFile.setPrefWidth(400);
+        TableColumn<DictRow, String> colName =
+                TableColumns.text("名称", 200, DictRow::name);
+        TableColumn<DictRow, String> colCount =
+                TableColumns.text("词条数", 80, r -> String.valueOf(r.count()));
+        TableColumn<DictRow, String> colFile =
+                TableColumns.text("文件", 400, DictRow::file);
         //noinspection unchecked
         table.getColumns().addAll(colName, colCount, colFile);
         table.setOnMouseClicked(e -> {
@@ -100,8 +84,7 @@ public class DictManagerDialog extends Stage {
         foot.setPadding(new Insets(4, 0, 0, 0));
         root.setBottom(new VBox(foot, tip));
 
-        setScene(new Scene(root));
-        app.theme().attach(getScene());
+        mount(root);
         app.addDictsListener(dictsListener);
         setOnHidden(e -> app.removeDictsListener(dictsListener));
         refresh();
@@ -135,9 +118,23 @@ public class DictManagerDialog extends Stage {
                 + "（" + dicts.count(dicts.activeName()) + " 条）");
     }
 
+    /** 刷新主窗下拉/统计，并通知所有已打开的词典窗口（含本窗口）同步列表。 */
     private void syncApp() {
-        // 刷新主窗下拉/统计，并通知所有已打开的词典窗口（含本窗口）同步列表
         app.notifyDictsChanged();
+    }
+
+    /** 切换当前词典并同步全部词典窗口与主窗（新建/删除/激活三处共用）。 */
+    private void switchTo(String name) {
+        try {
+            app.project().useDictionary(name);
+            app.settings().setOrIgnore("dictionary", name);
+        } catch (Exception ignored) {
+            // 切换失败不阻断：词典已变更，界面照常刷新
+        }
+        if (app.editor().currentClass() != null) {
+            app.editor().refreshRows();
+        }
+        syncApp();
     }
 
     private void create() {
@@ -153,16 +150,7 @@ public class DictManagerDialog extends Stage {
             Dialogs.warn("提示", exc.getMessage());
             return;
         }
-        try {
-            app.project().useDictionary(name);
-            app.settings().set("dictionary", name);
-        } catch (Exception ignored) {
-            // 切换/设置写盘失败不阻断：词典已创建成功，界面必须照常刷新
-        }
-        if (app.editor().currentClass() != null) {
-            app.editor().refreshRows();
-        }
-        syncApp();
+        switchTo(name);
     }
 
     private void rename() {
@@ -181,11 +169,7 @@ public class DictManagerDialog extends Stage {
             return;
         }
         if (dicts.activeName().equals(newName.trim())) {
-            try {
-                app.settings().set("dictionary", newName.trim());
-            } catch (Exception ignored) {
-                // 写盘失败不阻断
-            }
+            app.settings().setOrIgnore("dictionary", newName.trim());
         }
         syncApp();
     }
@@ -206,16 +190,7 @@ public class DictManagerDialog extends Stage {
             Dialogs.warn("提示", exc.getMessage());
             return;
         }
-        try {
-            app.project().useDictionary(dicts.activeName());
-            app.settings().set("dictionary", dicts.activeName());
-        } catch (Exception ignored) {
-            // 写盘失败不阻断
-        }
-        if (app.editor().currentClass() != null) {
-            app.editor().refreshRows();
-        }
-        syncApp();
+        switchTo(dicts.activeName());
     }
 
     private void importJson() {
@@ -224,7 +199,7 @@ public class DictManagerDialog extends Stage {
         chooser.getExtensionFilters().addAll(
                 new FileChooser.ExtensionFilter("JSON 文件", "*.json"),
                 new FileChooser.ExtensionFilter("所有文件", "*.*"));
-        java.io.File file = chooser.showOpenDialog(this);
+        File file = chooser.showOpenDialog(this);
         if (file == null) {
             return;
         }
@@ -262,7 +237,7 @@ public class DictManagerDialog extends Stage {
         chooser.setTitle("导出词典");
         chooser.setInitialFileName(name + ".json");
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("JSON 文件", "*.json"));
-        java.io.File file = chooser.showSaveDialog(this);
+        File file = chooser.showSaveDialog(this);
         if (file == null) {
             return;
         }
@@ -279,16 +254,7 @@ public class DictManagerDialog extends Stage {
         if (name == null || name.equals(dicts.activeName())) {
             return;
         }
-        try {
-            app.project().useDictionary(name);
-            app.settings().set("dictionary", name);
-        } catch (Exception ignored) {
-            // 写盘失败不阻断
-        }
-        if (app.editor().currentClass() != null) {
-            app.editor().refreshRows();
-        }
+        switchTo(name);
         app.setStatus("已切换到词典「" + name + "」");
-        syncApp();
     }
 }

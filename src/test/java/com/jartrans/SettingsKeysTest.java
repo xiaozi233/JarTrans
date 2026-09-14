@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SettingsKeysTest {
 
     private static final Pattern USAGE = Pattern.compile(
-            "(?:settings|app\\.settings\\(\\))\\.(?:set|setQuiet|get|getBool|getString)"
+            "(?:settings|app\\.settings\\(\\))\\.(?:set|setQuiet|setOrIgnore|get|getBool|getString)"
                     + "\\(\"([A-Za-z_][A-Za-z0-9_]*)\"");
 
     @Test

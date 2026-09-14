@@ -48,6 +48,15 @@ public final class Dictionary {
         Json.writeFile(path, sorted);
     }
 
+    /** 落盘但忽略失败：词典写盘失败不应打断界面操作。 */
+    public void saveQuietly() {
+        try {
+            save();
+        } catch (IOException ignored) {
+            // 写盘失败不阻断
+        }
+    }
+
     public String get(String orig) {
         return data.get(orig);
     }

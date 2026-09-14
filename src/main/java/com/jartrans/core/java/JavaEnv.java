@@ -55,16 +55,18 @@ public final class JavaEnv {
         return null;
     }
 
-    /** 按优先级产出候选 java 路径。 */
-    private static List<String> candidates(Settings settings) {
+    /**
+     * 按优先级产出候选 java 路径：配置项 → PATH → JAVA_HOME → MC 官方启动器 runtime。
+     * pathJava 为调用方已算好的 PATH 命中结果，避免重复扫描 PATH。
+     */
+    private static List<String> candidates(Settings settings, String pathJava) {
         List<String> out = new ArrayList<>();
         String configured = settings != null ? settings.getString("java_path") : "";
         if (!configured.isEmpty() && Files.isRegularFile(Paths.get(configured))) {
             out.add(configured);
         }
-        String found = whichJava();
-        if (found != null) {
-            out.add(found);
+        if (pathJava != null) {
+            out.add(pathJava);
         }
         String home = System.getenv("JAVA_HOME");
         if (home != null && !home.isEmpty()) {
@@ -166,7 +168,7 @@ public final class JavaEnv {
         List<Long> bestKey = null;
         String pathJava = whichJava();
         String configured = settings != null ? settings.getString("java_path") : "";
-        for (String path : candidates(settings)) {
+        for (String path : candidates(settings, pathJava)) {
             if (tried.contains(path)) {
                 continue;
             }

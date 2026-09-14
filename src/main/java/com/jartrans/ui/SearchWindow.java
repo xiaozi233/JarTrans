@@ -6,10 +6,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javafx.animation.PauseTransition;
-import javafx.beans.property.SimpleStringProperty;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
@@ -27,13 +25,11 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Modality;
-import javafx.stage.Stage;
 import javafx.util.Duration;
 
 /** 全局搜索窗口：输入即搜，支持原文/译文范围，并可批量替换译文。 */
-public class SearchWindow extends Stage {
+public class SearchWindow extends AppWindow {
 
-    private final MainApp app;
     private final TextField queryField = new TextField();
     private final ComboBox<String> scopeBox = new ComboBox<>();
     private final TableView<SearchRow> table = new TableView<>();
@@ -55,19 +51,9 @@ public class SearchWindow extends Stage {
     }
 
     public SearchWindow(MainApp app, String initial) {
-        this.app = app;
-        setTitle("全局搜索（全包）");
-        setWidth(1020);
-        setHeight(600);
-        initModality(Modality.NONE);
-        initOwner(app.stage());
-        setResizable(true);
-        setMinWidth(760);
-        setMinHeight(440);
+        super(app, "全局搜索（全包）", 1020, 600, 760, 440, Modality.NONE);
 
-        BorderPane root = new BorderPane();
-        root.setPadding(new Insets(10));
-        root.getStyleClass().add("root-pane");
+        BorderPane root = rootPane();
 
         // 第一行：关键词 + 范围 + 搜索按钮 + 计数
         HBox top = new HBox(8);
@@ -100,21 +86,13 @@ public class SearchWindow extends Stage {
         replaceRow.getChildren().addAll(new Label("替换为："), replaceField,
                 repSelBtn, repAllBtn, repTip);
 
-        TableColumn<SearchRow, String> colCls = new TableColumn<>("类");
-        colCls.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().cls()));
-        colCls.setPrefWidth(240);
-        TableColumn<SearchRow, String> colOrig = new TableColumn<>("原字符串");
-        colOrig.setCellValueFactory(d -> new SimpleStringProperty(
-                Texts.displayText(d.getValue().orig())));
-        colOrig.setPrefWidth(330);
-        TableColumn<SearchRow, String> colTrans = new TableColumn<>("译文");
-        colTrans.setCellValueFactory(d -> new SimpleStringProperty(
-                Texts.displayText(d.getValue().trans())));
-        colTrans.setPrefWidth(260);
-        TableColumn<SearchRow, String> colStatus = new TableColumn<>("状态");
-        colStatus.setCellValueFactory(d -> new SimpleStringProperty(
-                EditorPane.STATUS_TEXT.get(d.getValue().statusKey())));
-        colStatus.setPrefWidth(90);
+        TableColumn<SearchRow, String> colCls = TableColumns.text("类", 240, SearchRow::cls);
+        TableColumn<SearchRow, String> colOrig =
+                TableColumns.text("原字符串", 330, r -> Texts.displayText(r.orig()));
+        TableColumn<SearchRow, String> colTrans =
+                TableColumns.text("译文", 260, r -> Texts.displayText(r.trans()));
+        TableColumn<SearchRow, String> colStatus =
+                TableColumns.text("状态", 90, r -> EditorPane.STATUS_TEXT.get(r.statusKey()));
         colStatus.setCellFactory(c -> new TableCell<>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -153,8 +131,7 @@ public class SearchWindow extends Stage {
         tip.setPadding(new Insets(6, 0, 0, 0));
         root.setBottom(tip);
 
-        setScene(new Scene(root));
-        app.theme().attach(getScene());
+        mount(root);
 
         // 输入即搜（带防抖）+ 范围切换即搜
         debounce.setOnFinished(e -> doSearch());

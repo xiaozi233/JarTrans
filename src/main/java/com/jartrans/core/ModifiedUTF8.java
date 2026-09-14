@@ -1,5 +1,7 @@
 package com.jartrans.core;
 
+import java.util.Arrays;
+
 /**
  * Java class 文件专用的 Modified UTF-8 编解码。
  *
@@ -56,7 +58,7 @@ public final class ModifiedUTF8 {
                 n += encodeUnit(cp, out, n);
             }
         }
-        return java.util.Arrays.copyOf(out, n);
+        return Arrays.copyOf(out, n);
     }
 
     /** Modified UTF-8 字节 -&gt; str。非法序列替换为 U+FFFD，不抛异常。 */

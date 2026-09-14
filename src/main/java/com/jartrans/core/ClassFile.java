@@ -1,5 +1,6 @@
 package com.jartrans.core;
 
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -195,7 +196,25 @@ public final class ClassFile {
         if (eff.isEmpty()) {
             return data;
         }
+        byte[] newData = serialize(planRetarget(eff));
+        List<String> problems = verify(newData, translations);
+        if (!problems.isEmpty()) {
+            throw new ClassFileException("写回校验失败：" + String.join("；", problems));
+        }
+        return newData;
+    }
 
+    /** 一次重写产生的全部索引变更。 */
+    private record Retarget(Map<Integer, Integer> stringTargets, // CONSTANT_String 索引 -> 新 Utf8 索引
+                            Map<String, Integer> appended,       // 新文本 -> 追加索引
+                            int newCount) {                      // 新 constant_pool_count
+    }
+
+    /**
+     * 计算索引变更（不产生字节）：原条目一律原地保留，译文作为新 Utf8 追加到池尾。
+     * 内容与既有 Utf8 相同的复用既有索引，因此不会重复追加。
+     */
+    private Retarget planRetarget(Map<String, String> eff) throws ClassFileException {
         // 现有 Utf8 条目按原始字节建立复用表（字节比较，避免超长编码误判相同）
         Map<String, Integer> reuse = new LinkedHashMap<>();
         for (CpEntry entry : entries.values()) {
@@ -204,9 +223,9 @@ public final class ClassFile {
             }
         }
 
-        Map<String, Integer> appended = new LinkedHashMap<>(); // 新文本 -&gt; 追加索引
+        Map<String, Integer> appended = new LinkedHashMap<>();
+        Map<Integer, Integer> stringTargets = new LinkedHashMap<>();
         int nextIndex = count;
-        Map<Integer, Integer> stringTargets = new LinkedHashMap<>(); // CONSTANT_String 索引 -&gt; 新 Utf8 索引
         for (CpEntry entry : entries.values()) {
             if (entry.tag != CONSTANT_String) {
                 continue;
@@ -244,46 +263,43 @@ public final class ClassFile {
         if (nextIndex > CP_MAX_COUNT) {
             throw new ClassFileException("常量池条目数超过 65535，无法追加新条目");
         }
+        return new Retarget(stringTargets, appended, nextIndex);
+    }
 
-        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream(
-                data.length + 128);
-        out.write(data, 0, 8);                 // magic + minor + major
-        out.write((nextIndex >>> 8) & 0xFF);   // 新 constant_pool_count
-        out.write(nextIndex & 0xFF);
+    /** 按索引变更写出新字节：文件头 + 原条目（String 改指向）+ 追加的 Utf8 + 原尾字节。 */
+    private byte[] serialize(Retarget plan) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream(data.length + 128);
+        out.write(data, 0, 8);                        // magic + minor + major
+        out.write((plan.newCount() >>> 8) & 0xFF);    // 新 constant_pool_count
+        out.write(plan.newCount() & 0xFF);
         for (int index = 1; index < count; index++) {
             CpEntry entry = entries.get(index);
-            if (entry == null) {               // Long/Double 的第二槽位
+            if (entry == null) {                      // Long/Double 的第二槽位
                 continue;
             }
             out.write(entry.tag);
+            Integer newTarget = plan.stringTargets().get(entry.index);
             if (entry.tag == CONSTANT_Utf8) {
                 // 解析时 raw 只保留内容，写回时补上 u2 长度前缀
                 out.write((entry.raw.length >>> 8) & 0xFF);
                 out.write(entry.raw.length & 0xFF);
                 out.write(entry.raw, 0, entry.raw.length);
-            } else if (entry.tag == CONSTANT_String && stringTargets.containsKey(entry.index)) {
-                int ni = stringTargets.get(entry.index);
-                out.write((ni >>> 8) & 0xFF);
-                out.write(ni & 0xFF);
+            } else if (newTarget != null) {
+                out.write((newTarget >>> 8) & 0xFF);
+                out.write(newTarget & 0xFF);
             } else {
                 out.write(entry.raw, 0, entry.raw.length);
             }
         }
-        for (Map.Entry<String, Integer> e : appended.entrySet()) {
-            byte[] raw = ModifiedUTF8.encode(e.getKey());
+        for (String text : plan.appended().keySet()) {
+            byte[] raw = ModifiedUTF8.encode(text);
             out.write(CONSTANT_Utf8);
             out.write((raw.length >>> 8) & 0xFF);
             out.write(raw.length & 0xFF);
             out.write(raw, 0, raw.length);
         }
         out.write(tail, 0, tail.length);
-
-        byte[] newData = out.toByteArray();
-        List<String> problems = verify(newData, translations);
-        if (!problems.isEmpty()) {
-            throw new ClassFileException("写回校验失败：" + String.join("；", problems));
-        }
-        return newData;
+        return out.toByteArray();
     }
 
     // ---------- 校验 ----------

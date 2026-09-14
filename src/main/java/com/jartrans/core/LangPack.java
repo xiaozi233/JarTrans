@@ -3,9 +3,10 @@ package com.jartrans.core;
 import com.jartrans.core.json.Json;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -33,10 +34,10 @@ public final class LangPack {
     }
 
     public static String computeSha256(Path path) throws IOException {
-        java.security.MessageDigest digest;
+        MessageDigest digest;
         try {
-            digest = java.security.MessageDigest.getInstance("SHA-256");
-        } catch (java.security.NoSuchAlgorithmException e) {
+            digest = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
             throw new IOException("SHA-256 不可用", e);
         }
         try (InputStream in = Files.newInputStream(path)) {
@@ -161,9 +162,5 @@ public final class LangPack {
             }
         }
         return Long.MIN_VALUE;
-    }
-
-    static byte[] utf8(String s) {
-        return s.getBytes(StandardCharsets.UTF_8);
     }
 }

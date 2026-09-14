@@ -2,13 +2,13 @@ package com.jartrans.ui;
 
 import com.jartrans.core.java.DecompilerManager;
 import com.jartrans.core.java.DecompilerType;
+import java.util.Arrays;
 
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
@@ -26,12 +26,10 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
-import javafx.stage.Stage;
 
 /** 全局首选项：集中管理主题/图例/过滤/词典/翻译行为与快捷键绑定。 */
-public class PreferencesDialog extends Stage {
+public class PreferencesDialog extends AppWindow {
 
-    private final MainApp app;
     private final ToggleGroup themeGroup = new ToggleGroup();
     private final RadioButton themeSystem = new RadioButton("跟随系统");
     private final RadioButton themeLight = new RadioButton("浅色");
@@ -54,19 +52,9 @@ public class PreferencesDialog extends Stage {
     }
 
     public PreferencesDialog(MainApp app) {
-        this.app = app;
-        setTitle("首选项");
-        setWidth(680);
-        setHeight(620);
-        initOwner(app.stage());
-        initModality(Modality.WINDOW_MODAL);
-        setResizable(true);
-        setMinWidth(600);
-        setMinHeight(520);
+        super(app, "首选项", 680, 620, 600, 520, Modality.WINDOW_MODAL);
 
-        BorderPane root = new BorderPane();
-        root.setPadding(new Insets(12));
-        root.getStyleClass().add("root-pane");
+        BorderPane root = rootPane(12);
 
         // ---------- 外观 ----------
         Label secAppearance = section("外观");
@@ -115,7 +103,7 @@ public class PreferencesDialog extends Stage {
         // ---------- 源码查看 ----------
         Label secSource = section("源码查看");
         decompilerBox.getItems().setAll(
-                java.util.Arrays.stream(DecompilerType.values())
+                Arrays.stream(DecompilerType.values())
                         .map(DecompilerType::displayName).toList());
         decompilerBox.setValue(currentDecompilerDisplayName());
         decompilerBox.setPrefWidth(180);
@@ -125,12 +113,10 @@ public class PreferencesDialog extends Stage {
 
         // ---------- 快捷键 ----------
         Label secShortcut = section("快捷键（点击组合可修改）");
-        TableColumn<ShortcutRow, String> colName = new TableColumn<>("功能");
-        colName.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().label()));
-        colName.setPrefWidth(240);
-        TableColumn<ShortcutRow, String> colKey = new TableColumn<>("组合键");
-        colKey.setCellValueFactory(d -> new SimpleStringProperty(app.shortcutText(d.getValue().id())));
-        colKey.setPrefWidth(160);
+        TableColumn<ShortcutRow, String> colName =
+                TableColumns.text("功能", 240, ShortcutRow::label);
+        TableColumn<ShortcutRow, String> colKey =
+                TableColumns.text("组合键", 160, r -> app.shortcutText(r.id()));
         //noinspection unchecked
         shortcutTable.getColumns().addAll(colName, colKey);
         shortcutTable.setColumnResizePolicy(
@@ -170,10 +156,10 @@ public class PreferencesDialog extends Stage {
                 secSource, decompilerRow, secShortcut,
                 shortcutTable, shortcutButtons, hintLabel);
         VBox.setVgrow(shortcutTable, Priority.ALWAYS);
-        root.setCenter(new ScrollPane(body) {{
-            setFitToWidth(true);
-            setStyle("-fx-background-color: transparent; -fx-background: transparent;");
-        }});
+        ScrollPane scroller = new ScrollPane(body);
+        scroller.setFitToWidth(true);
+        scroller.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
+        root.setCenter(scroller);
 
         HBox bottom = new HBox(8);
         bottom.setPadding(new Insets(10, 0, 0, 0));
@@ -183,8 +169,7 @@ public class PreferencesDialog extends Stage {
         bottom.getChildren().add(closeBtn);
         root.setBottom(bottom);
 
-        setScene(new Scene(root));
-        app.theme().attach(getScene());
+        mount(root);
 
         // 主题选择立即生效
         themeSystem.setOnAction(e -> applyTheme("system"));
@@ -209,20 +194,11 @@ public class PreferencesDialog extends Stage {
     }
 
     private void setSetting(String key, boolean value) {
-        try {
-            app.settings().set(key, value);
-        } catch (Exception ignored) {
-            // 写盘失败不阻断
-        }
+        app.settings().setOrIgnore(key, value);
     }
 
     private void applyAuthor() {
-        String v = authorField.getText().trim();
-        try {
-            app.settings().set("pack_author", v);
-        } catch (Exception ignored) {
-            // 写盘失败不阻断
-        }
+        app.settings().setOrIgnore("pack_author", authorField.getText().trim());
     }
 
     /** 下拉初始显示：当前实际生效的引擎（所选缺失回退后亦如实显示）。 */
@@ -239,11 +215,7 @@ public class PreferencesDialog extends Stage {
         }
         for (DecompilerType t : DecompilerType.values()) {
             if (t.displayName().equals(chosen)) {
-                try {
-                    app.settings().set("decompiler_type", t.key);
-                } catch (Exception ignored) {
-                    // 写盘失败不阻断
-                }
+                app.settings().setOrIgnore("decompiler_type", t.key);
                 // 不同引擎产物同名互不兼容：清内存索引并清盘，避免旧产物混杂
                 app.invalidateDecompilerState();
                 DecompilerManager.clearAllCache();

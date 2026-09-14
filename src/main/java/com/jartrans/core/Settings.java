@@ -49,7 +49,7 @@ public final class Settings {
         if (!Files.exists(path)) {
             return;
         }
-        Map<String, Object> parsed = Json.object(Json.readFileQuiet(path));
+        Map<String, Object> parsed = Json.readObjectQuiet(path);
         if (parsed == null) {
             return;
         }
@@ -83,6 +83,19 @@ public final class Settings {
     public void set(String key, Object value) throws IOException {
         data.put(key, value);
         save();
+    }
+
+    /**
+     * 写入并立即落盘；写盘失败只忽略异常。
+     * 供界面侧使用——设置写不进磁盘不应中断用户当前操作。
+     */
+    public void setOrIgnore(String key, Object value) {
+        data.put(key, value);
+        try {
+            save();
+        } catch (IOException ignored) {
+            // 写盘失败不阻断
+        }
     }
 
     /** 修改但不立即落盘（如退出时批量保存）。 */

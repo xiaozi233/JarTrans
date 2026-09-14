@@ -3,20 +3,27 @@ package com.jartrans.core.java;
 import com.jartrans.core.AppDirs;
 import com.jartrans.core.Settings;
 import com.jartrans.core.jar.JarReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Constructor;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.jar.JarOutputStream;
 import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 /**
  * 反编译器管理：tools/ 扫描、按需单类反编译（含内部类）、临时缓存目录。
@@ -124,14 +131,26 @@ public final class DecompilerManager {
         return null;
     }
 
-    /** tools/ 中是否已有指定类型的反编译器。 */
-    public static boolean hasTool(DecompilerType type) {
+    /** tools/ 中指定类型的全部反编译器（按文件名排序）。 */
+    public static List<ToolEntry> findTools(DecompilerType type) {
+        List<ToolEntry> found = new ArrayList<>();
         for (ToolEntry entry : scanTools()) {
             if (entry.type() == type) {
-                return true;
+                found.add(entry);
             }
         }
-        return false;
+        return found;
+    }
+
+    /** tools/ 中指定类型的第一项；未安装返回 null。 */
+    public static ToolEntry findTool(DecompilerType type) {
+        List<ToolEntry> found = findTools(type);
+        return found.isEmpty() ? null : found.get(0);
+    }
+
+    /** tools/ 中是否已有指定类型的反编译器。 */
+    public static boolean hasTool(DecompilerType type) {
+        return !findTools(type).isEmpty();
     }
 
     /**
@@ -220,7 +239,7 @@ public final class DecompilerManager {
      * （lockInterruptibly），进入引擎执行后仍不可中断（引擎黑盒）。
      */
     public static List<Path> decompileClasses(String jarPath, String sha256,
-                                              java.util.Collection<String> classNames,
+                                              Collection<String> classNames,
                                               DecompilerType type)
             throws DecompileException {
         ReentrantLock lock = OUTPUT_LOCKS.computeIfAbsent(sha256, k -> new ReentrantLock());
@@ -238,7 +257,7 @@ public final class DecompilerManager {
     }
 
     private static List<Path> decompileClassesLocked(String jarPath, String sha256,
-                                                     java.util.Collection<String> classNames,
+                                                     Collection<String> classNames,
                                                      DecompilerType type)
             throws DecompileException {
         Path base = cacheDir(sha256);
@@ -258,13 +277,13 @@ public final class DecompilerManager {
         }
         try {
             JarReader jr = new JarReader(Paths.get(jarPath));
-            try (var jos = new java.util.jar.JarOutputStream(Files.newOutputStream(input))) {
+            try (var jos = new JarOutputStream(Files.newOutputStream(input))) {
                 for (String name : classNames) {
                     byte[] bytes = jr.readEntry(name + ".class");
                     if (bytes == null) {
                         continue;
                     }
-                    jos.putNextEntry(new java.util.zip.ZipEntry(name + ".class"));
+                    jos.putNextEntry(new ZipEntry(name + ".class"));
                     jos.write(bytes);
                     jos.closeEntry();
                     found++;
@@ -320,15 +339,15 @@ public final class DecompilerManager {
                     "org.jetbrains.java.decompiler.main.decompiler.ConsoleDecompiler");
             Class<?> loggerCls = Class.forName(
                     "org.jetbrains.java.decompiler.main.extern.IFernflowerLogger");
-            java.util.Map<String, Object> options = new java.util.LinkedHashMap<>();
+            Map<String, Object> options = new LinkedHashMap<>();
             options.put("log_level", "error");
             // 静默日志：用框架自带的 NO_OP 实例
             Object logger = loggerCls.getField("NO_OP").get(null);
-            java.lang.reflect.Constructor<?> ctor = cls.getDeclaredConstructor(
-                    java.io.File.class, java.util.Map.class, loggerCls);
+            Constructor<?> ctor = cls.getDeclaredConstructor(
+                    File.class, Map.class, loggerCls);
             ctor.setAccessible(true);
             Object decomp = ctor.newInstance(out.toFile(), options, logger);
-            cls.getMethod("addSource", java.io.File.class).invoke(decomp, inJar.toFile());
+            cls.getMethod("addSource", File.class).invoke(decomp, inJar.toFile());
             cls.getMethod("decompileContext").invoke(decomp);
             // 进程内模式可能把结果打成 <输入名>.jar：把里面的 .java 解包到 out 根目录
             unwrapArchives(out);
@@ -346,7 +365,7 @@ public final class DecompilerManager {
         }
         for (Path archive : archives) {
             try {
-                try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(archive.toFile())) {
+                try (ZipFile zf = new ZipFile(archive.toFile())) {
                     var entries = zf.entries();
                     while (entries.hasMoreElements()) {
                         var entry = entries.nextElement();
@@ -356,7 +375,7 @@ public final class DecompilerManager {
                         Path dest = out.resolve(entry.getName());
                         Files.createDirectories(dest.getParent());
                         try (InputStream in = zf.getInputStream(entry)) {
-                            Files.copy(in, dest, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                            Files.copy(in, dest, StandardCopyOption.REPLACE_EXISTING);
                         }
                     }
                 }
@@ -374,7 +393,7 @@ public final class DecompilerManager {
     }
 
     /** 只返回与本次请求类相关的产物（其它类累积产物不在此列）。 */
-    private static List<Path> producedFor(Path out, java.util.Collection<String> classNames) {
+    private static List<Path> producedFor(Path out, Collection<String> classNames) {
         List<String> relOf = classNames.stream().map(n -> n + ".java").toList();
         List<Path> produced = new ArrayList<>();
         try (Stream<Path> walk = Files.walk(out)) {

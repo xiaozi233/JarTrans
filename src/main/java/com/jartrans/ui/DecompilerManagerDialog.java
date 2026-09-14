@@ -6,13 +6,13 @@ import com.jartrans.core.java.DecompilerDownloader;
 import com.jartrans.core.java.DecompilerManager;
 import com.jartrans.core.java.DecompilerType;
 import com.jartrans.core.java.JavaEnv;
+import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
+import java.util.concurrent.TimeUnit;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
@@ -27,16 +27,14 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
-import javafx.stage.Stage;
 
 /**
  * 反编译管理器（对应并扩展 setup_dialog.py）。
  * 顶层「反编译管理器」分类 → 「实现」子节点 → CFR / Procyon / Vineflower，
  * 每项可独立「下载 / 校验 / 设为默认 / 移除」；另有 Java 环境与自定义 URL 下载。
  */
-public class DecompilerManagerDialog extends Stage {
+public class DecompilerManagerDialog extends AppWindow {
 
-    private final MainApp app;
     private final TreeView<String> tree = new TreeView<>();
     private final TreeItem<String> rootItem = new TreeItem<>("反编译管理器");
     private final TreeItem<String> implItem = new TreeItem<>("实现");
@@ -63,19 +61,9 @@ public class DecompilerManagerDialog extends Stage {
     private volatile boolean dlCancelled;
 
     public DecompilerManagerDialog(MainApp app) {
-        this.app = app;
-        setTitle("反编译管理器");
-        setWidth(860);
-        setHeight(560);
-        initModality(Modality.NONE);
-        initOwner(app.stage());
-        setResizable(true);
-        setMinWidth(720);
-        setMinHeight(460);
+        super(app, "反编译管理器", 860, 560, 720, 460, Modality.NONE);
 
-        BorderPane root = new BorderPane();
-        root.setPadding(new Insets(10));
-        root.getStyleClass().add("root-pane");
+        BorderPane root = rootPane();
 
         // ---- 左侧分类树 ----
         rootItem.getChildren().addAll(implItem, javaItem);
@@ -120,8 +108,7 @@ public class DecompilerManagerDialog extends Stage {
         autoDetectBtn.setOnAction(e -> refreshJava(true));
         pickJavaBtn.setOnAction(e -> pickJava());
 
-        setScene(new Scene(root));
-        app.theme().attach(getScene());
+        mount(root);
         // 三种内置反编译器自动就绪（首次打开即从应用资源释放到 tools/）
         DecompilerManager.ensureBundledAll();
         refreshJava(false);
@@ -202,12 +189,10 @@ public class DecompilerManagerDialog extends Stage {
 
     private String statusOf(DecompilerType type) {
         StringBuilder sb = new StringBuilder();
-        for (DecompilerManager.ToolEntry entry : DecompilerManager.scanTools()) {
-            if (entry.type() == type) {
-                sb.append("已安装：").append(entry.path())
-                        .append(entry.version().isEmpty() ? "" : "（版本 " + entry.version() + "）")
-                        .append('\n');
-            }
+        for (DecompilerManager.ToolEntry entry : DecompilerManager.findTools(type)) {
+            sb.append("已安装：").append(entry.path())
+                    .append(entry.version().isEmpty() ? "" : "（版本 " + entry.version() + "）")
+                    .append('\n');
         }
         String configured = app.settings().getString("decompiler_path");
         if (!configured.isEmpty() && Files.isRegularFile(Path.of(configured))
@@ -350,26 +335,19 @@ public class DecompilerManagerDialog extends Stage {
     private void verifyAndRegister(Path part, Path finalPath) {
         setBusy("校验中…", -1);
         String javaExe = app.getJavaQuick();
-        Task<int[]> task = new Task<>() {
+        Task<Boolean> task = new Task<>() {
             @Override
-            protected int[] call() throws Exception {
-                if (javaExe == null) {
-                    return new int[]{-1};
+            protected Boolean call() throws Exception {
+                JarProbe probe = probeJar(javaExe, part.toString());
+                if (probe.error() != null) {
+                    throw new IllegalStateException(probe.error());
                 }
-                Process proc = new ProcessBuilder(javaExe, "-jar", part.toString(), "--version")
-                        .redirectErrorStream(true)
-                        .start();
-                boolean done = proc.waitFor(30, java.util.concurrent.TimeUnit.SECONDS);
-                if (!done) {
-                    proc.destroyForcibly();
-                    return new int[]{-2};
-                }
-                return new int[]{proc.exitValue()};
+                // 未检测到 java 时无法运行校验：文件已通过 zip 魔数校验，同样允许登记
+                return !probe.timedOut();
             }
         };
         task.setOnSucceeded(e -> {
-            int code = task.getValue()[0];
-            if (code == -2) {
+            if (!task.getValue()) {
                 setBusy("校验失败", 0);
                 setStatus("可执行性验证出错（java -jar 超时），请检查下载内容。");
                 try {
@@ -380,8 +358,7 @@ public class DecompilerManagerDialog extends Stage {
                 return;
             }
             // 进程能启动就说明 jar 可执行（如 Vineflower 对 --version 回答
-            // "error: no sources given"，属正常）；code == -1 表示未检测到 java，
-            // 文件已通过 zip 魔数校验，同样允许登记。
+            // "error: no sources given"，属正常）。
             try {
                 DecompilerDownloader.promote(part, finalPath);
             } catch (Exception exc) {
@@ -409,13 +386,9 @@ public class DecompilerManagerDialog extends Stage {
             type = DecompilerType.VINEFLOWER;
         }
         Settings settings = app.settings();
-        try {
-            settings.set("decompiler_path", finalPath.toString());
-            settings.set("decompiler_type", type.key);
-            settings.set("decompiler_version", "");
-        } catch (Exception ignored) {
-            // 设置写盘失败不阻断
-        }
+        settings.setOrIgnore("decompiler_path", finalPath.toString());
+        settings.setOrIgnore("decompiler_type", type.key);
+        settings.setOrIgnore("decompiler_version", "");
         // 已下载三种之一后立即生效
         app.invalidateDecompilerState();
     }
@@ -426,7 +399,7 @@ public class DecompilerManagerDialog extends Stage {
         if (selectedType == null) {
             return;
         }
-        DecompilerManager.ToolEntry found = findInstalled(selectedType);
+        DecompilerManager.ToolEntry found = DecompilerManager.findTool(selectedType);
         if (found == null) {
             Dialogs.warn("提示", "尚未安装 " + selectedType.displayName() + "，请先下载。");
             return;
@@ -437,19 +410,19 @@ public class DecompilerManagerDialog extends Stage {
         Task<String> task = new Task<>() {
             @Override
             protected String call() throws Exception {
-                if (javaExe == null) {
+                JarProbe probe = probeJar(javaExe, path);
+                if (probe.error() != null) {
+                    throw new IllegalStateException(probe.error());
+                }
+                if (!probe.started()) {
                     return "（未检测到 java，跳过可执行性验证；文件存在且为 zip/jar 格式）";
                 }
-                Process proc = new ProcessBuilder(javaExe, "-jar", path, "--version")
-                        .redirectErrorStream(true).start();
-                boolean done = proc.waitFor(30, java.util.concurrent.TimeUnit.SECONDS);
-                String out = new String(proc.getInputStream().readAllBytes()).trim();
-                if (!done) {
-                    proc.destroyForcibly();
+                if (probe.timedOut()) {
                     return "验证超时（java -jar --version 30 秒未返回）";
                 }
-                return "退出码 " + proc.exitValue()
-                        + (out.isEmpty() ? "" : "，输出：\n" + out.lines().findFirst().orElse(""));
+                return "退出码 " + probe.exitCode()
+                        + (probe.output().isEmpty() ? "" : "，输出：\n"
+                        + probe.output().lines().findFirst().orElse(""));
             }
         };
         task.setOnSucceeded(e -> {
@@ -464,32 +437,62 @@ public class DecompilerManagerDialog extends Stage {
         new Thread(task, "verify-selected").start();
     }
 
-    private DecompilerManager.ToolEntry findInstalled(DecompilerType type) {
-        List<DecompilerManager.ToolEntry> scan = DecompilerManager.scanTools();
-        for (DecompilerManager.ToolEntry entry : scan) {
-            if (entry.type() == type) {
-                return entry;
-            }
+    /**
+     * `java -jar &lt;jar&gt; --version` 的探测结果：
+     * started=false 表示未检测到 java；timedOut=true 表示 30 秒未退出（已强制结束）；
+     * error 非 null 表示进程无法启动（交由调用方按失败处理）。
+     */
+    private record JarProbe(int exitCode, String output, boolean started,
+                            boolean timedOut, String error) {
+
+        static JarProbe notStarted() {
+            return new JarProbe(-1, "", false, false, null);
         }
-        return null;
+
+        static JarProbe timeout() {
+            return new JarProbe(-1, "", true, true, null);
+        }
+
+        static JarProbe launchFailed(String message) {
+            return new JarProbe(-1, "", true, false, message);
+        }
+    }
+
+    /** 运行 {@code java -jar <jar> --version}；Java 未就绪/超时/启动失败都如实回报，不抛异常。 */
+    private static JarProbe probeJar(String javaExe, String jarPath) {
+        if (javaExe == null) {
+            return JarProbe.notStarted();
+        }
+        Process proc = null;
+        try {
+            proc = new ProcessBuilder(javaExe, "-jar", jarPath, "--version")
+                    .redirectErrorStream(true).start();
+            if (!proc.waitFor(30, TimeUnit.SECONDS)) {
+                proc.destroyForcibly();
+                return JarProbe.timeout();
+            }
+            String out = new String(proc.getInputStream().readAllBytes()).trim();
+            return new JarProbe(proc.exitValue(), out, true, false, null);
+        } catch (Exception exc) {
+            if (proc != null) {
+                proc.destroyForcibly();
+            }
+            return JarProbe.launchFailed(String.valueOf(exc.getMessage()));
+        }
     }
 
     private void setDefault() {
         if (selectedType == null) {
             return;
         }
-        DecompilerManager.ToolEntry found = findInstalled(selectedType);
+        DecompilerManager.ToolEntry found = DecompilerManager.findTool(selectedType);
         if (found == null) {
             Dialogs.warn("提示", "尚未安装 " + selectedType.displayName() + "，请先下载。");
             return;
         }
         Settings settings = app.settings();
-        try {
-            settings.set("decompiler_path", found.path().toString());
-            settings.set("decompiler_type", selectedType.key);
-        } catch (Exception ignored) {
-            // 设置写盘失败不阻断
-        }
+        settings.setOrIgnore("decompiler_path", found.path().toString());
+        settings.setOrIgnore("decompiler_type", selectedType.key);
         app.invalidateDecompilerState();
         setStatus("已将 " + selectedType.displayName() + " 设为默认反编译器。");
         refreshDetail();
@@ -499,7 +502,7 @@ public class DecompilerManagerDialog extends Stage {
         if (selectedType == null) {
             return;
         }
-        DecompilerManager.ToolEntry found = findInstalled(selectedType);
+        DecompilerManager.ToolEntry found = DecompilerManager.findTool(selectedType);
         if (found == null) {
             Dialogs.warn("提示", "尚未安装 " + selectedType.displayName() + "。");
             return;
@@ -517,13 +520,9 @@ public class DecompilerManagerDialog extends Stage {
         // 若默认反编译器被移除则清空配置
         Settings settings = app.settings();
         if (settings.getString("decompiler_path").equals(found.path().toString())) {
-            try {
-                settings.set("decompiler_path", "");
-                settings.set("decompiler_type", "");
-                settings.set("decompiler_version", "");
-            } catch (Exception ignored) {
-                // 写盘失败不阻断
-            }
+            settings.setOrIgnore("decompiler_path", "");
+            settings.setOrIgnore("decompiler_type", "");
+            settings.setOrIgnore("decompiler_version", "");
         }
         app.invalidateDecompilerState();
         setStatus(selectedType.displayName() + " 已移除。");
@@ -569,7 +568,7 @@ public class DecompilerManagerDialog extends Stage {
         chooser.getExtensionFilters().addAll(
                 new FileChooser.ExtensionFilter("java.exe", "java.exe"),
                 new FileChooser.ExtensionFilter("所有文件", "*.*"));
-        java.io.File file = chooser.showOpenDialog(this);
+        File file = chooser.showOpenDialog(this);
         if (file == null) {
             return;
         }
@@ -578,11 +577,7 @@ public class DecompilerManagerDialog extends Stage {
             Dialogs.error("错误", "该文件无法执行 java -version，请确认选择的是 java 可执行文件。");
             return;
         }
-        try {
-            app.settings().set("java_path", file.getAbsolutePath());
-        } catch (Exception ignored) {
-            // 写盘失败不阻断
-        }
+        app.settings().setOrIgnore("java_path", file.getAbsolutePath());
         javaInfo.setText("java：" + file.getAbsolutePath() + "\n版本：" + version);
         app.setJavaInfo(file.getAbsolutePath(), version);
         setStatus("java 路径已保存。");

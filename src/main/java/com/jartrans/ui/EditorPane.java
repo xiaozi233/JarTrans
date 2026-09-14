@@ -30,7 +30,6 @@ import javafx.scene.control.TextField;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ContextMenuEvent;
 import javafx.scene.input.DataFormat;
-import javafx.scene.input.KeyCode;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
@@ -90,14 +89,38 @@ public class EditorPane extends BorderPane {
     /** 程序化同步下拉选中值时置位，避免 valueProperty 监听误触发写状态。 */
     private boolean syncingState;
 
-    // ---------- 类内查找 / 替换（Ctrl+F / Ctrl+R） ----------
-    private final VBox findBar = new VBox(4);
-    private final TextField findField = new TextField();
-    private final ComboBox<String> findScopeBox = new ComboBox<>();
-    private final Label findCount = new Label("");
-    private final TextField replaceField = new TextField();
-    private String findKeyword = "";   // 查找关键词（小写，空 = 不过滤）
-    private String findScope = "both"; // orig / trans / both
+    // ---------- 类内查找 / 替换（Ctrl+F / Ctrl+R；界面在 FindReplaceBar） ----------
+    private final FindReplaceBar findBar = new FindReplaceBar(new FindReplaceBar.Handler() {
+        @Override
+        public void onFilterChanged() {
+            applyFindFilter();
+        }
+
+        @Override
+        public void onFindNext() {
+            findNext();
+        }
+
+        @Override
+        public void onFindPrev() {
+            findPrev();
+        }
+
+        @Override
+        public void onReplaceCurrent() {
+            replaceCurrent();
+        }
+
+        @Override
+        public void onReplaceAll() {
+            replaceAll();
+        }
+
+        @Override
+        public void onDismiss() {
+            closeFindBar();
+        }
+    });
 
     // ---------- 译文自动保存（输入停顿或切换行/类时落库） ----------
     private final PauseTransition autoSave =
@@ -130,7 +153,7 @@ public class EditorPane extends BorderPane {
         HBox head = new HBox(8);
         head.setPadding(new Insets(2, 2, 6, 2));
         head.setAlignment(Pos.CENTER_LEFT);
-        classStateBox.getItems().addAll("自动", "未开始", "翻译中", "已完成", "已忽略");
+        classStateBox.getItems().addAll(ClassStates.SELECTABLE_LABELS);
         classStateBox.setPrefWidth(112);
         classStateBox.getSelectionModel().selectFirst();
         classStateBox.valueProperty().addListener((o, ov, nv) -> onClassStateBox());
@@ -142,37 +165,23 @@ public class EditorPane extends BorderPane {
             refreshRows();
         });
 
-        // 顶部 = 类状态行 + （可隐藏的）查找/替换栏
-        findBar.setPadding(new Insets(0, 2, 6, 2));
-        findBar.getStyleClass().add("find-bar");
-        findBar.setVisible(false);
-        findBar.setManaged(false);
+        // 顶部 = 类状态行 + （默认隐藏的）查找/替换栏
         setTop(new VBox(head, findBar));
-
-        // ---- 类内查找 / 替换栏（默认隐藏，Ctrl+F / Ctrl+R 呼出） ----
-        buildFindBar();
     }
 
     /** 中央翻译表格：列定义、行着色、选择联动与右键菜单。 */
     private void buildTableArea() {
         // ---- 表格 ----
-        TableColumn<Row, String> colOrig = new TableColumn<>("原字符串");
-        colOrig.setCellValueFactory(d -> new SimpleStringProperty(Texts.displayText(d.getValue().orig)));
-        colOrig.setPrefWidth(340);
-        TableColumn<Row, String> colTrans = new TableColumn<>("译文");
-        colTrans.setCellValueFactory(d -> new SimpleStringProperty(Texts.displayText(d.getValue().trans)));
-        colTrans.setPrefWidth(260);
-        TableColumn<Row, String> colStatus = new TableColumn<>("状态");
-        colStatus.setCellValueFactory(d -> new SimpleStringProperty(STATUS_TEXT.get(d.getValue().statusKey)));
-        colStatus.setPrefWidth(70);
-        colStatus.setStyle("-fx-alignment: CENTER;");
-        TableColumn<Row, String> colCount = new TableColumn<>("次数");
-        colCount.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().count));
-        colCount.setPrefWidth(42);
-        colCount.setStyle("-fx-alignment: CENTER;");
-        TableColumn<Row, String> colMethods = new TableColumn<>("所在方法");
-        colMethods.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().methods));
-        colMethods.setPrefWidth(130);
+        TableColumn<Row, String> colOrig =
+                TableColumns.text("原字符串", 340, r -> Texts.displayText(r.orig));
+        TableColumn<Row, String> colTrans =
+                TableColumns.text("译文", 260, r -> Texts.displayText(r.trans));
+        TableColumn<Row, String> colStatus =
+                TableColumns.centered("状态", 70, r -> STATUS_TEXT.get(r.statusKey));
+        TableColumn<Row, String> colCount =
+                TableColumns.centered("次数", 42, r -> r.count);
+        TableColumn<Row, String> colMethods =
+                TableColumns.text("所在方法", 130, r -> r.methods);
 
         List<TableColumn<Row, String>> allCols =
                 List.of(colOrig, colTrans, colStatus, colCount, colMethods);
@@ -314,99 +323,14 @@ public class EditorPane extends BorderPane {
         });
     }
 
-    // ---------- 类内查找 / 替换 ----------
-
-    private void buildFindBar() {
-        // 第一行：查找
-        Label findLbl = new Label("查找：");
-        findField.getStyleClass().add("find-input");
-        findField.setPromptText("在原字符串 / 译文中查找…");
-        findField.setPrefWidth(240);
-        HBox.setHgrow(findField, Priority.ALWAYS);
-        findScopeBox.getItems().addAll("两者", "原字符串", "译文");
-        findScopeBox.setValue("两者");
-        findScopeBox.setPrefWidth(110);
-        Button prevBtn = new Button("↑");
-        prevBtn.setOnAction(e -> findPrev());
-        Button nextBtn = new Button("↓");
-        nextBtn.setOnAction(e -> findNext());
-        findCount.setStyle("-fx-text-fill: -jr-muted;");
-        Button replaceModeBtn = new Button("替换…");
-        replaceModeBtn.setOnAction(e -> beginReplace());
-        Button closeBtn = new Button("✕");
-        closeBtn.getStyleClass().add("flat");
-        closeBtn.setOnAction(e -> closeFindBar());
-        HBox row1 = new HBox(6, findLbl, findField, findScopeBox,
-                prevBtn, nextBtn, findCount, replaceModeBtn, closeBtn);
-        row1.setAlignment(Pos.CENTER_LEFT);
-
-        // 第二行：替换（替换模式才显示）
-        Label repLbl = new Label("替换为：");
-        replaceField.getStyleClass().add("replace-input");
-        replaceField.setPromptText("新的译文文本");
-        replaceField.setPrefWidth(240);
-        HBox.setHgrow(replaceField, Priority.ALWAYS);
-        Button repOne = new Button("替换当前");
-        repOne.setOnAction(e -> replaceCurrent());
-        Button repAll = new Button("全部替换");
-        repAll.getStyleClass().add("accent");
-        repAll.setOnAction(e -> replaceAll());
-        HBox row2 = new HBox(6, repLbl, replaceField, repOne, repAll);
-        row2.setAlignment(Pos.CENTER_LEFT);
-        row2.setVisible(false);
-        row2.setManaged(false);
-        row2.setId("replace-row");
-
-        findBar.getChildren().setAll(row1, row2);
-
-        // 输入即过滤
-        findField.textProperty().addListener((o, ov, nv) -> {
-            findKeyword = nv == null ? "" : nv.trim().toLowerCase();
-            applyFindFilter();
-        });
-        findScopeBox.valueProperty().addListener((o, ov, nv) -> {
-            findScope = switch (nv == null ? "两者" : nv) {
-                case "原字符串" -> "orig";
-                case "译文" -> "trans";
-                default -> "both";
-            };
-            applyFindFilter();
-        });
-        // Enter=下一个，Shift+Enter=上一个，Esc=关闭并恢复
-        findField.setOnKeyPressed(e -> {
-            if (e.getCode() == KeyCode.ENTER) {
-                if (e.isShiftDown()) {
-                    findPrev();
-                } else {
-                    findNext();
-                }
-                e.consume();
-            } else if (e.getCode() == KeyCode.ESCAPE) {
-                closeFindBar();
-                e.consume();
-            }
-        });
-        replaceField.setOnKeyPressed(e -> {
-            if (e.getCode() == KeyCode.ENTER) {
-                replaceCurrent();
-                e.consume();
-            } else if (e.getCode() == KeyCode.ESCAPE) {
-                closeFindBar();
-                e.consume();
-            }
-        });
-    }
+    // ---------- 类内查找 / 替换（界面见 FindReplaceBar） ----------
 
     /** Ctrl+F：呼出查找栏并聚焦。 */
     public void beginFind() {
         if (currentClass == null || app == null || !app.project().hasJar()) {
             return;
         }
-        findBar.setVisible(true);
-        findBar.setManaged(true);
-        row2Visible(false);
-        findField.requestFocus();
-        findField.selectAll();
+        findBar.open(false);
     }
 
     /** Ctrl+R：呼出查找栏并进入替换模式。 */
@@ -414,64 +338,45 @@ public class EditorPane extends BorderPane {
         if (currentClass == null || app == null || !app.project().hasJar()) {
             return;
         }
-        findBar.setVisible(true);
-        findBar.setManaged(true);
-        row2Visible(true);
-        replaceField.requestFocus();
-        if (!findField.getText().isBlank()) {
+        findBar.open(true);
+        if (!findBar.keyword().isEmpty()) {
             applyFindFilter();
         }
     }
 
-    private void row2Visible(boolean v) {
-        for (Node n : findBar.getChildren()) {
-            if (n instanceof HBox h && "replace-row".equals(h.getId())) {
-                h.setVisible(v);
-                h.setManaged(v);
-            }
-        }
-    }
-
     private void closeFindBar() {
-        findField.clear();
-        findKeyword = "";
-        findBar.setVisible(false);
-        findBar.setManaged(false);
-        row2Visible(false);
+        findBar.closeBar();
         applyFindFilter();
         if (table.getScene() != null) {
             table.requestFocus();
         }
     }
 
-    private boolean rowMatches(Row r) {
-        String q = findKeyword;
-        if (q.isEmpty()) {
+    private static boolean rowMatches(Row r, String keyword, String scope) {
+        if (keyword.isEmpty()) {
             return true;
         }
-        boolean hitOrig = !"trans".equals(findScope)
-                && r.orig.toLowerCase().contains(q);
-        boolean hitTrans = !"orig".equals(findScope)
-                && r.trans != null && r.trans.toLowerCase().contains(q);
+        boolean hitOrig = !"trans".equals(scope)
+                && r.orig.toLowerCase().contains(keyword);
+        boolean hitTrans = !"orig".equals(scope)
+                && r.trans != null && r.trans.toLowerCase().contains(keyword);
         return hitOrig || hitTrans;
     }
 
     /** 按查找词重建可见行，并保持选中。 */
     private void applyFindFilter() {
+        String keyword = findBar.keyword();
+        String scope = findBar.scope();
         List<Row> visible = new ArrayList<>();
-        boolean filtering = !findKeyword.isEmpty();
+        boolean filtering = !keyword.isEmpty();
         for (Row r : allRows) {
-            if (!filtering || rowMatches(r)) {
+            if (!filtering || rowMatches(r, keyword, scope)) {
                 visible.add(r);
             }
         }
         String keep = editingOrig;
         rows.setAll(visible);
-        if (filtering) {
-            findCount.setText(visible.size() + " 条");
-        } else {
-            findCount.setText("");
-        }
+        findBar.setCount(filtering ? visible.size() + " 条" : "");
         if (visible.isEmpty()) {
             if (filtering) {
                 table.getSelectionModel().clearSelection();
@@ -540,7 +445,7 @@ public class EditorPane extends BorderPane {
             app.setStatus("该行为内部只读或已标记「不翻译」，不可替换");
             return;
         }
-        String replacement = replaceField.getText();
+        String replacement = findBar.replacement();
         String before = app.project().effective(currentClass).getOrDefault(row.orig, "");
         if (before.equals(replacement)) {
             findNext();
@@ -568,8 +473,8 @@ public class EditorPane extends BorderPane {
         if (currentClass == null || app == null) {
             return;
         }
-        String replacement = replaceField.getText();
-        if (findKeyword.isEmpty() && !Dialogs.confirm("全部替换",
+        String replacement = findBar.replacement();
+        if (findBar.keyword().isEmpty() && !Dialogs.confirm("全部替换",
                 "当前没有输入查找词，将把本类全部行译文替换为：\n\n「"
                         + Texts.displayText(replacement) + "」\n\n确定继续吗？")) {
             return;
@@ -603,11 +508,7 @@ public class EditorPane extends BorderPane {
     }
 
     private void setQuiet(String key, boolean value) {
-        try {
-            app.settings().set(key, value);
-        } catch (Exception ignored) {
-            // 设置写盘失败不影响界面
-        }
+        app.settings().setOrIgnore(key, value);
     }
 
     // ---------- 类状态控件 ----------
@@ -616,8 +517,7 @@ public class EditorPane extends BorderPane {
         if (currentClass == null || app == null || syncingState) {
             return;
         }
-        String label = classStateBox.getValue();
-        String state = labelToStateKey(label);
+        String state = ClassStates.keyOf(classStateBox.getValue());
         app.recordClassMark(currentClass, app.project().classStatus().get(currentClass), state);
         try {
             app.project().setClassStatus(currentClass, state);
@@ -629,25 +529,12 @@ public class EditorPane extends BorderPane {
         refreshClassStateUi();
     }
 
-    /** 下拉显示名 → 状态键；「自动」等下拉里不可手动选择项返回 null。 */
-    private static String labelToStateKey(String label) {
-        for (Map.Entry<String, String> e : MainApp.STATE_LABEL.entrySet()) {
-            if (e.getValue().equals(label)) {
-                return e.getKey();
-            }
-        }
-        return null;
-    }
-
+    /** 当前类的状态键（手动标记优先，否则按翻译进度自动判定）。 */
     private String currentStateKey() {
         if (currentClass == null || app == null) {
             return null;
         }
-        String manual = app.project().classStatus().get(currentClass);
-        if (manual != null && Project.MANUAL_STATES.contains(manual)) {
-            return manual;
-        }
-        return app.project().autoClassState(currentClass);
+        return app.project().classState(currentClass);
     }
 
     void refreshClassStateUi() {
@@ -658,11 +545,11 @@ public class EditorPane extends BorderPane {
             return;
         }
         String key = currentStateKey();
-        // 中文名与 MainApp.STATE_LABEL 同一来源，避免本地再抄一份映射
-        String label = MainApp.STATE_LABEL.get(key);
+        // 中文名与 ClassStates 同一来源，避免本地再抄一份映射
+        String label = ClassStates.labelOf(key);
         // 「无字符串」不是可选手动状态：下拉保持「自动」，仅状态点标灰
         if (label == null || !classStateBox.getItems().contains(label)) {
-            label = "自动";
+            label = ClassStates.AUTO_LABEL;
         }
         syncingState = true;
         try {
@@ -826,11 +713,7 @@ public class EditorPane extends BorderPane {
         app.recordTranslation(currentClass, orig, beforeEff, afterEff);
         if (saveDict.isSelected() && !trans.isEmpty() && !trans.equals(orig)) {
             p.dictionary().add(orig, trans);
-            try {
-                p.dictionary().save();
-            } catch (Exception ignored) {
-                // 词典写盘失败不阻断
-            }
+            p.dictionary().saveQuietly();
         }
         showClass(currentClass);
         selectRow(orig);
@@ -902,8 +785,7 @@ public class EditorPane extends BorderPane {
 
     /** 右键菜单：支持多选批量（保留原文/恢复/清空译文/复制）。 */
     private void showRowMenu(double x, double y) {
-        java.util.List<Row> rowsSel = new java.util.ArrayList<>(
-                table.getSelectionModel().getSelectedItems());
+        List<Row> rowsSel = new ArrayList<>(table.getSelectionModel().getSelectedItems());
         rowsSel.removeIf(r -> r.internal);
         if (rowsSel.isEmpty() || currentClass == null || app == null) {
             return;
@@ -930,7 +812,7 @@ public class EditorPane extends BorderPane {
     }
 
     /** 批量设置「不翻译」。 */
-    private void bulkSkip(java.util.List<Row> rowsSel, boolean skip) {
+    private void bulkSkip(List<Row> rowsSel, boolean skip) {
         int n = 0;
         for (Row r : rowsSel) {
             boolean cur = app.project().isSkipped(r.orig);
@@ -951,7 +833,7 @@ public class EditorPane extends BorderPane {
     }
 
     /** 批量清空译文。 */
-    private void bulkClear(java.util.List<Row> rowsSel) {
+    private void bulkClear(List<Row> rowsSel) {
         int n = 0;
         for (Row r : rowsSel) {
             if (app.project().isSkipped(r.orig)) {
@@ -989,11 +871,11 @@ public class EditorPane extends BorderPane {
     // ---------- 供首选项/自动化验证使用的访问器 ----------
 
     public TextField findFieldNode() {
-        return findField;
+        return findBar.findNode();
     }
 
     public TextField replaceFieldNode() {
-        return replaceField;
+        return findBar.replaceNode();
     }
 
     /** 当前表格可见行数（未过滤时=类内全部行）。 */
@@ -1002,7 +884,7 @@ public class EditorPane extends BorderPane {
     }
 
     public boolean findBarShowing() {
-        return findBar.isVisible();
+        return findBar.isOpen();
     }
 
     /** 首选项联动：只看未翻译（保持与顶部复选框一致并持久化）。 */

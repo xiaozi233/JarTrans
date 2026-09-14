@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.IntFunction;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javafx.animation.KeyFrame;
@@ -241,7 +242,7 @@ public class SourcePanel extends BorderPane {
                     }
                 }
             }
-            java.util.function.IntFunction<String> commentAt = p -> {
+            IntFunction<String> commentAt = p -> {
                 for (int[] s : cmt) {
                     if (s[0] <= p && p < s[1]) {
                         return "c";

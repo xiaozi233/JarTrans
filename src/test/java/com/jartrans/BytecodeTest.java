@@ -2,7 +2,6 @@ package com.jartrans;
 
 import com.jartrans.core.Bytecode;
 import com.jartrans.core.ClassFile;
-import com.jartrans.core.ClassFileException;
 import com.jartrans.core.Disassembler;
 import org.junit.jupiter.api.Test;
 

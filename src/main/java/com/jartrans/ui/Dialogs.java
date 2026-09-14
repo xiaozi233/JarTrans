@@ -15,39 +15,30 @@ public final class Dialogs {
     }
 
     public static void info(String title, String message) {
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle(title);
-        alert.setHeaderText(null);
-        alert.setContentText(message);
-        applyTheme(alert.getDialogPane());
-        alert.showAndWait();
+        alert(Alert.AlertType.INFORMATION, title, message).showAndWait();
     }
 
     public static void warn(String title, String message) {
-        Alert alert = new Alert(Alert.AlertType.WARNING);
-        alert.setTitle(title);
-        alert.setHeaderText(null);
-        alert.setContentText(message);
-        applyTheme(alert.getDialogPane());
-        alert.showAndWait();
+        alert(Alert.AlertType.WARNING, title, message).showAndWait();
     }
 
     public static void error(String title, String message) {
-        Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle(title);
-        alert.setHeaderText(null);
-        alert.setContentText(message);
-        applyTheme(alert.getDialogPane());
-        alert.showAndWait();
+        alert(Alert.AlertType.ERROR, title, message).showAndWait();
     }
 
     public static boolean confirm(String title, String message) {
-        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        return alert(Alert.AlertType.CONFIRMATION, title, message)
+                .showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK;
+    }
+
+    /** 构造与应用主题一致的提示框（标题/正文设置方式全应用统一）。 */
+    private static Alert alert(Alert.AlertType type, String title, String message) {
+        Alert alert = new Alert(type);
         alert.setTitle(title);
         alert.setHeaderText(null);
         alert.setContentText(message);
         applyTheme(alert.getDialogPane());
-        return alert.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK;
+        return alert;
     }
 
     /** 返回 null 表示取消。 */

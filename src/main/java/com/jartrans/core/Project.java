@@ -378,28 +378,8 @@ public final class Project {
             }
         }
         lastMissing = result.missing();
-        Object statusObj = pack.get("class_status");
-        Map<String, Object> status = Json.object(statusObj);
-        boolean changed = false;
-        if (status != null && !status.isEmpty()) {
-            for (Map.Entry<String, Object> e : status.entrySet()) {
-                String st = String.valueOf(e.getValue());
-                if (MANUAL_STATES.contains(st) && textSets.containsKey(e.getKey())) {
-                    classStatus.put(e.getKey(), st);
-                    changed = true;
-                }
-            }
-        }
-        // 语言包里声明的「不翻译」原字符串 → 记入本工程名单
-        Object skips = pack.get("skip_texts");
-        if (skips instanceof List<?> list) {
-            for (Object o : list) {
-                String s = String.valueOf(o);
-                if (!s.isEmpty() && skipTexts.add(s)) {
-                    changed = true;
-                }
-            }
-        }
+        boolean changed = applyPackClassStatus(pack);
+        changed |= applyPackSkipTexts(pack);
         if (changed) {
             saveProgress();
         }
@@ -408,6 +388,38 @@ public final class Project {
             total += pairs.size();
         }
         return total;
+    }
+
+    /** 应用语言包里的类状态手动标记（只接受仍存在的类与合法状态），返回是否有改动。 */
+    private boolean applyPackClassStatus(Map<String, Object> pack) {
+        Map<String, Object> status = Json.object(pack.get("class_status"));
+        if (status == null || status.isEmpty()) {
+            return false;
+        }
+        boolean changed = false;
+        for (Map.Entry<String, Object> e : status.entrySet()) {
+            String st = String.valueOf(e.getValue());
+            if (MANUAL_STATES.contains(st) && textSets.containsKey(e.getKey())) {
+                classStatus.put(e.getKey(), st);
+                changed = true;
+            }
+        }
+        return changed;
+    }
+
+    /** 应用语言包里声明的「不翻译」原字符串，返回是否有改动。 */
+    private boolean applyPackSkipTexts(Map<String, Object> pack) {
+        if (!(pack.get("skip_texts") instanceof List<?> list)) {
+            return false;
+        }
+        boolean changed = false;
+        for (Object o : list) {
+            String s = String.valueOf(o);
+            if (!s.isEmpty() && skipTexts.add(s)) {
+                changed = true;
+            }
+        }
+        return changed;
     }
 
     /**
@@ -566,12 +578,7 @@ public final class Project {
     }
 
     private Map<String, Object> readProgressFile() {
-        Path file = AppDirs.progressFile();
-        if (!Files.exists(file)) {
-            return new LinkedHashMap<>();
-        }
-        Map<String, Object> data = Json.object(
-                Json.readFileQuiet(file));
+        Map<String, Object> data = Json.readObjectQuiet(AppDirs.progressFile());
         return data != null ? data : new LinkedHashMap<>();
     }
 
@@ -620,11 +627,8 @@ public final class Project {
             String first = data.keySet().iterator().next();
             data.remove(first);
         }
-        Path file = AppDirs.progressFile();
-        Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
         try {
-            Json.writeFile(tmp, data);
-            Files.move(tmp, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            Json.writeFile(AppDirs.progressFile(), data);
         } catch (IOException ignored) {
             // 进度写入失败不影响主流程
         }

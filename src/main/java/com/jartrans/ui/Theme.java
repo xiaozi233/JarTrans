@@ -1,6 +1,6 @@
 package com.jartrans.ui;
 
-import java.io.IOException;
+import java.nio.charset.MalformedInputException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -209,7 +209,7 @@ public final class Theme {
                         if (!text.contains("0x")) {
                             text = Files.readString(out, StandardCharsets.UTF_8);
                         }
-                    } catch (java.nio.charset.MalformedInputException ex) {
+                    } catch (MalformedInputException ex) {
                         text = Files.readString(out, StandardCharsets.UTF_8);
                     }
                     text = text.trim();

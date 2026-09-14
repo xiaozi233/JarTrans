@@ -5,16 +5,13 @@ import com.jartrans.core.LangPack;
 import com.jartrans.core.Project;
 import com.jartrans.core.Settings;
 import com.jartrans.core.java.DecompilerManager;
-import com.jartrans.core.java.DecompilerType;
-import com.jartrans.core.java.JavaEnv;
 import java.io.File;
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiConsumer;
 import javafx.animation.PauseTransition;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -22,7 +19,6 @@ import javafx.concurrent.Task;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
-import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -65,14 +61,9 @@ import javafx.util.Duration;
  */
 public class MainApp extends Application {
 
-    // 类状态常量
-    static final Map<String, String> STATE_LABEL = new LinkedHashMap<>(Map.of(
-            "empty", "无字符串", "todo", "未开始", "doing", "翻译中",
-            "done", "已完成", "ignore", "已忽略"));
-    static final List<String[]> STATE_FILTERS = List.of(
-            new String[]{"all", "全部"}, new String[]{"todo", "未开始"},
-            new String[]{"doing", "翻译中"}, new String[]{"done", "已完成"},
-            new String[]{"ignore", "已忽略"}, new String[]{"empty", "无字符串"});
+    // 类状态文案与筛选项的唯一来源在 ClassStates；这里保留别名，供既有调用与守护测试使用。
+    static final Map<String, String> STATE_LABEL = ClassStates.LABELS;
+    static final List<String[]> STATE_FILTERS = ClassStates.FILTERS;
 
     // 可自定义快捷键的定义与解析见 Shortcuts（SHORTCUT_DEFS 单一来源，存于 settings 的 "key_<id>"）。
 
@@ -87,17 +78,12 @@ public class MainApp extends Application {
     private final PauseTransition searchDebounce =
             new PauseTransition(Duration.millis(180));
 
-    private String javaPathCache;
-    private String javaVersionCache;
-    private boolean decompiling;
-    /** 进行中的单类反编译任务（供「取消反编译」中断与丢弃结果）。 */
-    private Task<List<Path>> activeDecompileTask;
-    private Map<String, Path> indexCache;
-    /** 已按单类反编译过的类 → 产出的 .java 文件（本会话内复用）。 */
-    private final Map<String, List<Path>> singleClassFiles = new HashMap<>();
+    /** 反编译编排：按需单类反编译、产物缓存与取消、Java 环境缓存。 */
+    private final DecompileController decompile = new DecompileController(this);
+    /** 撤销/重做：译文修改 · 「不翻译」标记 · 类状态标记。 */
+    private final UndoRedo undoRedo = new UndoRedo(this);
     /** 词典结构/激活词典变化时需要同步的窗口回调（词典条目窗口、词典管理窗口多实例）。 */
     private final List<Runnable> dictsListeners = new ArrayList<>();
-    private boolean javaPrompted;
 
     // ---------- FXML 控件 ----------
     @FXML
@@ -446,8 +432,7 @@ public class MainApp extends Application {
     @FXML
     public void onClearDecompileCache(ActionEvent e) {
         DecompilerManager.clearAllCache();
-        indexCache = null;
-        singleClassFiles.clear();
+        decompile.invalidate();
         setStatus("反编译缓存已清理。");
     }
 
@@ -514,31 +499,19 @@ public class MainApp extends Application {
                 return false; // 已被其它动作占用
             }
         }
-        try {
-            settings.set("key_" + id, norm);
-        } catch (Exception ignored) {
-            // 写盘失败不阻断
-        }
+        settings.setOrIgnore("key_" + id, norm);
         registerShortcuts(mainScene);
         return true;
     }
 
     public void resetShortcut(String id) {
-        try {
-            settings.set("key_" + id, Shortcuts.defaultFor(id));
-        } catch (Exception ignored) {
-            // 忽略
-        }
+        settings.setOrIgnore("key_" + id, Shortcuts.defaultFor(id));
         registerShortcuts(mainScene);
     }
 
     public void resetAllShortcuts() {
         for (String[] d : Shortcuts.DEFS) {
-            try {
-                settings.set("key_" + d[0], d[2]);
-            } catch (Exception ignored) {
-                // 忽略
-            }
+            settings.setOrIgnore("key_" + d[0], d[2]);
         }
         registerShortcuts(mainScene);
     }
@@ -627,11 +600,7 @@ public class MainApp extends Application {
     private void setThemeMode(String mode) {
         theme.setMode(mode);
         setThemeSelections(theme.mode());
-        try {
-            settings.set("theme", theme.mode());
-        } catch (Exception ignored) {
-            // 设置写盘失败不阻断
-        }
+        settings.setOrIgnore("theme", theme.mode());
         String suffix = theme.mode().equals(Theme.MODE_SYSTEM)
                 ? "（" + (theme.dark() ? "系统为深色" : "系统为浅色") + "）"
                 : "";
@@ -650,22 +619,12 @@ public class MainApp extends Application {
 
     /** 状态筛选显示名 → 状态键；未知返回 "all"。 */
     static String stateKeyOfLabel(String label) {
-        for (String[] f : STATE_FILTERS) {
-            if (f[1].equals(label)) {
-                return f[0];
-            }
-        }
-        return "all";
+        return ClassStates.filterKeyOf(label);
     }
 
     /** 状态筛选键 → 显示名；未知返回 "全部"。 */
     static String stateLabelOfKey(String key) {
-        for (String[] f : STATE_FILTERS) {
-            if (f[0].equals(key)) {
-                return f[1];
-            }
-        }
-        return "全部";
+        return ClassStates.filterLabelOf(key);
     }
 
     private void rebuildTree() {
@@ -796,8 +755,7 @@ public class MainApp extends Application {
         for (String cls : classes) {
             recordClassMark(cls, olds.get(cls), state);
         }
-        refreshClassNodes();
-        updateStats();
+        refreshAfterModelChange(false);
         String label = state == null ? "自动判定" : STATE_LABEL.get(state);
         setStatus("已将 " + classes.size() + " 个类标记为「" + label + "」");
     }
@@ -816,11 +774,8 @@ public class MainApp extends Application {
             return;
         }
         int count = project.fillFromDictionary(classes);
-        refreshClassNodes();
-        updateStats();
-        if (editor.currentClass() != null && classes.contains(editor.currentClass())) {
-            editor.refreshRows();
-        }
+        refreshAfterModelChange(editor.currentClass() != null
+                && classes.contains(editor.currentClass()));
         setStatus("词典填充了 " + count + " 条未翻译字符串");
     }
 
@@ -900,10 +855,10 @@ public class MainApp extends Application {
         }
         try {
             project.useDictionary(name);
-            settings.set("dictionary", name);
         } catch (Exception ignored) {
-            // 写盘失败不阻断
+            // 切换失败不阻断：下拉已切换，界面照常刷新
         }
+        settings.setOrIgnore("dictionary", name);
         setStatus("已切换到词典「" + name + "」（" + project.dictionary().size() + " 条）");
         if (editor.currentClass() != null) {
             editor.refreshRows();
@@ -925,9 +880,7 @@ public class MainApp extends Application {
             return;
         }
         int count = project.fillFromDictionary();
-        refreshClassNodes();
-        updateStats();
-        editor.refreshRows();
+        refreshAfterModelChange(true);
         Dialogs.info("完成", "词典自动填充了 " + count + " 条未翻译字符串（标记为\"自动）。");
     }
 
@@ -941,9 +894,7 @@ public class MainApp extends Application {
             return;
         }
         int count = project.fillFromDictionary(List.of(cls));
-        refreshClassNodes();
-        updateStats();
-        editor.refreshRows();
+        refreshAfterModelChange(true);
         setStatus("「" + cls + "」：词典填充了 " + count + " 条");
     }
 
@@ -1054,9 +1005,7 @@ public class MainApp extends Application {
                 }
             }
             long applied = project.applyLanguagePack(pack);
-            refreshClassNodes();
-            updateStats();
-            editor.refreshRows();
+            refreshAfterModelChange(true);
             if (!project.lastMissing().isEmpty()) {
                 showMissing();
                 setStatus("语言包已应用：成功 " + applied + " 条，失效 "
@@ -1136,33 +1085,19 @@ public class MainApp extends Application {
         searchWindow.show();
     }
 
-    // ---------- 源码查看 ----------
+    // ---------- 源码查看（实现见 DecompileController，此处转发） ----------
 
+    /** 记住已探测到的 java 路径（版本号由需要展示它的窗口自行持有）。 */
     public void setJavaInfo(String path, String version) {
-        javaPathCache = path;
-        javaVersionCache = version;
+        decompile.rememberJava(path);
     }
 
     public String getJavaQuick() {
-        if (javaPathCache != null) {
-            return javaPathCache;
-        }
-        String configured = settings.getString("java_path");
-        if (!configured.isEmpty() && new File(configured).isFile()) {
-            return configured;
-        }
-        JavaEnv.JavaResult result = JavaEnv.findJava(settings);
-        if (result.path() != null) {
-            javaPathCache = result.path();
-            javaVersionCache = result.version();
-            return result.path();
-        }
-        return null;
+        return decompile.javaQuick();
     }
 
     public void invalidateDecompilerState() {
-        indexCache = null;
-        singleClassFiles.clear();
+        decompile.invalidate();
         sourcePanel.refreshTheme();
     }
 
@@ -1246,151 +1181,19 @@ public class MainApp extends Application {
         editor.selectRow(literal);
     }
 
-    /** 取当前反编译器（内置 Vineflower 自动兜底）。 */
-    private DecompilerManager.Selection currentTool() {
-        // 三种反编译器均内置：缺失时自动释放，保证有可用引擎
-        DecompilerManager.ensureBundledAll();
-        return DecompilerManager.currentDecompiler(settings);
+    /** 按需准备某个类的反编译源码；回调语义见 DecompileController。 */
+    public void ensureClassSources(String cls, BiConsumer<String, Object> then) {
+        decompile.ensureClassSources(cls, then);
     }
 
-    /** class 内部名（UI 里类键带 .class 后缀，反编译器需要去掉）。 */
-    private static String internalName(String cls) {
-        return cls.endsWith(".class")
-                ? cls.substring(0, cls.length() - ".class".length()) : cls;
-    }
-
-    /**
-     * 按需准备某个类的反编译源码（不再整 jar 反编译）：
-     * 已有整 jar 缓存 → "whole"(Path 缓存根)；已单类反编译过 → "single"(List&lt;Path&gt;)；
-     * 正在反编译 → "loading"；不具备条件 → "bytecode"。结果均在 FX 线程回调。
-     */
-    public void ensureClassSources(String cls, java.util.function.BiConsumer<String, Object> then) {
-        if (!project.hasJar()) {
-            then.accept("bytecode", null);
-            return;
-        }
-        String sha;
-        try {
-            sha = project.jarSha256();
-        } catch (IOException e) {
-            then.accept("bytecode", null);
-            return;
-        }
-        Path whole = DecompilerManager.findCache(sha);
-        if (whole != null) {
-            then.accept("whole", whole);
-            return;
-        }
-        List<Path> cached = singleClassFiles.get(cls);
-        if (cached != null) {
-            then.accept("single", cached);
-            return;
-        }
-        DecompilerManager.Selection dec = currentTool();
-        if (dec == null) {
-            maybePromptSetup();
-            then.accept("bytecode", null);
-            return;
-        }
-        if (decompiling) {
-            then.accept("loading", null);
-            return;
-        }
-        DecompilerType type = dec.type();
-        String inner = internalName(cls);
-        // 目标类 + 内部类（如 Foo 与 Foo$Inner），整组一次喂给反编译器
-        List<String> names = new ArrayList<>();
-        for (String c : project.classOrder()) {
-            String n = internalName(c);
-            if (n.equals(inner) || n.startsWith(inner + "$")) {
-                names.add(n);
-            }
-        }
-        decompiling = true;
-        setStatus("正在反编译 " + inner + " …");
-        Task<List<java.nio.file.Path>> task = new Task<>() {
-            @Override
-            protected List<java.nio.file.Path> call() throws Exception {
-                JavaEnv.JavaResult java = JavaEnv.findJava(settings);
-                if (java.path() == null) {
-                    throw new DecompilerManager.DecompileException(
-                            "反编译器初始化失败，请重试或清理反编译缓存后再试。");
-                }
-                setJavaInfo(java.path(), java.version());
-                return DecompilerManager.decompileClasses(project.jarPath().toString(), sha,
-                        names, type);
-            }
-        };
-        activeDecompileTask = task;
-        task.setOnSucceeded(ev -> {
-            decompiling = false;
-            activeDecompileTask = null;
-            List<java.nio.file.Path> files = task.getValue();
-            if (files.isEmpty()) {
-                setStatus("反编译未生成源码（可能类被混淆/无法解析），已回退字节码视图");
-                then.accept("bytecode", null);
-                return;
-            }
-            singleClassFiles.put(cls, files);
-            setStatus("已完成「" + inner + "」反编译");
-            then.accept("single", files);
-        });
-        task.setOnFailed(ev -> {
-            decompiling = false;
-            activeDecompileTask = null;
-            String msg = task.getException() == null ? "" : task.getException().getMessage();
-            setStatus("反编译失败：" + msg);
-            if (!String.valueOf(msg).contains("已取消")) {
-                Dialogs.error("反编译失败", String.valueOf(msg));
-            }
-            then.accept("bytecode", null);
-        });
-        task.setOnCancelled(ev -> {
-            // 用户点击「取消反编译」：丢弃未回填的结果并回退字节码视图
-            decompiling = false;
-            activeDecompileTask = null;
-            setStatus("已取消反编译");
-            then.accept("bytecode", null);
-        });
-        new Thread(task, "decompile-class").start();
-        then.accept("loading", null);
-    }
-
-    /**
-     * 「取消反编译」：中断进行中的单类反编译，丢弃其尚未回填的结果并回退字节码视图。
-     * 进程内反编译器为黑盒引擎，中断后旧线程可能仍在后台自然收尾，但结果不再上屏、
-     * 状态与缓存均不写入（onCancelled 同步给出「已取消反编译」反馈）。
-     */
+    /** 取消进行中的单类反编译；无任务时只在状态栏提示。 */
     public void cancelDecompile() {
-        Task<List<Path>> task = activeDecompileTask;
-        if (task == null) {
-            setStatus("当前没有正在进行的反编译");
-            return;
-        }
-        task.cancel(true);
-        // cancel(true) 会同步触发 onCancelled：置 decompiling=false、回退字节码、更新状态栏
+        decompile.cancel();
     }
 
+    /** 整 jar 反编译产物索引（类 → .java）。 */
     public Map<String, Path> decompiledIndex() {
-        if (indexCache == null) {
-            try {
-                Path cache = DecompilerManager.findCache(project.jarSha256());
-                indexCache = cache != null ? DecompilerManager.buildFileIndex(cache) : Map.of();
-            } catch (IOException e) {
-                indexCache = Map.of();
-            }
-        }
-        return indexCache;
-    }
-
-    private void maybePromptSetup() {
-        if (javaPrompted || getJavaQuick() != null) {
-            return;
-        }
-        javaPrompted = true;
-        Dialogs.info("提示",
-                "反编译器未能就绪，已回退字节码视图。\n"
-                        + "可在「源码 → 清理反编译缓存」后重试。");
+        return decompile.index();
     }
 
     // ---------- 其他 ----------
@@ -1404,112 +1207,51 @@ public class MainApp extends Application {
     }
 
     private void persistHideEmpty() {
-        try {
-            settings.set("hide_empty", hideEmptyCheck.isSelected());
-        } catch (Exception ignored) {
-            // 写盘失败不阻断
-        }
+        settings.setOrIgnore("hide_empty", hideEmptyCheck.isSelected());
     }
 
     private void onStatusFilterChanged() {
-        try {
-            settings.set("status_filter", stateFilterKey());
-        } catch (Exception ignored) {
-            // 写盘失败不阻断
-        }
+        settings.setOrIgnore("status_filter", stateFilterKey());
         rebuildTree();
         updateStats();
     }
 
     public void onTranslationChanged() {
-        refreshClassNodes();
-        updateStats();
+        refreshAfterModelChange(false);
     }
 
-    // ---------- 撤销 / 重做（翻译 · 不翻译 · 类状态） ----------
+    /** 模型变化后的统一刷新：类列表（节点文案/颜色） + 统计；refreshEditor 时一并刷新翻译表格。 */
+    void refreshAfterModelChange(boolean refreshEditor) {
+        refreshClassNodes();
+        updateStats();
+        if (refreshEditor) {
+            editor.refreshRows();
+        }
+    }
 
-    /** 撤销/重做历史栈（回放动作在本类 applyHist 实现）。 */
-    private final EditHistory history = new EditHistory();
+    // ---------- 撤销 / 重做（实现见 UndoRedo，此处转发） ----------
 
     /** 记录一次译文变更（EditorPane 保存/清空后按生效值调用）。 */
     void recordTranslation(String cls, String orig, String before, String after) {
-        if (before.equals(after)) {
-            return;
-        }
-        history.push(new EditHistory.Hist("trans", cls, orig, before, after));
+        undoRedo.recordTranslation(cls, orig, before, after);
     }
 
     /** 记录「不翻译」切换。 */
     void recordSkip(String orig, boolean before, boolean after) {
-        if (before == after) {
-            return;
-        }
-        history.push(new EditHistory.Hist("skip", null, orig,
-                before ? "1" : "0", after ? "1" : "0"));
+        undoRedo.recordSkip(orig, before, after);
     }
 
     /** 记录类状态手动标记（null 视为自动）。 */
     void recordClassMark(String cls, String beforeManual, String afterManual) {
-        String b = beforeManual == null ? EditHistory.AUTO : beforeManual;
-        String a = afterManual == null ? EditHistory.AUTO : afterManual;
-        if (b.equals(a)) {
-            return;
-        }
-        history.push(new EditHistory.Hist("mark", cls, null, b, a));
-    }
-
-    private String histLabel(String kind) {
-        return switch (kind) {
-            case "trans" -> "译文修改";
-            case "skip" -> "「不翻译」标记";
-            case "mark" -> "类状态标记";
-            default -> kind;
-        };
+        undoRedo.recordClassMark(cls, beforeManual, afterManual);
     }
 
     private void undoAction() {
-        if (!history.canUndo()) {
-            setStatus("没有可撤销的操作");
-            return;
-        }
-        EditHistory.Hist h = history.takeUndo();
-        applyHist(h, h.before());
-        setStatus("已撤销：" + histLabel(h.kind()));
+        undoRedo.undo();
     }
 
     private void redoAction() {
-        if (!history.canRedo()) {
-            setStatus("没有可重做的操作");
-            return;
-        }
-        EditHistory.Hist h = history.takeRedo();
-        applyHist(h, h.after());
-        setStatus("已重做：" + histLabel(h.kind()));
-    }
-
-    private void applyHist(EditHistory.Hist h, String target) {
-        try {
-            switch (h.kind()) {
-                case "trans" -> project.setTranslation(h.cls(), h.orig(), target);
-                case "skip" -> project.setTextSkipped(h.orig(), "1".equals(target));
-                case "mark" -> project.setClassStatus(h.cls(),
-                        EditHistory.AUTO.equals(target) ? null : target);
-                default -> {
-                    return;
-                }
-            }
-        } catch (Exception exc) {
-            return; // 写盘失败等不回滚界面
-        }
-        refreshClassNodes();
-        updateStats();
-        if (project.hasJar()) {
-            String keepOrig = h.orig();
-            editor.refreshRows();
-            if (keepOrig != null) {
-                editor.selectRow(keepOrig);
-            }
-        }
+        undoRedo.redo();
     }
 
     public void setStatus(String text) {
@@ -1569,11 +1311,7 @@ public class MainApp extends Application {
     }
 
     public void applyLegendVisible(boolean v) {
-        try {
-            settings.set("legend_visible", v);
-        } catch (Exception ignored) {
-            // 写盘失败不阻断
-        }
+        settings.setOrIgnore("legend_visible", v);
         buildLegend();
     }
 
@@ -1591,11 +1329,7 @@ public class MainApp extends Application {
     }
 
     private void onClose() {
-        try {
-            settings.set("theme", theme.mode());
-        } catch (Exception ignored) {
-            // 写盘失败不阻断
-        }
+        settings.setOrIgnore("theme", theme.mode());
         // 译文自动保存：退出前冲刷编辑区未落库内容
         try {
             editor.flushEdit();

@@ -16,6 +16,7 @@ import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.OptionalLong;
 
 /**
  * 反编译器 jar 下载：GitHub API 查询 + HTTP 分块下载（进度/取消/校验）。
@@ -87,10 +88,7 @@ public final class DecompilerDownloader {
             throw new DownloadException("GitHub 返回内容无法解析");
         }
         List<Asset> assets = new ArrayList<>();
-        Object rawAssets = data.get("assets");
-        var assetList = Json.object(rawAssets) != null
-                ? null : (rawAssets instanceof List<?> l ? l : List.of());
-        if (assetList != null) {
+        if (data.get("assets") instanceof List<?> assetList) {
             for (Object o : assetList) {
                 var a = Json.object(o);
                 if (a == null) {
@@ -150,9 +148,7 @@ public final class DecompilerDownloader {
         try {
             resp = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
         } catch (IOException | InterruptedException exc) {
-            if (exc instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
+            restoreInterrupt(exc);
             throw new DownloadException("下载失败：" + exc.getMessage(), exc);
         }
         try (InputStream in = resp.body()) {
@@ -219,7 +215,7 @@ public final class DecompilerDownloader {
     }
 
     private static Long contentLength(HttpResponse<?> resp) {
-        java.util.OptionalLong value = resp.headers().firstValueAsLong("Content-Length");
+        OptionalLong value = resp.headers().firstValueAsLong("Content-Length");
         return value.isPresent() ? value.getAsLong() : null;
     }
 

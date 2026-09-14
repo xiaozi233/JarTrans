@@ -4,10 +4,8 @@ import com.jartrans.core.Dictionary;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import javafx.beans.property.SimpleStringProperty;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
@@ -21,12 +19,10 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
-import javafx.stage.Stage;
 
 /** 词典条目编辑对话框（可切换当前编辑的词典）。对应 gui/dict_dialog.py。 */
-public class DictDialog extends Stage {
+public class DictDialog extends AppWindow {
 
-    private final MainApp app;
     private final ComboBox<String> dictBox = new ComboBox<>();
     private final TextField queryField = new TextField();
     private final TableView<Map.Entry<String, String>> table = new TableView<>();
@@ -37,28 +33,17 @@ public class DictDialog extends Stage {
     private final Runnable dictsListener;
 
     public DictDialog(MainApp app) {
-        this.app = app;
+        super(app, "词典条目", 820, 560, 620, 420, Modality.NONE);
         dictsListener = () -> {
             if (app.project().dicts() == null) {
                 return;
             }
-            String active = app.project().dicts().activeName();
             dictBox.getItems().setAll(app.project().dicts().names());
-            dictBox.setValue(active);
+            dictBox.setValue(app.project().dicts().activeName());
             refresh();
         };
-        setTitle("词典条目");
-        setWidth(820);
-        setHeight(560);
-        initModality(Modality.NONE);
-        initOwner(app.stage());
-        setResizable(true);
-        setMinWidth(620);
-        setMinHeight(420);
 
-        BorderPane root = new BorderPane();
-        root.setPadding(new Insets(10));
-        root.getStyleClass().add("root-pane");
+        BorderPane root = rootPane();
 
         HBox top = new HBox(8);
         top.setPadding(new Insets(0, 0, 6, 0));
@@ -91,13 +76,9 @@ public class DictDialog extends Stage {
         search.getChildren().addAll(new Label("搜索："), queryField, searchBtn, allBtn);
 
         TableColumn<Map.Entry<String, String>, String> colOrig =
-                new TableColumn<>("原字符串");
-        colOrig.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().getKey()));
-        colOrig.setPrefWidth(380);
+                TableColumns.text("原字符串", 380, Map.Entry::getKey);
         TableColumn<Map.Entry<String, String>, String> colTrans =
-                new TableColumn<>("译文");
-        colTrans.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().getValue()));
-        colTrans.setPrefWidth(380);
+                TableColumns.text("译文", 380, Map.Entry::getValue);
         //noinspection unchecked
         table.getColumns().addAll(colOrig, colTrans);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
@@ -133,8 +114,7 @@ public class DictDialog extends Stage {
         root.setBottom(formPane);
 
         setOnCloseRequest(e -> closeAndSave());
-        setScene(new Scene(root));
-        app.theme().attach(getScene());
+        mount(root);
         if (app.project().dicts() != null) {
             app.addDictsListener(dictsListener);
             setOnHidden(e -> app.removeDictsListener(dictsListener));
@@ -150,10 +130,10 @@ public class DictDialog extends Stage {
         }
         try {
             app.project().useDictionary(name);
-            app.settings().set("dictionary", name);
         } catch (Exception ignored) {
-            // 设置写盘失败不阻断
+            // 切换失败不阻断：下拉已切换，界面照常刷新
         }
+        app.settings().setOrIgnore("dictionary", name);
         if (app.editor().currentClass() != null) {
             app.editor().refreshRows();
         }
@@ -182,11 +162,7 @@ public class DictDialog extends Stage {
             return;
         }
         app.project().dictionary().add(orig, trans);
-        try {
-            app.project().dictionary().save();
-        } catch (Exception ignored) {
-            // 写盘失败不阻断
-        }
+        app.project().dictionary().saveQuietly();
         refresh();
         // 词条数变化 → 管理窗口「词条数」列与主窗统计跟随刷新
         app.notifyDictsChanged();
@@ -207,11 +183,7 @@ public class DictDialog extends Stage {
             for (Map.Entry<String, String> entry : selected) {
                 app.project().dictionary().remove(entry.getKey());
             }
-            try {
-                app.project().dictionary().save();
-            } catch (Exception ignored) {
-                // 写盘失败不阻断
-            }
+            app.project().dictionary().saveQuietly();
             refresh();
             // 词条数变化 → 管理窗口「词条数」列与主窗统计跟随刷新
             app.notifyDictsChanged();
@@ -219,11 +191,7 @@ public class DictDialog extends Stage {
     }
 
     private void closeAndSave() {
-        try {
-            app.project().dictionary().save();
-        } catch (Exception ignored) {
-            // 写盘失败不阻断
-        }
+        app.project().dictionary().saveQuietly();
         app.updateStats();
         close();
     }

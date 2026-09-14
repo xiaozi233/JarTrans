@@ -2,16 +2,17 @@ package com.jartrans.core;
 
 import com.jartrans.core.json.Json;
 import java.io.IOException;
-import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
@@ -52,22 +53,9 @@ public final class DictionaryManager {
     // ---------- 载入 / 保存索引 ----------
 
     private void load() throws IOException {
-        Map<String, Object> data = Json.object(Json.readFileQuiet(indexPath));
-        List<Item> list = new ArrayList<>();
-        String activeName = "";
-        if (data != null) {
-            Object rawItems = data.get("items");
-            if (rawItems instanceof List<?> l) {
-                for (Object o : l) {
-                    Map<String, Object> it = Json.object(o);
-                    if (it != null && str(it.get("name")).isEmpty() == false
-                            && !str(it.get("file")).isEmpty()) {
-                        list.add(new Item(str(it.get("name")), str(it.get("file"))));
-                    }
-                }
-            }
-            activeName = str(data.get("active"));
-        }
+        Map<String, Object> data = Json.readObjectQuiet(indexPath);
+        String activeName = data == null ? "" : str(data.get("active"));
+        List<Item> list = data == null ? new ArrayList<>() : parseItems(data.get("items"));
         // 丢弃文件已不存在的记录
         list.removeIf(it -> !Files.isRegularFile(dir.resolve(it.file())));
         if (list.isEmpty()) {
@@ -78,13 +66,34 @@ public final class DictionaryManager {
             list = scanJsonFiles();
         }
         if (list.isEmpty()) {
-            list.add(new Item(DEFAULT_NAME, DEFAULT_NAME + ".json"));
-            Json.writeFile(dir.resolve(list.get(0).file()), new LinkedHashMap<>());
+            Item fallback = new Item(DEFAULT_NAME, DEFAULT_NAME + ".json");
+            Json.writeFile(dir.resolve(fallback.file()), new LinkedHashMap<>());
+            list = new ArrayList<>(List.of(fallback));
         }
-        items = list;
+        items = new ArrayList<>(list);
         List<String> names = names();
         active = names.contains(activeName) ? activeName : names.get(0);
         saveIndex();
+    }
+
+    /** 解析 index.json 的 items 数组；条目缺名或缺文件时跳过。 */
+    private static List<Item> parseItems(Object rawItems) {
+        List<Item> list = new ArrayList<>();
+        if (!(rawItems instanceof List<?> rawList)) {
+            return list;
+        }
+        for (Object o : rawList) {
+            Map<String, Object> it = Json.object(o);
+            if (it == null) {
+                continue;
+            }
+            String name = str(it.get("name"));
+            String file = str(it.get("file"));
+            if (!name.isEmpty() && !file.isEmpty()) {
+                list.add(new Item(name, file));
+            }
+        }
+        return list;
     }
 
     private List<Item> scanJsonFiles() throws IOException {
@@ -92,7 +101,7 @@ public final class DictionaryManager {
         try (Stream<Path> files = Files.list(dir)) {
             List<String> fnames = new ArrayList<>();
             files.forEach(p -> fnames.add(p.getFileName().toString()));
-            java.util.Collections.sort(fnames);
+            Collections.sort(fnames);
             for (String fn : fnames) {
                 if (fn.toLowerCase(Locale.ROOT).endsWith(".json") && !fn.equals(INDEX_FILE)) {
                     list.add(new Item(stripExt(fn), fn));
@@ -107,7 +116,7 @@ public final class DictionaryManager {
         if (!Files.isRegularFile(legacy)) {
             return;
         }
-        Map<String, Object> data = Json.object(Json.readFileQuiet(legacy));
+        Map<String, Object> data = Json.readObjectQuiet(legacy);
         if (data == null) {
             return;
         }
@@ -146,7 +155,12 @@ public final class DictionaryManager {
     }
 
     public boolean exists(String name) {
-        return names().contains(name);
+        for (Item it : items) {
+            if (it.name().equals(name)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public Path pathOf(String name) {
@@ -190,7 +204,7 @@ public final class DictionaryManager {
     }
 
     public String setActive(String name) throws IOException {
-        if (names().contains(name) && !name.equals(active)) {
+        if (exists(name) && !name.equals(active)) {
             active = name;
             saveIndex();
         }
@@ -333,7 +347,7 @@ public final class DictionaryManager {
         }
         dic.save();
         // 导出按码点排序（与 Python 版 sort_keys=True 一致）
-        Map<String, Object> sorted = new java.util.TreeMap<>(Json.CODE_POINT_ORDER);
+        Map<String, Object> sorted = new TreeMap<>(Json.CODE_POINT_ORDER);
         sorted.putAll(dic.entries());
         Json.writeFile(dest, sorted);
         return dic.size();

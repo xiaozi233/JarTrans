@@ -54,6 +54,11 @@ public final class Json {
         }
     }
 
+    /** 容错读取 JSON 对象：文件缺失/损坏/根不是对象时返回 null。 */
+    public static Map<String, Object> readObjectQuiet(Path path) {
+        return object(readFileQuiet(path));
+    }
+
     @SuppressWarnings("unchecked")
     public static Map<String, Object> object(Object o) {
         return o instanceof Map ? (Map<String, Object>) o : null;

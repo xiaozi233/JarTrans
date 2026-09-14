@@ -52,6 +52,14 @@ src/main/java/com/jartrans/
 │   ├── java/            #   反编译器：内置释放/进程内执行/产物与缓存管理
 │   └── json/            #   自研 JSON 读写
 └── ui/                  # JavaFX 界面（FXML + CSS 双主题）
+    ├── MainApp.java             # 主窗口：FXML 接线、菜单/快捷键、动作编排
+    ├── EditorPane.java          # 翻译表格 + 译文编辑区（查找替换栏见 FindReplaceBar）
+    ├── SourcePanel.java         # 源码/字节码视图
+    ├── DecompileController.java # 按需单类反编译、产物缓存与取消
+    ├── UndoRedo.java            # 撤销/重做（译文 · 不翻译 · 类状态）
+    ├── ClassStates.java         # 类状态文案与筛选定义（唯一来源）
+    ├── TableColumns.java        # 表格列构造（消除列样板）
+    └── AppWindow.java           # 独立窗口基类（尺寸/模态/主题挂载统一）
 ```
 
 运行时数据（`settings.json`、`class_status.json`、`dictionaries/`）默认落在程序所在目录；反编译缓存位于系统临时目录，退出时自动清理。
