@@ -22,7 +22,6 @@ import javafx.fxml.FXMLLoader;
 import javafx.geometry.Pos;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.ComboBox;
@@ -265,18 +264,11 @@ public class MainApp extends Application {
         setStatus("请先打开一个 jar 文件");
     }
 
-    /** 填充类状态图例。始终保留一个「显示/隐藏」开关按钮；开启时附带彩色圆点+文字。 */
+    /** 填充类状态图例（是否显示由首选项「显示类状态图例」控制）。 */
     private void buildLegend() {
         legendBox.getChildren().clear();
         legendBox.setAlignment(Pos.CENTER_LEFT);
-        final boolean visible = legendVisible();
-        Button toggle = new Button(visible ? "隐藏图例" : "显示图例");
-        toggle.setStyle("-fx-font-size: 11px; -fx-padding: 1 8 1 8;");
-        toggle.setTooltip(new Tooltip(
-                visible ? "收起类状态图例" : "展开类状态图例（彩色圆点+说明）"));
-        toggle.setOnAction(e -> applyLegendVisible(!legendVisible()));
-        legendBox.getChildren().add(toggle);
-        if (!visible) {
+        if (!legendVisible()) {
             return;
         }
         for (String st : List.of("todo", "doing", "done", "ignore", "empty")) {
