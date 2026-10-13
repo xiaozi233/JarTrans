@@ -22,13 +22,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class DecompilerTypeTest {
 
     @Test
-    void fromFileNameIdentifiesEngines() {
-        assertEquals(DecompilerType.VINEFLOWER, DecompilerType.fromFileName("vineflower-1.9.1.jar"));
-        assertEquals(DecompilerType.CFR, DecompilerType.fromFileName("cfr-0.152.jar"));
-        assertEquals(DecompilerType.PROCYON, DecompilerType.fromFileName("procyon-0.6.0.jar"));
-        // 文件名含关键词即可识别（scanTools 用全小写文件名探测）
-        assertEquals(DecompilerType.VINEFLOWER, DecompilerType.fromFileName("myvineflowercustom.jar"));
-        assertNull(DecompilerType.fromFileName("unknown-tool.jar"));
+    void enginesAreRegisteredWithVersions() {
+        assertEquals(List.of(DecompilerType.values()),
+                DecompilerManager.engines().stream().map(DecompilerManager.EngineInfo::type).toList());
+        assertTrue(DecompilerManager.engines().stream().allMatch(info -> !info.version().isBlank()));
     }
 
     @Test
@@ -45,9 +42,7 @@ class DecompilerTypeTest {
     void enumKeysAreUniqueAndFieldsConsistent() {
         assertTrue(DecompilerType.values().length >= 3, "至少三种内置引擎");
         for (DecompilerType t : DecompilerType.values()) {
-            assertEquals(t.key, t.assetPrefix);
             assertTrue(!t.key.isEmpty());
-            assertTrue(!t.repo.isEmpty());
             assertTrue(t.displayName().length() > 0);
         }
         long distinct = java.util.Arrays.stream(DecompilerType.values())
@@ -98,16 +93,15 @@ class DecompilerTypeTest {
 
     @Test
     void currentDecompilerRespectsExplicitChoice() {
-        DecompilerManager.ensureBundledAll(); // 保证 tools/ 三种引擎都在（setQuiet 不落盘）
         Settings settings = new Settings();
 
         settings.setQuiet("decompiler_type", "cfr");
-        DecompilerManager.Selection sel = DecompilerManager.currentDecompiler(settings);
-        assertNotNull(sel, "tools/ 有内置引擎时应总能选到");
-        assertEquals(DecompilerType.CFR, sel.type(), "首选项显式选择的引擎应优先");
+        DecompilerType sel = DecompilerManager.currentDecompiler(settings);
+        assertNotNull(sel, "内置引擎应总能选到");
+        assertEquals(DecompilerType.CFR, sel, "首选项显式选择的引擎应优先");
 
         settings.setQuiet("decompiler_type", "");
         assertEquals(DecompilerType.VINEFLOWER,
-                DecompilerManager.currentDecompiler(settings).type(), "未选择时回退默认优先级");
+                DecompilerManager.currentDecompiler(settings), "未选择时回退默认优先级");
     }
 }

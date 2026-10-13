@@ -2,7 +2,7 @@ package com.jartrans.core;
 
 import java.nio.file.Path;
 
-/** 程序目录定位：settings.json、dictionaries/、class_status.json、tools/ 的基准目录。 */
+/** 程序目录定位：settings.json、dictionaries/、class_status.json 的基准目录。 */
 public final class AppDirs {
 
     private AppDirs() {
@@ -27,9 +27,5 @@ public final class AppDirs {
 
     public static Path progressFile() {
         return baseDir().resolve("class_status.json");
-    }
-
-    public static Path toolsDir() {
-        return baseDir().resolve("tools");
     }
 }

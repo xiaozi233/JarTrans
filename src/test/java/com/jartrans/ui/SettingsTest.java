@@ -33,7 +33,7 @@ class SettingsTest {
         assertEquals("Ctrl+Alt+K", settings.getString("key_find"));
         assertEquals("hello", settings.getString("future_key"));
         // 缺省键仍取默认值
-        assertEquals("", settings.getString("java_path"));
+        assertEquals("", settings.getString("decompiler_type"));
         assertTrue(settings.getBool("save_to_dict"));
     }
 

@@ -28,11 +28,10 @@ dependencies {
     testImplementation(platform("org.junit:junit-bom:5.11.4"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-    // 三种内置反编译器以库形式进 classpath（与资源里的 jar 同源）：全部进程内反编译
-    implementation(files(
-            "src/main/resources/com/jartrans/bundled/vineflower.jar",
-            "src/main/resources/com/jartrans/bundled/cfr.jar",
-            "src/main/resources/com/jartrans/bundled/procyon.jar"))
+    // Recaf-style: decompilers are regular runtime libraries and are invoked in-process.
+    implementation("org.vineflower:vineflower:1.12.0")
+    implementation("org.benf:cfr:0.152")
+    implementation("org.bitbucket.mstrobel:procyon-compilertools:0.6.0")
 }
 
 application {

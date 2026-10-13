@@ -7,7 +7,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** settings.json 读写（java 路径、反编译器信息等）。 */
+/** settings.json 读写（界面偏好、反编译器选择等）。 */
 public final class Settings {
 
     private final Path path;
@@ -24,10 +24,7 @@ public final class Settings {
 
     public static Map<String, Object> defaults() {
         Map<String, Object> d = new LinkedHashMap<>();
-        d.put("java_path", "");
-        d.put("decompiler_path", "");
         d.put("decompiler_type", "");       // 'vineflower' | 'cfr' | 'procyon'
-        d.put("decompiler_version", "");
         d.put("theme", "system");           // 'system' | 'light' | 'dark'
         d.put("dictionary", "");            // 当前词典名
         d.put("hide_empty", Boolean.FALSE); // 隐藏无可翻译字符串的类

@@ -201,10 +201,9 @@ public class PreferencesDialog extends AppWindow {
         app.settings().setOrIgnore("pack_author", authorField.getText().trim());
     }
 
-    /** 下拉初始显示：当前实际生效的引擎（所选缺失回退后亦如实显示）。 */
+    /** 下拉初始显示：当前实际生效的引擎。 */
     private String currentDecompilerDisplayName() {
-        DecompilerManager.Selection sel = DecompilerManager.currentDecompiler(app.settings());
-        return (sel == null ? DecompilerType.VINEFLOWER : sel.type()).displayName();
+        return DecompilerManager.currentDecompiler(app.settings()).displayName();
     }
 
     /** 用户切换反编译器：持久化设置，并清空本会话旧引擎的源码缓存。 */
@@ -216,9 +215,7 @@ public class PreferencesDialog extends AppWindow {
         for (DecompilerType t : DecompilerType.values()) {
             if (t.displayName().equals(chosen)) {
                 app.settings().setOrIgnore("decompiler_type", t.key);
-                // 不同引擎产物同名互不兼容：清内存索引并清盘，避免旧产物混杂
                 app.invalidateDecompilerState();
-                DecompilerManager.clearAllCache();
                 status("反编译器已切换为 " + t.displayName() + "（重新打开源码页生效）");
                 return;
             }

@@ -53,7 +53,7 @@ src/main/java/com/jartrans/
 │   ├── ProgressStore.java #    类状态/忽略文本持久化
 │   ├── io/               #   原子文件写入等基础设施
 │   ├── jar/             #   jar 读取与重打包
-│   ├── java/            #   反编译器：内置释放/进程内执行/产物与缓存管理
+│   ├── java/            #   反编译器：进程内库适配器/产物与缓存管理
 │   └── json/            #   自研 JSON 读写
 └── ui/                  # JavaFX 界面（FXML + CSS 双主题）
     ├── MainApp.java             # 主窗口：FXML 接线、菜单/快捷键、动作编排
@@ -74,7 +74,9 @@ src/main/java/com/jartrans/
 - [CFR](https://github.com/leibnitz27/CFR)（MIT）
 - [Procyon](https://github.com/mstrobel/procyon)（Apache-2.0）
 
-三者均为反编译器，打包于应用资源中，首次使用自动释放到本地，无需联网下载。
+采用 Recaf 的集成方式：三者通过 Gradle 依赖打入可执行 JAR，直接在当前 JVM 中调用库 API，读取原 JAR 的类字节；不释放反编译器到本地目录，也不启动外部 Java 进程。运行时无需联网下载，构建时由 Gradle 获取依赖。
+
+源码结果缓存仍写入系统临时目录中的 `jartrans_decomp/<SHA-256>/<引擎>/classes/`，按 JAR 内容与引擎隔离，退出时清理。这是反编译结果缓存，不是反编译器释放目录。旧版本生成的 `tools/` 不再使用，可自行删除。
 
 ## 协议
 

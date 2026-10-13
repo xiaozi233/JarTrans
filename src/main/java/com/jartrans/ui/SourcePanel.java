@@ -158,8 +158,10 @@ public class SourcePanel extends BorderPane {
         currentClass = cls;
         pendingJump = jumpOrig;
         app.ensureClassSources(cls, (modeFlag, payload) -> Platform.runLater(() -> {
+            if (!cls.equals(currentClass)) {
+                return;
+            }
             switch (modeFlag) {
-                case "whole" -> showWhole((Path) payload);
                 case "single" -> showSingle((List<Path>) payload);
                 case "loading" -> showLoading();
                 default -> showBytecode();
@@ -319,23 +321,6 @@ public class SourcePanel extends BorderPane {
 
     // ---------- 反编译模式 ----------
 
-    /** 已有整 jar 反编译缓存（老版本/外部产物）时按旧路径展示。 */
-    private void showWhole(Path cacheDir) {
-        mode = Mode.JAVA;
-        hideLoading();
-        Map<String, Path> index = app.decompiledIndex();
-        DecompilerManager.SourceFiles sf =
-                DecompilerManager.sourceFilesFor(index, currentClass);
-        List<Map.Entry<String, Path>> entries = new ArrayList<>();
-        if (sf.external() != null) {
-            entries.add(Map.entry(sf.external(), cacheDir.resolve(sf.external())));
-        }
-        for (String rel : sf.inners()) {
-            entries.add(Map.entry(rel, cacheDir.resolve(rel)));
-        }
-        populate(entries);
-    }
-
     /** 按需单类反编译结果（本次产出的 .java 列表）。 */
     private void showSingle(List<Path> produced) {
         mode = Mode.JAVA;
@@ -411,10 +396,7 @@ public class SourcePanel extends BorderPane {
         } catch (Bytecode.BytecodeException exc) {
             content = "// 字节码解析失败：" + exc.getMessage();
         }
-        boolean hasDec = DecompilerManager.currentDecompiler(app.settings()) != null;
-        String banner = hasDec
-                ? "反编译器已就绪但尚未完成反编译，以下为字节码视图。"
-                : "未配置反编译器，当前为字节码视图（仅供对照，不影响翻译功能）";
+        String banner = "尚未获得反编译源码，以下为字节码视图。";
         render(content, banner);
         info.setText("");
     }

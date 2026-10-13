@@ -77,7 +77,7 @@ public class MainApp extends Application {
     private final PauseTransition searchDebounce =
             new PauseTransition(Duration.millis(180));
 
-    /** 反编译编排：按需单类反编译、产物缓存与取消、Java 环境缓存。 */
+    /** 反编译编排：按需单类反编译、产物缓存与取消。 */
     private final DecompileController decompile = new DecompileController(this);
     /** 撤销/重做：译文修改 · 「不翻译」标记 · 类状态标记。 */
     private final UndoRedo undoRedo = new UndoRedo(this);
@@ -1079,15 +1079,6 @@ public class MainApp extends Application {
 
     // ---------- 源码查看（实现见 DecompileController，此处转发） ----------
 
-    /** 记住已探测到的 java 路径（版本号由需要展示它的窗口自行持有）。 */
-    public void setJavaInfo(String path, String version) {
-        decompile.rememberJava(path);
-    }
-
-    public String getJavaQuick() {
-        return decompile.javaQuick();
-    }
-
     public void invalidateDecompilerState() {
         decompile.invalidate();
         sourcePanel.refreshTheme();
@@ -1181,11 +1172,6 @@ public class MainApp extends Application {
     /** 取消进行中的单类反编译；无任务时只在状态栏提示。 */
     public void cancelDecompile() {
         decompile.cancel();
-    }
-
-    /** 整 jar 反编译产物索引（类 → .java）。 */
-    public Map<String, Path> decompiledIndex() {
-        return decompile.index();
     }
 
     // ---------- 其他 ----------

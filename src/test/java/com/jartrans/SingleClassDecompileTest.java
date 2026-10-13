@@ -3,6 +3,8 @@ package com.jartrans;
 import com.jartrans.core.java.DecompilerManager;
 import com.jartrans.core.java.DecompilerType;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.DirectoryStream;
@@ -16,12 +18,29 @@ import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /** 回归测试：按需只反编译单个类（含内部类），不做整 jar 反编译。 */
 class SingleClassDecompileTest {
 
     @TempDir
     Path tmp;
+    private String previousAppDir;
+
+    @BeforeEach
+    void isolateAppDirectory() {
+        previousAppDir = System.getProperty("jartrans.dir");
+        System.setProperty("jartrans.dir", tmp.toString());
+    }
+
+    @AfterEach
+    void restoreAppDirectory() {
+        if (previousAppDir == null) {
+            System.clearProperty("jartrans.dir");
+        } else {
+            System.setProperty("jartrans.dir", previousAppDir);
+        }
+    }
 
     private static String sha16(Path jar) throws Exception {
         byte[] digest = MessageDigest.getInstance("SHA-256")
@@ -62,7 +81,6 @@ class SingleClassDecompileTest {
     @Test
     void decompilesOnlyRequestedClass() throws Exception {
         Path jar = compilePairJar();
-        DecompilerManager.ensureBundledAll(); // 三种反编译器都应内置可用
         String sha = sha16(jar);
 
         long t0 = System.nanoTime();
@@ -72,6 +90,7 @@ class SingleClassDecompileTest {
         System.out.println("[single] Beta decompile took " + ms + " ms -> "
                 + betaFiles.stream().map(p -> p.getFileName().toString()).toList());
         assertFalse(betaFiles.isEmpty());
+        assertTrue(Files.readString(betaFiles.getFirst()).contains("Inner"));
         // 产物只应包含 Beta（Alpha 不该被反编译出来）
         boolean hasAlpha = betaFiles.stream()
                 .anyMatch(p -> p.getFileName().toString().contains("Alpha"));
@@ -83,19 +102,38 @@ class SingleClassDecompileTest {
         System.out.println("[single] Alpha files="
                 + alphaFiles.stream().map(p -> p.getFileName().toString()).toList());
         assertFalse(alphaFiles.isEmpty());
+        assertTrue(Files.readString(alphaFiles.getFirst()).contains("\"alpha\""));
         // 无整 jar .ok 标记（不能误导“整 jar 已完成”判断）
         assertFalse(Files.exists(DecompilerManager.cacheDir(sha).resolve(".ok")));
 
-        // CFR 与 Procyon 同样内置可用（临时 jar 输入通吃三种引擎）
+        // CFR 与 Procyon 同样通过库 API 读取原始类字节，缓存按引擎隔离。
         for (DecompilerType engine : List.of(DecompilerType.CFR, DecompilerType.PROCYON)) {
-            assertTrue(DecompilerManager.ensureBundled(engine), engine + " 应内置");
-            Path tool = DecompilerManager.toolsDir().resolve(engine.key + ".jar");
-            assertTrue(Files.isRegularFile(tool), engine + " jar 应存在");
             List<Path> files = DecompilerManager.decompileClasses(jar.toString(), sha,
                     List.of("p/Alpha"), engine);
             System.out.println("[single] " + engine + " files="
                     + files.stream().map(p -> p.getFileName().toString()).toList());
             assertFalse(files.isEmpty(), engine + " 应能反编译单类");
+            assertTrue(Files.readString(files.getFirst()).contains("\"alpha\""));
+            assertTrue(files.getFirst().startsWith(DecompilerManager.outputDir(sha, engine)));
+            List<Path> beta = DecompilerManager.decompileClasses(jar.toString(), sha,
+                    List.of("p/Beta", "p/Beta$Inner"), engine);
+            assertTrue(beta.stream().anyMatch(p -> p.getFileName().toString().equals("Beta.java")));
+            assertTrue(Files.readString(beta.stream().filter(p -> p.getFileName().toString().equals("Beta.java"))
+                    .findFirst().orElseThrow()).contains("Inner"), engine + " 应保留内部类");
+        }
+        assertFalse(Files.exists(tmp.resolve("tools")), "反编译不得释放本地工具");
+        assertFalse(Files.exists(tmp.resolve("p")), "源码只能写入缓存目录");
+    }
+
+    @Test
+    void rejectsMissingClassesAndUnsafeNames() throws Exception {
+        Path jar = compilePairJar();
+        String sha = sha16(jar);
+        for (DecompilerType engine : DecompilerType.values()) {
+            assertThrows(DecompilerManager.DecompileException.class, () ->
+                    DecompilerManager.decompileClasses(jar.toString(), sha, List.of("p/Absent"), engine));
+            assertThrows(DecompilerManager.DecompileException.class, () ->
+                    DecompilerManager.decompileClasses(jar.toString(), sha, List.of("../Escape"), engine));
         }
     }
 
@@ -107,14 +145,13 @@ class SingleClassDecompileTest {
     @Test
     void concurrentSameShaDecompilesDoNotCorruptCache() throws Exception {
         Path jar = compilePairJar();
-        DecompilerManager.ensureBundledAll();
         String sha = sha16(jar);
-        Path out = DecompilerManager.cacheDir(sha).resolve("classes");
+        Path out = DecompilerManager.outputDir(sha, DecompilerType.VINEFLOWER);
 
         CountDownLatch gate = new CountDownLatch(1);
         List<Path> alphaResult = new ArrayList<>();
         List<Path> betaResult = new ArrayList<>();
-        List<Throwable> failures = new ArrayList<>();
+        List<Throwable> failures = java.util.Collections.synchronizedList(new ArrayList<>());
         Thread a = new Thread(() -> {
             try {
                 gate.await();
@@ -140,7 +177,7 @@ class SingleClassDecompileTest {
         gate.countDown();
         a.join(90_000);
         b.join(90_000);
-        assertFalse(a.isAlive() && b.isAlive(), "并发反编译未在时限内结束");
+        assertFalse(a.isAlive() || b.isAlive(), "并发反编译未在时限内结束");
         assertTrue(failures.isEmpty(), "并发反编译失败：" + failures);
         assertFalse(alphaResult.isEmpty(), "Alpha 产物缺失");
         assertFalse(betaResult.isEmpty(), "Beta 产物缺失");
@@ -148,7 +185,7 @@ class SingleClassDecompileTest {
                         .anyMatch(p -> p.getFileName().toString().contains("Beta")),
                 "Beta 产物应含目标类");
 
-        // 互斥 + unwrap 自愈后，输出目录不应残留半截/未解包的 *.jar
+        // 库 API 不生成中间 JAR。
         try (DirectoryStream<Path> ds = Files.newDirectoryStream(out, "*.jar")) {
             assertFalse(ds.iterator().hasNext(), "classes/ 下不应残留未解包的 *.jar");
         }
