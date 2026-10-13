@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -77,11 +78,11 @@ public final class Dictionary {
     }
 
     public Map<String, String> search(String keyword) {
-        String q = keyword.toLowerCase();
+        String q = keyword == null ? "" : keyword.toLowerCase(Locale.ROOT);
         Map<String, String> out = new LinkedHashMap<>();
         for (Map.Entry<String, String> e : data.entrySet()) {
-            if (e.getKey().toLowerCase().contains(q)
-                    || e.getValue().toLowerCase().contains(q)) {
+            if (e.getKey().toLowerCase(Locale.ROOT).contains(q)
+                    || e.getValue().toLowerCase(Locale.ROOT).contains(q)) {
                 out.put(e.getKey(), e.getValue());
             }
         }

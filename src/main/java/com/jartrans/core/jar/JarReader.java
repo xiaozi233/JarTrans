@@ -36,6 +36,10 @@ public final class JarReader {
             this.method = method;
             this.data = data;
         }
+
+        EntryInfo copy() {
+            return new EntryInfo(name, timeMillis, method, data.clone());
+        }
     }
 
     private final Path path;
@@ -43,6 +47,9 @@ public final class JarReader {
     private final Map<String, EntryInfo> data = new LinkedHashMap<>(); // 文件名 -&gt; 条目
 
     public JarReader(Path path) throws JarFileException {
+        if (path == null) {
+            throw new JarFileException("jar 路径不能为空", null);
+        }
         this.path = path;
         try (ZipFile zf = new ZipFile(path.toFile())) {
             var entries = zf.entries();
@@ -54,7 +61,10 @@ public final class JarReader {
                 if (data.containsKey(entry.getName())) { // 同名条目（极罕见），保留第一个
                     continue;
                 }
-                byte[] bytes = zf.getInputStream(entry).readAllBytes();
+                byte[] bytes;
+                try (var input = zf.getInputStream(entry)) {
+                    bytes = input.readAllBytes();
+                }
                 EntryInfo info = new EntryInfo(entry.getName(), entry.getTime(),
                         entry.getMethod(), bytes);
                 infos.add(info);
@@ -74,12 +84,17 @@ public final class JarReader {
     }
 
     public List<EntryInfo> infos() {
+        // The reader is a snapshot. Do not let callers reorder entries or mutate payloads.
+        return infos.stream().map(EntryInfo::copy).toList();
+    }
+
+    Iterable<EntryInfo> entriesForPacking() {
         return infos;
     }
 
     public byte[] readEntry(String name) {
         EntryInfo info = data.get(name);
-        return info == null ? null : info.data;
+        return info == null ? null : info.data.clone();
     }
 
     public List<String> classNames() {
@@ -89,7 +104,7 @@ public final class JarReader {
                 out.add(info.name);
             }
         }
-        return out;
+        return List.copyOf(out);
     }
 
     public byte[] readClass(String name) {
@@ -98,6 +113,9 @@ public final class JarReader {
 
     /** 判断文件是否为 zip/jar（PK 魔数）。 */
     public static boolean isZipFile(Path path) {
+        if (path == null) {
+            return false;
+        }
         try {
             byte[] head = new byte[4];
             int n;
@@ -105,7 +123,8 @@ public final class JarReader {
                 n = in.readNBytes(head, 0, 4);
             }
             return n == 4 && head[0] == 'P' && head[1] == 'K'
-                    && head[2] == 0x03 && head[3] == 0x04;
+                    && ((head[2] == 0x03 && head[3] == 0x04)
+                    || (head[2] == 0x05 && head[3] == 0x06));
         } catch (IOException e) {
             return false;
         }

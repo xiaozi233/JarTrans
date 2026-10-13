@@ -1,11 +1,13 @@
 package com.jartrans.core.jar;
 
+import com.jartrans.core.io.AtomicFiles;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.regex.Pattern;
+import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -29,19 +31,40 @@ public final class JarPacker {
     public static void save(JarReader src, Path outPath,
                             Map<String, byte[]> modified, boolean stripSignature)
             throws IOException {
+        if (src == null || outPath == null || modified == null) {
+            throw new IllegalArgumentException("源 jar、输出路径和修改表不能为空");
+        }
+        AtomicFiles.write(outPath, temporary -> writeArchive(src, temporary, modified, stripSignature));
+    }
+
+    private static void writeArchive(JarReader src, Path outPath,
+                                     Map<String, byte[]> modified, boolean stripSignature)
+            throws IOException {
         try (ZipOutputStream zf = new ZipOutputStream(
                 Files.newOutputStream(outPath), StandardCharsets.UTF_8)) {
-            for (JarReader.EntryInfo info : src.infos()) {
+            for (JarReader.EntryInfo info : src.entriesForPacking()) {
                 String name = info.name;
                 if (stripSignature && SIGNATURE_NAME.matcher(name).matches()) {
                     continue;
                 }
                 byte[] payload = modified.getOrDefault(name, info.data);
+                if (payload == null) {
+                    throw new IOException("条目 " + name + " 的替换内容不能为空");
+                }
                 ZipEntry zi = new ZipEntry(name);
                 if (info.timeMillis >= 0) {
                     zi.setTime(info.timeMillis);
                 }
-                zi.setMethod(info.method);
+                int method = info.method == ZipEntry.STORED || info.method == ZipEntry.DEFLATED
+                        ? info.method : ZipEntry.DEFLATED;
+                zi.setMethod(method);
+                if (method == ZipEntry.STORED) {
+                    CRC32 crc = new CRC32();
+                    crc.update(payload);
+                    zi.setSize(payload.length);
+                    zi.setCompressedSize(payload.length);
+                    zi.setCrc(crc.getValue());
+                }
                 zf.putNextEntry(zi);
                 zf.write(payload);
                 zf.closeEntry();

@@ -48,6 +48,10 @@ src/main/java/com/jartrans/
 │   ├── ClassFile.java   #   class 解析与追加式常量重写
 │   ├── Bytecode.java    #   字节码指令扫描（字符串引用定位）
 │   ├── Project.java     #   工程状态：翻译/词典/类状态/语言包
+│   ├── ProjectArchive.java #  JAR 解析快照与类索引
+│   ├── TranslationStore.java # 翻译优先级与编辑状态
+│   ├── ProgressStore.java #    类状态/忽略文本持久化
+│   ├── io/               #   原子文件写入等基础设施
 │   ├── jar/             #   jar 读取与重打包
 │   ├── java/            #   反编译器：内置释放/进程内执行/产物与缓存管理
 │   └── json/            #   自研 JSON 读写

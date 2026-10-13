@@ -1,10 +1,10 @@
 package com.jartrans.core.json;
 
+import com.jartrans.core.io.AtomicFiles;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -73,11 +73,9 @@ public final class Json {
     }
 
     public static void writeFile(Path path, Object value) throws IOException {
-        Path tmp = path.resolveSibling(path.getFileName() + ".tmp");
-        Files.createDirectories(path.getParent());
-        Files.writeString(tmp, write(value), StandardCharsets.UTF_8);
-        Files.move(tmp, path, StandardCopyOption.REPLACE_EXISTING,
-                StandardCopyOption.ATOMIC_MOVE);
+        Path absolute = path.toAbsolutePath();
+        AtomicFiles.write(absolute,
+                temporary -> Files.writeString(temporary, write(value), StandardCharsets.UTF_8));
     }
 
     private static void writeValue(StringBuilder sb, Object value, int indent) {

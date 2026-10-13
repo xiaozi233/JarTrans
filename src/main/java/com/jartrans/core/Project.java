@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -52,44 +53,12 @@ public final class Project {
     public record FailedClass(String name, String reason) {
     }
 
-    /** 一个类可翻译字符串的收集结果：按首次出现顺序 + 全量集合。 */
-    private record ClassTexts(List<TextCount> items, Set<String> set) {
-    }
-
-    /** 收集 class 中的可翻译字符串字面量（按首次出现顺序计数）。 */
-    private static ClassTexts collectTexts(ClassFile cf) {
-        Map<String, Integer> counts = new LinkedHashMap<>();
-        List<String> seq = new ArrayList<>();
-        for (Literal lit : cf.literals()) {
-            if (lit.text == null) {
-                continue;
-            }
-            int prev = counts.getOrDefault(lit.text, 0);
-            counts.put(lit.text, prev + 1);
-            if (prev == 0) {
-                seq.add(lit.text);
-            }
-        }
-        List<TextCount> items = new ArrayList<>();
-        for (String t : seq) {
-            items.add(new TextCount(t, counts.get(t)));
-        }
-        return new ClassTexts(items, counts.keySet());
-    }
-
     private final DictionaryManager dicts;   // 可为 null（单词典模式）
     private Dictionary dictionary;
 
-    private JarReader jar;
-    private final Map<String, ClassFile> classes = new LinkedHashMap<>();
-    private final List<String> classOrder = new ArrayList<>();
-    private final Map<String, List<TextCount>> texts = new LinkedHashMap<>();
-    private final Map<String, Set<String>> textSets = new LinkedHashMap<>();
-    private final List<FailedClass> failed = new ArrayList<>();
-    private final Map<String, Map<String, String>> edits = new LinkedHashMap<>();
-    private final Map<String, Map<String, String>> auto = new LinkedHashMap<>();
+    private ProjectArchive archive = ProjectArchive.empty();
+    private final TranslationStore translations = new TranslationStore();
     private List<LangPack.MissingEntry> lastMissing = new ArrayList<>();
-    private final Map<String, Map<String, List<String>>> methodUsage = new LinkedHashMap<>();
     private final Map<String, String> classStatus = new LinkedHashMap<>();
     /** 「不翻译」的原字符串集合：这些文本不写入导出的 jar、不套用词典/语言包译文。 */
     private final Set<String> skipTexts = new LinkedHashSet<>();
@@ -158,106 +127,78 @@ public final class Project {
     // ---------- 打开 ----------
 
     public void openJar(Path path) throws IOException {
-        JarReader reader;
-        try {
-            reader = new JarReader(path);
-        } catch (JarReader.JarFileException e) {
-            throw new IOException(e.getMessage(), e);
-        }
-        classes.clear();
-        texts.clear();
-        textSets.clear();
-        classOrder.clear();
-        failed.clear();
-        methodUsage.clear();
-
-        for (String name : reader.classNames()) {
-            try {
-                ClassFile cf = ClassFile.parse(reader.readClass(name));
-                ClassTexts ct = collectTexts(cf);
-                classes.put(name, cf);
-                texts.put(name, ct.items());
-                textSets.put(name, ct.set());
-                classOrder.add(name);
-                try {
-                    methodUsage.put(name, Bytecode.stringUsage(cf));
-                } catch (Exception e) {
-                    methodUsage.put(name, new LinkedHashMap<>());
-                }
-            } catch (ClassFileException exc) {
-                failed.add(new FailedClass(name, exc.getMessage()));
-            }
-        }
-        jar = reader;
+        ProjectArchive loaded = ProjectArchive.load(path);
+        archive = loaded;
         sha256 = null;
-        edits.clear();
-        auto.clear();
+        translations.clear();
         lastMissing = new ArrayList<>();
         skipTexts.clear();
         loadProgress();
     }
 
     public boolean hasJar() {
-        return jar != null;
+        return archive.reader() != null;
     }
 
     public JarReader jar() {
-        return jar;
+        return archive.reader();
     }
 
     public String jarName() {
-        return jar != null ? jar.name() : "";
+        return hasJar() ? jar().name() : "";
     }
 
     public String jarSha256() throws IOException {
         if (sha256 == null) {
-            sha256 = jar != null ? LangPack.computeSha256(jar.path()) : "";
+            sha256 = hasJar() ? LangPack.computeSha256(jarPath()) : "";
         }
         return sha256;
     }
 
     public Path jarPath() {
-        return jar.path();
+        if (!hasJar()) {
+            throw new IllegalStateException("尚未打开 jar 文件");
+        }
+        return jar().path();
     }
 
     public List<String> classOrder() {
-        return classOrder;
+        return archive.order();
     }
 
     public Map<String, ClassFile> classes() {
-        return classes;
+        return archive.classes();
     }
 
     public List<TextCount> texts(String cls) {
-        return texts.getOrDefault(cls, List.of());
+        return archive.texts(cls);
     }
 
     public Set<String> textSet(String cls) {
-        return textSets.getOrDefault(cls, Set.of());
+        return archive.textSet(cls);
     }
 
     public List<FailedClass> failed() {
-        return failed;
+        return archive.failures();
     }
 
     public List<LangPack.MissingEntry> lastMissing() {
-        return lastMissing;
+        return Collections.unmodifiableList(lastMissing);
     }
 
     public Map<String, String> classStatus() {
-        return classStatus;
+        return Collections.unmodifiableMap(classStatus);
     }
 
     public List<String> methodNames(String cls, String orig) {
-        List<String> usage = methodUsage.getOrDefault(cls, Map.of()).get(orig);
-        return usage == null ? List.of() : usage;
+        return archive.methodNames(cls, orig);
     }
 
     // ---------- 不翻译名单 ----------
 
     /** 当前被标记为「不翻译」的原字符串集合（跨类生效）。 */
     public Set<String> skipTexts() {
-        return skipTexts;
+        return Collections.unmodifiableSet(skipTexts);
     }
 
     public boolean isSkipped(String orig) {
@@ -288,21 +229,11 @@ public final class Project {
 
     /** 该类当前生效的译文表（用户编辑覆盖自动填充，空译文视为未翻译）。 */
     public Map<String, String> effective(String cls) {
-        Map<String, String> merged = new LinkedHashMap<>();
-        merged.putAll(auto.getOrDefault(cls, Map.of()));
-        merged.putAll(edits.getOrDefault(cls, Map.of()));
-        merged.values().removeIf(v -> v == null || v.isEmpty());
-        return merged;
+        return translations.effective(cls);
     }
 
     public Status status(String cls, String orig) {
-        if (edits.getOrDefault(cls, Map.of()).containsKey(orig)) {
-            return Status.TRANSLATED;
-        }
-        if (auto.getOrDefault(cls, Map.of()).containsKey(orig)) {
-            return Status.AUTO;
-        }
-        return Status.UNTRANSLATED;
+        return translations.status(cls, orig);
     }
 
     public void setTranslation(String cls, String orig, String trans) {
@@ -310,24 +241,7 @@ public final class Project {
     }
 
     public void setTranslation(String cls, String orig, String trans, boolean autoFill) {
-        if (trans == null || trans.isEmpty() || trans.equals(orig)) {
-            Map<String, String> e = edits.get(cls);
-            if (e != null) {
-                e.remove(orig);
-            }
-            Map<String, String> a = auto.get(cls);
-            if (a != null) {
-                a.remove(orig);
-            }
-            return;
-        }
-        Map<String, Map<String, String>> bucket = autoFill ? auto : edits;
-        Map<String, Map<String, String>> other = autoFill ? edits : auto;
-        bucket.computeIfAbsent(cls, k -> new LinkedHashMap<>()).put(orig, trans);
-        Map<String, String> om = other.get(cls);
-        if (om != null) {
-            om.remove(orig);
-        }
+        translations.set(cls, orig, trans, autoFill);
     }
 
     /** 把词典命中的未翻译字符串批量填充为"自动填充"。返回填充条数。 */
@@ -337,12 +251,12 @@ public final class Project {
 
     public int fillFromDictionary(List<String> onlyClasses) {
         int count = 0;
-        Iterable<String> scope = onlyClasses != null ? onlyClasses : classOrder;
+        Iterable<String> scope = onlyClasses != null ? onlyClasses : classOrder();
         for (String cls : scope) {
             if (isIgnored(cls)) {
                 continue; // 已忽略 = 整类不翻译
             }
-            for (TextCount tc : texts.getOrDefault(cls, List.of())) {
+            for (TextCount tc : texts(cls)) {
                 if (skipTexts.contains(tc.text()) || status(cls, tc.text()) != Status.UNTRANSLATED) {
                     continue;
                 }
@@ -361,20 +275,16 @@ public final class Project {
     /** 应用语言包，不覆盖用户已手动编辑的条目。返回 (成功条数, 失效条目)。
         语言包内 skip_texts 名单与 class_status=ignore 的类会一起被尊重（不套用译文）。 */
     public long applyLanguagePack(Map<String, Object> pack) {
-        LangPack.MatchResult result = LangPack.matchPack(pack, textSets);
+        LangPack.MatchResult result = LangPack.matchPack(pack, archive.textSets());
         for (Map.Entry<String, Map<String, String>> e : result.applied().entrySet()) {
             if (isIgnored(e.getKey())) {
                 continue;
             }
-            Map<String, String> user = edits.get(e.getKey());
             for (Map.Entry<String, String> p : e.getValue().entrySet()) {
                 if (skipTexts.contains(p.getKey())) {
                     continue;
                 }
-                if (user == null || !user.containsKey(p.getKey())) {
-                    auto.computeIfAbsent(e.getKey(), k -> new LinkedHashMap<>())
-                            .put(p.getKey(), p.getValue());
-                }
+                translations.applyAutomatic(e.getKey(), p.getKey(), p.getValue());
             }
         }
         lastMissing = result.missing();
@@ -399,7 +309,7 @@ public final class Project {
         boolean changed = false;
         for (Map.Entry<String, Object> e : status.entrySet()) {
             String st = String.valueOf(e.getValue());
-            if (MANUAL_STATES.contains(st) && textSets.containsKey(e.getKey())) {
+            if (MANUAL_STATES.contains(st) && classes().containsKey(e.getKey())) {
                 classStatus.put(e.getKey(), st);
                 changed = true;
             }
@@ -428,7 +338,7 @@ public final class Project {
      */
     private Map<String, Map<String, String>> translationsForExport() {
         Map<String, Map<String, String>> entries = new LinkedHashMap<>();
-        for (String cls : classOrder) {
+        for (String cls : classOrder()) {
             if (isIgnored(cls)) {
                 continue; // 已忽略的类整类不导出译文
             }
@@ -455,27 +365,27 @@ public final class Project {
 
     /** 写回全部已翻译的类并导出（已忽略类与「不翻译」文本不写入）。rewrite 内部会做写回校验。 */
     public int exportJar(Path outPath, boolean stripSignature) throws IOException {
+        if (!hasJar()) {
+            throw new IllegalStateException("尚未打开 jar 文件");
+        }
         Map<String, byte[]> modified = new LinkedHashMap<>();
         for (Map.Entry<String, Map<String, String>> e : translationsForExport().entrySet()) {
             try {
-                modified.put(e.getKey(), classes.get(e.getKey()).rewrite(e.getValue()));
+                modified.put(e.getKey(), classes().get(e.getKey()).rewrite(e.getValue()));
             } catch (ClassFileException exc) {
                 throw new IOException("重写 " + e.getKey() + " 失败：" + exc.getMessage(), exc);
             }
         }
-        JarPacker.save(jar, outPath, modified, stripSignature);
+        JarPacker.save(jar(), outPath, modified, stripSignature);
         return modified.size();
     }
 
     // ---------- 统计 / 搜索 ----------
 
     public long[] stats() {
-        long total = 0;
-        for (List<TextCount> list : texts.values()) {
-            total += list.size();
-        }
+        long total = archive.textCount();
         long done = 0;
-        for (String c : classOrder) {
+        for (String c : classOrder()) {
             done += effective(c).size();
         }
         return new long[]{total, done};
@@ -487,30 +397,30 @@ public final class Project {
         for (String st : CLASS_STATES) {
             out.put(st, 0);
         }
-        for (String cls : classOrder) {
+        for (String cls : classOrder()) {
             out.merge(classState(cls), 1, Integer::sum);
         }
         return out;
     }
 
     public int untranslatedCount(String cls) {
-        return texts.getOrDefault(cls, List.of()).size() - effective(cls).size();
+        return texts(cls).size() - effective(cls).size();
     }
 
     public List<String> internalTexts(String cls) {
-        return classes.get(cls).internalTexts(textSets.get(cls));
+        return classes().get(cls).internalTexts(textSet(cls));
     }
 
     // ---------- 类状态 ----------
 
     /** 该类是否含有可翻译的字符串字面量。 */
     public boolean hasTranslatable(String cls) {
-        return !texts.getOrDefault(cls, List.of()).isEmpty();
+        return !texts(cls).isEmpty();
     }
 
     /** 按翻译进度自动判定的状态。 */
     public String autoClassState(String cls) {
-        List<TextCount> list = texts.getOrDefault(cls, List.of());
+        List<TextCount> list = texts(cls);
         if (list.isEmpty()) {
             return "empty";
         }
@@ -565,72 +475,31 @@ public final class Project {
     // ---------- 进度持久化（按 jar 名 + 体积 + 类数量识别同一个 jar） ----------
 
     private String progressKey() {
-        if (jar == null) {
+        if (!hasJar()) {
             return null;
         }
         long size;
         try {
-            size = Files.size(jar.path());
+            size = Files.size(jarPath());
         } catch (IOException e) {
             size = 0;
         }
-        return jarName() + "|" + size + "|" + classOrder.size();
-    }
-
-    private Map<String, Object> readProgressFile() {
-        Map<String, Object> data = Json.readObjectQuiet(AppDirs.progressFile());
-        return data != null ? data : new LinkedHashMap<>();
+        return jarName() + "|" + size + "|" + classOrder().size();
     }
 
     private void loadProgress() {
+        ProgressStore.Progress progress = new ProgressStore(AppDirs.progressFile()).load(progressKey());
         classStatus.clear();
+        classStatus.putAll(progress.classStatus());
         skipTexts.clear();
-        String key = progressKey();
-        if (key == null) {
-            return;
-        }
-        Object got = readProgressFile().get(key);
-        Map<String, Object> map = Json.object(got);
-        if (map == null) {
-            return;
-        }
-        for (Map.Entry<String, Object> e : map.entrySet()) {
-            String v = String.valueOf(e.getValue());
-            if (MANUAL_STATES.contains(v)) {
-                classStatus.put(e.getKey(), v);
-            } else if ("__skip_texts".equals(e.getKey()) && e.getValue() instanceof List<?> list) {
-                for (Object o : list) {
-                    skipTexts.add(String.valueOf(o));
-                }
-            }
-        }
+        skipTexts.addAll(progress.skippedTexts());
     }
 
     private void saveProgress() {
-        String key = progressKey();
-        if (key == null) {
-            return;
-        }
-        Map<String, Object> data = readProgressFile();
-        if (!classStatus.isEmpty() || !skipTexts.isEmpty()) {
-            Map<String, Object> block = new LinkedHashMap<>(classStatus);
-            if (!skipTexts.isEmpty()) {
-                List<String> sorted = new ArrayList<>(skipTexts);
-                sorted.sort(String::compareTo);
-                block.put("__skip_texts", sorted);
-            }
-            data.put(key, block);
-        } else {
-            data.remove(key);
-        }
-        while (data.size() > 50) { // 只保留最近 50 个 jar
-            String first = data.keySet().iterator().next();
-            data.remove(first);
-        }
         try {
-            Json.writeFile(AppDirs.progressFile(), data);
+            new ProgressStore(AppDirs.progressFile()).save(progressKey(), classStatus, skipTexts);
         } catch (IOException ignored) {
-            // 进度写入失败不影响主流程
+            // 进度写入失败不影响主流程。
         }
     }
 
@@ -639,16 +508,21 @@ public final class Project {
     }
 
     public List<SearchResult> search(String keyword, String scope) {
-        String q = keyword.toLowerCase();
+        String q = keyword == null ? "" : keyword.toLowerCase(java.util.Locale.ROOT);
+        String normalizedScope = switch (scope) {
+            case "orig", "trans", "both" -> scope;
+            case null -> "both";
+            default -> "both";
+        };
         List<SearchResult> results = new ArrayList<>();
-        for (String cls : classOrder) {
+        for (String cls : classOrder()) {
             Map<String, String> eff = effective(cls);
-            for (TextCount tc : texts.get(cls)) {
+            for (TextCount tc : texts(cls)) {
                 String trans = eff.getOrDefault(tc.text(), "");
-                boolean origHit = ("orig".equals(scope) || "both".equals(scope))
-                        && tc.text().toLowerCase().contains(q);
-                boolean transHit = ("trans".equals(scope) || "both".equals(scope))
-                        && trans.toLowerCase().contains(q);
+                boolean origHit = ("orig".equals(normalizedScope) || "both".equals(normalizedScope))
+                        && tc.text().toLowerCase(java.util.Locale.ROOT).contains(q);
+                boolean transHit = ("trans".equals(normalizedScope) || "both".equals(normalizedScope))
+                        && trans.toLowerCase(java.util.Locale.ROOT).contains(q);
                 if (origHit || transHit) {
                     results.add(new SearchResult(cls, tc.text(), trans, status(cls, tc.text())));
                 }

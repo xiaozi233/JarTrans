@@ -57,7 +57,8 @@ public final class DictionaryManager {
         String activeName = data == null ? "" : str(data.get("active"));
         List<Item> list = data == null ? new ArrayList<>() : parseItems(data.get("items"));
         // 丢弃文件已不存在的记录
-        list.removeIf(it -> !Files.isRegularFile(dir.resolve(it.file())));
+        list.removeIf(it -> !isSafeDictionaryPath(it.file())
+                || !Files.isRegularFile(dir.resolve(it.file())));
         if (list.isEmpty()) {
             list = scanJsonFiles();
         }
@@ -165,7 +166,7 @@ public final class DictionaryManager {
 
     public Path pathOf(String name) {
         for (Item it : items) {
-            if (it.name().equals(name)) {
+            if (it.name().equals(name) && isSafeDictionaryPath(it.file())) {
                 return dir.resolve(it.file());
             }
         }
@@ -362,6 +363,22 @@ public final class DictionaryManager {
     static String stripExt(String filename) {
         int dot = filename.lastIndexOf('.');
         return dot > 0 ? filename.substring(0, dot) : filename;
+    }
+
+    /** Index entries are user-editable JSON; never allow them to escape dictionaries/. */
+    private boolean isSafeDictionaryPath(String file) {
+        if (file == null || file.isBlank()) {
+            return false;
+        }
+        Path root = dir.toAbsolutePath().normalize();
+        Path candidate;
+        try {
+            candidate = root.resolve(file).normalize();
+        } catch (RuntimeException e) {
+            return false;
+        }
+        return candidate.startsWith(root) && candidate.getFileName().toString().endsWith(".json")
+                && !candidate.getFileName().toString().equals(INDEX_FILE);
     }
 
     static String safeStem(String name) {

@@ -187,6 +187,9 @@ public final class DecompilerManager {
     }
 
     public static Path cacheDir(String jarSha256) {
+        if (jarSha256 == null || jarSha256.isBlank()) {
+            throw new IllegalArgumentException("jar SHA-256 不能为空");
+        }
         return CACHE_ROOT.resolve(jarSha256.substring(0, Math.min(16, jarSha256.length())));
     }
 
@@ -242,6 +245,10 @@ public final class DecompilerManager {
                                               Collection<String> classNames,
                                               DecompilerType type)
             throws DecompileException {
+        if (jarPath == null || jarPath.isBlank() || sha256 == null || sha256.isBlank()
+                || classNames == null || classNames.isEmpty() || type == null) {
+            throw new DecompileException("反编译参数不完整");
+        }
         ReentrantLock lock = OUTPUT_LOCKS.computeIfAbsent(sha256, k -> new ReentrantLock());
         try {
             lock.lockInterruptibly();

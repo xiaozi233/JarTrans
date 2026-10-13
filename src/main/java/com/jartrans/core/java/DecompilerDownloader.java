@@ -1,5 +1,6 @@
 package com.jartrans.core.java;
 
+import com.jartrans.core.io.AtomicFiles;
 import com.jartrans.core.jar.JarReader;
 import com.jartrans.core.json.Json;
 import java.io.IOException;
@@ -261,6 +262,11 @@ public final class DecompilerDownloader {
 
     /** 把下载完成的 .part 文件转正。 */
     public static void promote(Path part, Path finalPath) throws IOException {
-        Files.move(part, finalPath, StandardCopyOption.REPLACE_EXISTING);
+        if (part == null || finalPath == null) {
+            throw new IllegalArgumentException("下载路径不能为空");
+        }
+        Path target = finalPath.toAbsolutePath().normalize();
+        Files.createDirectories(target.getParent());
+        AtomicFiles.replace(part, target);
     }
 }
