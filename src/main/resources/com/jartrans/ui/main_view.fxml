@@ -37,22 +37,20 @@
         <VBox>
             <MenuBar>
                 <Menu text="文件">
-                    <MenuItem text="打开 Jar..." onAction="#onOpenJar"/>
-                    <MenuItem text="导出汉化 Jar..." onAction="#onExportJar"/>
+                    <MenuItem text="打开 Jar…" onAction="#onOpenJar"/>
+                    <MenuItem text="导出汉化 Jar…" onAction="#onExportJar"/>
+                    <SeparatorMenuItem/>
+                    <MenuItem text="导入语言包…" onAction="#onImportPack"/>
+                    <MenuItem text="导出语言包…" onAction="#onExportPack"/>
+                    <MenuItem text="查看失效条目" onAction="#onShowMissing"/>
                     <SeparatorMenuItem/>
                     <MenuItem text="首选项…" onAction="#onOpenPreferences"/>
                     <SeparatorMenuItem/>
                     <MenuItem text="退出" onAction="#onExit"/>
                 </Menu>
-                <Menu text="语言包">
-                    <MenuItem text="导入语言包..." onAction="#onImportPack"/>
-                    <MenuItem text="导出语言包..." onAction="#onExportPack"/>
-                    <SeparatorMenuItem/>
-                    <MenuItem text="查看失效条目" onAction="#onShowMissing"/>
-                </Menu>
                 <Menu text="词典">
-                    <MenuItem text="编辑词典条目..." onAction="#onManageDictionary"/>
-                    <MenuItem text="管理多个词典..." onAction="#onManageDictionaries"/>
+                    <MenuItem text="编辑词典条目…" onAction="#onManageDictionary"/>
+                    <MenuItem text="管理多个词典…" onAction="#onManageDictionaries"/>
                     <SeparatorMenuItem/>
                     <MenuItem text="用词典填充当前类" onAction="#onFillClassFromDictionary"/>
                     <MenuItem text="用词典填充全部未翻译" onAction="#onFillFromDictionary"/>
@@ -68,6 +66,9 @@
                     <MenuItem text="展开全部" onAction="#onExpandAll"/>
                 </Menu>
                 <Menu text="查看">
+                    <MenuItem text="查看当前类源码" onAction="#onViewCurrentSource"/>
+                    <MenuItem text="清理反编译缓存" onAction="#onClearDecompileCache"/>
+                    <SeparatorMenuItem/>
                     <CheckMenuItem fx:id="showInternalItem" text="显示内部 UTF8 条目（只读）"
                                    onAction="#onToggleInternal"/>
                     <CheckMenuItem fx:id="hideEmptyItem" text="隐藏无可翻译字符串的类"
@@ -84,11 +85,6 @@
                         <RadioMenuItem fx:id="themeDarkItem" text="深色"
                                        toggleGroup="$themeGroup" onAction="#onThemeDark"/>
                     </Menu>
-                </Menu>
-                <Menu text="源码">
-                    <MenuItem text="查看当前类源码" onAction="#onViewCurrentSource"/>
-                    <SeparatorMenuItem/>
-                    <MenuItem text="清理反编译缓存" onAction="#onClearDecompileCache"/>
                 </Menu>
                 <Menu text="搜索">
                     <MenuItem fx:id="globalSearchItem" text="全包搜索" onAction="#onGlobalSearch"/>
@@ -111,24 +107,12 @@
                     </tooltip>
                 </Button>
                 <Separator orientation="VERTICAL"/>
-                <Button fx:id="importPackBtn" text="导入语言包" onAction="#onImportPack">
-                    <tooltip>
-                        <Tooltip text="应用 JSON 语言包（会校验目标 jar 的 SHA-256）"/>
-                    </tooltip>
-                </Button>
-                <Button fx:id="exportPackBtn" text="导出语言包" onAction="#onExportPack">
-                    <tooltip>
-                        <Tooltip text="把当前译文导出为 JSON 语言包，可分享或复用到新版本"/>
-                    </tooltip>
-                </Button>
-                <Separator orientation="VERTICAL"/>
                 <Label text="词典："/>
-                <ComboBox fx:id="dictBox" prefWidth="170"/>
-                <Button text="管理…" onAction="#onManageDictionaries">
+                <ComboBox fx:id="dictBox" prefWidth="170" promptText="词典">
                     <tooltip>
-                        <Tooltip text="新建 / 重命名 / 删除 / 导入导出词典，或切换当前词典"/>
+                        <Tooltip text="切换当前词典（管理词典见「词典」菜单）"/>
                     </tooltip>
-                </Button>
+                </ComboBox>
                 <Separator orientation="VERTICAL"/>
                 <TextField fx:id="searchField" promptText="全局搜索（Ctrl+Alt+F）" prefWidth="200" minWidth="140"
                            onAction="#onOpenSearch"/>

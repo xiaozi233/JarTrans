@@ -58,7 +58,7 @@ public final class Settings {
         d.put(Keys.STATUS_FILTER, "all");
         d.put(Keys.ONLY_UNTRANSLATED, Boolean.FALSE);
         d.put(Keys.SAVE_TO_DICT, Boolean.TRUE);
-        d.put(Keys.LEGEND_VISIBLE, Boolean.TRUE);
+        d.put(Keys.LEGEND_VISIBLE, Boolean.FALSE);
         d.put(Keys.DBLCLICK_SOURCE, Boolean.TRUE);
         d.put(Keys.AUTO_SAVE_TRANSLATION, Boolean.TRUE);
         d.put(Keys.PACK_AUTHOR, "");

@@ -24,6 +24,7 @@ import javafx.scene.control.MenuItem;
 import javafx.scene.control.SelectionMode;
 import javafx.scene.control.Separator;
 import javafx.scene.control.SplitPane;
+import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
@@ -151,25 +152,9 @@ public class EditorPane extends BorderPane {
         buildEditorArea();
     }
 
-    /** 顶部：类状态行 + （可隐藏的）查找/替换栏。 */
+    /** 顶部：（可隐藏的）查找/替换栏。类状态控件在编辑工具行（见 buildEditorArea）。 */
     private void buildHeadBar() {
-        // ---- 顶部：类状态 + 只看未翻译 ----
-        HBox head = new HBox(8);
-        head.setPadding(new Insets(2, 2, 6, 2));
-        head.setAlignment(Pos.CENTER_LEFT);
-        classStateBox.getItems().addAll(ClassStates.SELECTABLE_LABELS);
-        classStateBox.setPrefWidth(112);
-        classStateBox.getSelectionModel().selectFirst();
-        classStateBox.valueProperty().addListener((o, ov, nv) -> onClassStateBox());
-        stateDot.getStyleClass().add("state-dot");
-        head.getChildren().addAll(new Label("类状态："), classStateBox, stateDot, new Separator(), onlyUntranslated);
-        onlyUntranslated.setOnAction(e -> {
-            setQuiet(Settings.Keys.ONLY_UNTRANSLATED, onlyUntranslated.isSelected());
-            refreshRows();
-        });
-
-        // 顶部 = 类状态行 + （默认隐藏的）查找/替换栏
-        setTop(new VBox(head, findBar));
+        setTop(findBar);
     }
 
     /** 状态 -> Color（按当前调色板缓存，主题切换后自动重建）。 */
@@ -192,9 +177,35 @@ public class EditorPane extends BorderPane {
         // ---- 表格 ----
         TableColumn<Row, String> colOrig = TableColumns.text("原字符串", 340, r -> Texts.displayText(r.orig));
         TableColumn<Row, String> colTrans = TableColumns.text("译文", 260, r -> Texts.displayText(r.trans));
-        TableColumn<Row, String> colStatus = TableColumns.centered("状态", 70, r -> STATUS_TEXT.get(r.statusKey));
+        TableColumn<Row, String> colStatus = TableColumns.centered("状态", 76, r -> STATUS_TEXT.get(r.statusKey));
+        colStatus.setCellFactory(c -> new TableCell<>() {
+            private final Circle dot = new Circle(3.5);
+            private final Label text = new Label();
+            private final HBox box = new HBox(5, dot, text);
+
+            {
+                dot.getStyleClass().add("state-dot");
+                box.setAlignment(Pos.CENTER);
+            }
+
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setGraphic(null);
+                    return;
+                }
+                Row row = getTableRow().getItem();
+                dot.setFill(statusColor(row == null ? "untranslated" : row.statusKey));
+                text.setText(item);
+                setGraphic(box);
+            }
+        });
         TableColumn<Row, String> colCount = TableColumns.centered("次数", 42, r -> r.count);
         TableColumn<Row, String> colMethods = TableColumns.text("所在方法", 130, r -> r.methods);
+        // 低频信息默认隐藏，右键表头可随时打开，把宽度让给原文/译文
+        colCount.setVisible(false);
+        colMethods.setVisible(false);
 
         List<TableColumn<Row, String>> allCols = List.of(colOrig, colTrans, colStatus, colCount, colMethods);
         //noinspection unchecked
@@ -285,7 +296,18 @@ public class EditorPane extends BorderPane {
         Button clearBtn = new Button("清空译文");
         clearBtn.setOnAction(e -> clearTranslation());
         hint.getStyleClass().add("hint");
-        buttons.getChildren().addAll(saveBtn, useDictBtn, clearBtn, saveDict, hint);
+        classStateBox.getItems().addAll(ClassStates.SELECTABLE_LABELS);
+        classStateBox.setPrefWidth(104);
+        classStateBox.getSelectionModel().selectFirst();
+        classStateBox.valueProperty().addListener((o, ov, nv) -> onClassStateBox());
+        stateDot.getStyleClass().add("state-dot");
+        onlyUntranslated.setOnAction(e -> {
+            setQuiet(Settings.Keys.ONLY_UNTRANSLATED, onlyUntranslated.isSelected());
+            refreshRows();
+        });
+        HBox stateGroup = new HBox(6, new Label("类状态："), classStateBox, stateDot, onlyUntranslated);
+        stateGroup.setAlignment(Pos.CENTER_LEFT);
+        buttons.getChildren().addAll(saveBtn, useDictBtn, clearBtn, saveDict, new Separator(), stateGroup, hint);
         saveDict.setOnAction(e -> setQuiet(Settings.Keys.SAVE_TO_DICT, saveDict.isSelected()));
 
         VBox editBox = new VBox(buttons, editor);

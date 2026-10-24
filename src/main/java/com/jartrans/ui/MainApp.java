@@ -175,12 +175,6 @@ public class MainApp extends Application {
     private Button exportJarBtn;
 
     @FXML
-    private Button importPackBtn;
-
-    @FXML
-    private Button exportPackBtn;
-
-    @FXML
     private MenuItem globalSearchItem;
 
     @FXML
@@ -620,10 +614,7 @@ public class MainApp extends Application {
 
     /** 未打开 jar 时禁用依赖工程内容的工具栏动作；打开成功后恢复。 */
     void updateJarDependentActions() {
-        boolean hasJar = project.hasJar();
-        exportJarBtn.setDisable(!hasJar);
-        importPackBtn.setDisable(!hasJar);
-        exportPackBtn.setDisable(!hasJar);
+        exportJarBtn.setDisable(!project.hasJar());
     }
 
     private void put(Scene scene, String id, Runnable action) {
@@ -829,14 +820,21 @@ public class MainApp extends Application {
     void updateStats() {
         if (!project.hasJar()) {
             statsLabel.setText("");
+            statsLabel.setTooltip(null);
             progressBar.setProgress(0);
+            progressBar.setVisible(false);
+            progressBar.setManaged(false);
             return;
         }
         long[] totalDone = project.stats();
         long total = totalDone[0];
         long done = totalDone[1];
+        progressBar.setVisible(true);
+        progressBar.setManaged(true);
         progressBar.setProgress(total == 0 ? 0 : done * 1.0 / total);
-        statsLabel.setText(done + "/" + total);
+        // 状态栏只显示最关键的进度与词典规模；各状态类数收进 tooltip，避免长串挤占
+        statsLabel.setText(
+                "已完成 " + done + "/" + total + " · 词典 " + project.dictionary().size() + " 条");
         Map<String, Integer> cs = project.classStats();
         StringBuilder parts = new StringBuilder();
         for (String st : ClassStates.STATS_ORDER) {
@@ -845,8 +843,7 @@ public class MainApp extends Application {
             }
             parts.append(STATE_LABEL.get(st)).append(" ").append(cs.get(st));
         }
-        statsLabel.setText("类：" + parts + "    词典「" + project.dictionaryLabel() + "」"
-                + project.dictionary().size() + " 条");
+        statsLabel.setTooltip(new Tooltip("类：" + parts + "    词典「" + project.dictionaryLabel() + "」"));
     }
 
     // ---------- 词典 ----------

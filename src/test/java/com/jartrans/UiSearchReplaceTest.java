@@ -116,12 +116,12 @@ class UiSearchReplaceTest {
             assertTrue(pref != null);
             pref.hide();
 
-            // --- 图例：显示开关（默认开，可关可开） ---
-            assertTrue(app.legendVisible(), "图例默认应显示");
-            app.applyLegendVisible(false);
-            assertFalse(app.legendVisible(), "图例可隐藏");
+            // --- 图例：显示开关（状态列已用彩色圆点表达语义，默认收起以节省左栏空间） ---
+            assertFalse(app.legendVisible(), "图例默认应隐藏");
             app.applyLegendVisible(true);
-            assertTrue(app.legendVisible(), "图例可再次显示");
+            assertTrue(app.legendVisible(), "图例可显示");
+            app.applyLegendVisible(false);
+            assertFalse(app.legendVisible(), "图例可再次隐藏");
 
             // --- 译文自动保存：输入后 flush/切换即落库 ---
             assertTrue(app.settings().getBool("auto_save_translation"), "自动保存默认应开启");
