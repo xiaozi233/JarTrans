@@ -72,12 +72,8 @@ public class EditorPane extends BorderPane {
         }
     }
 
-    public static final Map<String, String> STATUS_TEXT = Map.of(
-            "untranslated", "未翻译",
-            "translated", "已翻译",
-            "auto", "自动",
-            "internal", "内部·只读",
-            "skipped", "不翻译");
+    /** 条目状态文案唯一来源在 ClassStates.ENTRY_LABELS；别名供既有调用（搜索窗口等）使用。 */
+    public static final Map<String, String> STATUS_TEXT = ClassStates.ENTRY_LABELS;
 
     private MainApp app;
     private String currentClass;
@@ -464,18 +460,13 @@ public class EditorPane extends BorderPane {
             return;
         }
         String replacement = findBar.replacement();
-        String before = app.project().effective(currentClass).getOrDefault(row.orig, "");
-        if (before.equals(replacement)) {
+        List<Project.ReplaceChange> changes = app.project().replaceTranslations(
+                List.of(new Project.ReplaceTarget(currentClass, row.orig)), replacement);
+        if (changes.isEmpty()) {
             findNext();
             return;
         }
-        try {
-            app.project().setTranslation(currentClass, row.orig, replacement);
-        } catch (Exception exc) {
-            Dialogs.warn("替换失败", exc.getMessage());
-            return;
-        }
-        app.recordTranslation(currentClass, row.orig, before, replacement);
+        app.recordBatchTranslation(changes, replacement);
         app.onTranslationChanged();
         // 刷新后跳到下一条
         refreshRows();
@@ -497,32 +488,22 @@ public class EditorPane extends BorderPane {
                         + Texts.displayText(replacement) + "」\n\n确定继续吗？")) {
             return;
         }
-        List<Row> targets = new ArrayList<>();
+        List<Project.ReplaceTarget> targets = new ArrayList<>();
         for (Row r : rows) {
-            if (canEditRow(r) && !app.project().effective(currentClass)
-                    .getOrDefault(r.orig, "").equals(replacement)) {
-                targets.add(r);
+            if (canEditRow(r)) {
+                targets.add(new Project.ReplaceTarget(currentClass, r.orig));
             }
         }
-        if (targets.isEmpty()) {
+        // 「不翻译」与译文相同的行由 core 统一跳过；变更合并为单条撤销记录
+        List<Project.ReplaceChange> changes = app.project().replaceTranslations(targets, replacement);
+        if (changes.isEmpty()) {
             app.setStatus("没有需要替换的行（译文与目标相同）");
             return;
         }
-        int n = 0;
-        for (Row r : targets) {
-            String before = app.project().effective(currentClass).getOrDefault(r.orig, "");
-            try {
-                app.project().setTranslation(currentClass, r.orig, replacement);
-            } catch (Exception exc) {
-                Dialogs.warn("替换失败", exc.getMessage());
-                break;
-            }
-            app.recordTranslation(currentClass, r.orig, before, replacement);
-            n++;
-        }
+        app.recordBatchTranslation(changes, replacement);
         app.onTranslationChanged();
         refreshRows();
-        app.setStatus("已替换 " + n + " 行译文");
+        app.setStatus("已替换 " + changes.size() + " 行译文");
     }
 
     private void setQuiet(String key, boolean value) {

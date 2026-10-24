@@ -20,12 +20,12 @@ class EditHistoryTest {
         assertTrue(history.canUndo());
         assertFalse(history.canRedo());
 
-        EditHistory.Hist taken = history.takeUndo();
+        EditHistory.Hist taken = (EditHistory.Hist) history.takeUndo();
         assertEquals(a, taken);
         assertFalse(history.canUndo());
         assertTrue(history.canRedo());
 
-        EditHistory.Hist back = history.takeRedo();
+        EditHistory.Hist back = (EditHistory.Hist) history.takeRedo();
         assertEquals(a, back);
         assertTrue(history.canUndo());
         assertFalse(history.canRedo());
@@ -56,7 +56,7 @@ class EditHistoryTest {
         EditHistory.Hist last = null;
         for (int i = 0; i < 200; i++) {
             assertTrue(history.canUndo());
-            last = history.takeUndo();
+            last = (EditHistory.Hist) history.takeUndo();
             if (i == 0) {
                 first = last;
             }
@@ -69,5 +69,22 @@ class EditHistoryTest {
     @Test
     void autoSentinelConstant() {
         assertEquals("*auto", EditHistory.AUTO);
+    }
+
+    @Test
+    void batchUndoRedoRoundTripsAsSingleStep() {
+        EditHistory history = new EditHistory();
+        EditHistory.Batch batch = new EditHistory.Batch("trans", java.util.List.of(
+                new EditHistory.Hist("trans", "c1", "o1", "a1", "n"),
+                new EditHistory.Hist("trans", "c2", "o2", "a2", "n")));
+        history.push(batch);
+        assertTrue(history.canUndo());
+
+        EditHistory.Op undone = history.takeUndo();
+        assertEquals(batch, undone, "整批应作为单条记录弹出");
+        assertTrue(history.canRedo());
+        assertFalse(history.canUndo());
+
+        assertEquals(batch, history.takeRedo(), "重做同样一步整批返回");
     }
 }

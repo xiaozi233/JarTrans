@@ -257,6 +257,35 @@ public final class Project {
         translations.set(cls, orig, trans, autoFill);
     }
 
+    /** 批量替换的目标条目（类 + 原字符串）。 */
+    public record ReplaceTarget(String cls, String orig) {
+    }
+
+    /** 一次实际发生的替换变更（撤销时需要原值）。 */
+    public record ReplaceChange(String cls, String orig, String before) {
+    }
+
+    /**
+     * 批量替换译文（类内「全部替换」与全局搜索「替换选中/全部替换」的单一实现）。
+     * 统一规则：跳过「不翻译」条目与译文已等于目标的条目；其余全部写入目标译文。
+     * 返回实际发生的变更（按输入顺序），供界面合并为单条撤销记录。
+     */
+    public List<ReplaceChange> replaceTranslations(List<ReplaceTarget> targets, String replacement) {
+        List<ReplaceChange> changes = new ArrayList<>();
+        for (ReplaceTarget t : targets) {
+            if (isSkipped(t.orig())) {
+                continue;
+            }
+            String before = effective(t.cls()).getOrDefault(t.orig(), "");
+            if (before.equals(replacement)) {
+                continue;
+            }
+            setTranslation(t.cls(), t.orig(), replacement);
+            changes.add(new ReplaceChange(t.cls(), t.orig(), before));
+        }
+        return changes;
+    }
+
     /** 把词典命中的未翻译字符串批量填充为"自动填充"。返回填充条数。 */
     public int fillFromDictionary() {
         return fillFromDictionary(null);

@@ -212,60 +212,36 @@ public class SearchWindow extends AppWindow {
         worker.start();
     }
 
-    private List<SearchRow> replaceable() {
-        List<SearchRow> out = new ArrayList<>();
-        for (SearchRow r : table.getItems()) {
-            if ("skipped".equals(r.statusKey())) {
-                continue;
-            }
-            out.add(r);
-        }
-        return out;
-    }
-
-    private boolean performReplace(SearchRow r, String replacement) {
-        if ("skipped".equals(r.statusKey())) {
-            return false;
-        }
-        String before = app.project().effective(r.cls()).getOrDefault(r.orig(), "");
-        if (before.equals(replacement)) {
-            return false;
-        }
-        try {
-            app.project().setTranslation(r.cls(), r.orig(), replacement);
-        } catch (Exception exc) {
-            Dialogs.warn("替换失败", exc.getMessage());
-            return false;
-        }
-        app.recordTranslation(r.cls(), r.orig(), before, replacement);
-        return true;
-    }
-
     private void replaceSelected() {
         SearchRow row = table.getSelectionModel().getSelectedItem();
         if (row == null) {
             Dialogs.info("提示", "请先在结果里选中一行。");
             return;
         }
-        if (performReplace(row, replaceField.getText())) {
-            doSearch();
-            afterBulkReplace();
-            countLabel.setText("已替换 1 条译文");
-        } else {
+        String replacement = replaceField.getText();
+        List<Project.ReplaceChange> changes = app.project().replaceTranslations(
+                List.of(new Project.ReplaceTarget(row.cls(), row.orig())), replacement);
+        if (changes.isEmpty()) {
             Dialogs.info("提示", "该行无需替换（译文相同或为「不翻译」）。");
+            return;
         }
+        app.recordBatchTranslation(changes, replacement);
+        doSearch();
+        afterBulkReplace();
+        countLabel.setText("已替换 1 条译文");
     }
 
     private void replaceAll() {
-        List<SearchRow> rows = replaceable();
+        List<SearchRow> rows = new ArrayList<>(table.getItems());
         if (rows.isEmpty()) {
             Dialogs.info("提示", "当前结果没有可替换的行。");
             return;
         }
         String replacement = replaceField.getText();
         long diff = rows.stream()
-                .filter(r -> !app.project().effective(r.cls())
-                        .getOrDefault(r.orig(), "").equals(replacement))
+                .filter(r -> !app.project().isSkipped(r.orig())
+                        && !app.project().effective(r.cls())
+                                .getOrDefault(r.orig(), "").equals(replacement))
                 .count();
         if (diff == 0) {
             Dialogs.info("提示", "所有结果的译文都已与目标一致，无需替换。");
@@ -274,18 +250,17 @@ public class SearchWindow extends AppWindow {
         if (!Dialogs.confirm("全部替换",
                 "将把当前 " + diff + " 条匹配结果的译文全部替换为：\n\n「"
                         + Texts.displayText(replacement) + "」\n\n"
-                        + "（跳过已标记「不翻译」的行；可 Ctrl+Z 撤销）\n确定继续吗？")) {
+                        + "（跳过已标记「不翻译」的行；可 Ctrl+Z 一步撤销）\n确定继续吗？")) {
             return;
         }
-        int n = 0;
-        for (SearchRow r : rows) {
-            if (performReplace(r, replacement)) {
-                n++;
-            }
-        }
+        List<Project.ReplaceTarget> targets = rows.stream()
+                .map(r -> new Project.ReplaceTarget(r.cls(), r.orig())).toList();
+        // 跳过规则与写入由 core 单点执行；变更合并为单条撤销记录
+        List<Project.ReplaceChange> changes = app.project().replaceTranslations(targets, replacement);
+        app.recordBatchTranslation(changes, replacement);
         doSearch();
         afterBulkReplace();
-        countLabel.setText("已替换 " + n + " 条译文");
+        countLabel.setText("已替换 " + changes.size() + " 条译文");
     }
 
     private void afterBulkReplace() {

@@ -37,9 +37,14 @@ public final class DictionaryManager {
     public record Item(String name, String file) {
     }
 
-    public final Path baseDir;
-    public final Path dir;
-    public final Path indexPath;
+    private final Path baseDir;
+    private final Path dir;
+    private final Path indexPath;
+
+    /** 词典根目录（程序目录/dictionaries）。 */
+    public Path dir() {
+        return dir;
+    }
 
     private List<Item> items = new ArrayList<>();
     private String active = "";

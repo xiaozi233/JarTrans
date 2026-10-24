@@ -82,10 +82,16 @@ public class MainApp extends Application {
     private final PauseTransition searchDebounce =
             new PauseTransition(Duration.millis(180));
 
-    /** 反编译编排：按需单类反编译、产物缓存与取消。 */
+    /** 重操作后台执行器（ProjectIoActions 等协作者使用）。 */
+    BackgroundOps bgOps() {
+        return bgOps;
+    }
+
     private final DecompileController decompile = new DecompileController(this);
     /** 撤销/重做：译文修改 · 「不翻译」标记 · 类状态标记。 */
     private final UndoRedo undoRedo = new UndoRedo(this);
+    /** jar/语言包文件 IO 动作（含后台执行与完成回调）。 */
+    private final ProjectIoActions ioActions = new ProjectIoActions(this);
     /** 词典结构/激活词典变化时需要同步的窗口回调（词典条目窗口、词典管理窗口多实例）。 */
     private final List<Runnable> dictsListeners = new ArrayList<>();
 
@@ -277,7 +283,7 @@ public class MainApp extends Application {
         if (!legendVisible()) {
             return;
         }
-        for (String st : List.of("todo", "doing", "done", "ignore", "empty")) {
+        for (String st : ClassStates.ALL) {
             Circle dot = new Circle(4);
             dot.getStyleClass().addAll("state-dot", "cell-state-" + st);
             Tooltip.install(dot,
@@ -311,27 +317,27 @@ public class MainApp extends Application {
 
     @FXML
     public void onOpenJar(ActionEvent e) {
-        openJar();
+        ioActions.openJar();
     }
 
     @FXML
     public void onExportJar(ActionEvent e) {
-        exportJar();
+        ioActions.exportJar();
     }
 
     @FXML
     public void onImportPack(ActionEvent e) {
-        importPack();
+        ioActions.importPack();
     }
 
     @FXML
     public void onExportPack(ActionEvent e) {
-        exportPack();
+        ioActions.exportPack();
     }
 
     @FXML
     public void onShowMissing(ActionEvent e) {
-        showMissing();
+        ioActions.showMissing();
     }
 
     @FXML
@@ -346,12 +352,12 @@ public class MainApp extends Application {
 
     @FXML
     public void onFillClassFromDictionary(ActionEvent e) {
-        fillClassFromDictionary();
+        ioActions.fillClassFromDictionary();
     }
 
     @FXML
     public void onFillFromDictionary(ActionEvent e) {
-        fillFromDictionary();
+        ioActions.fillFromDictionary();
     }
 
     @FXML
@@ -625,7 +631,8 @@ public class MainApp extends Application {
         return ClassStates.filterLabelOf(key);
     }
 
-    private void rebuildTree() {
+    /** 重建左侧类树（ioActions 打开 jar 后调用）。 */
+    void rebuildTree() {
         TreeItem<String> newRoot = new TreeItem<>("");
         classTree.setRoot(newRoot);
         if (!project.hasJar()) {
@@ -801,7 +808,7 @@ public class MainApp extends Application {
         statsLabel.setText(done + "/" + total);
         Map<String, Integer> cs = project.classStats();
         StringBuilder parts = new StringBuilder();
-        for (String st : List.of("done", "doing", "todo", "ignore")) {
+        for (String st : ClassStates.STATS_ORDER) {
             if (parts.length() > 0) {
                 parts.append("  ");
             }
@@ -846,24 +853,33 @@ public class MainApp extends Application {
         }
     }
 
-    private void onDictSelected(String name) {
-        if (name == null || project.dicts() == null
-                || name.equals(project.dicts().activeName())) {
+    /**
+     * 切换当前词典并同步全部相关界面（主窗下拉/统计、编辑区、所有词典窗口）。
+     * 主窗下拉、词典条目窗口、词典管理窗口三处的切换协议在此单点实现。
+     */
+    public void switchDictionary(String name) {
+        if (name == null || project.dicts() == null) {
             return;
         }
-        try {
-            project.useDictionary(name);
-        } catch (Exception e) {
-            // 切换失败不阻断：下拉已切换，界面照常刷新
-            LOG.log(System.Logger.Level.WARNING, "词典切换失败：" + name, e);
+        if (!name.equals(project.dicts().activeName())) {
+            try {
+                project.useDictionary(name);
+            } catch (Exception e) {
+                // 切换失败不阻断：界面照常刷新到当前激活词典
+                LOG.log(System.Logger.Level.WARNING, "词典切换失败：" + name, e);
+            }
         }
+        // 无论工程侧是否已激活（新建后已 setActive），选择都要落盘
         settings.setOrIgnore(Settings.Keys.DICTIONARY, name);
         setStatus("已切换到词典「" + name + "」（" + project.dictionary().size() + " 条）");
         if (editor.currentClass() != null) {
             editor.refreshRows();
         }
-        // 已打开的词典条目/管理窗口一起同步激活词典
         notifyDictsChanged();
+    }
+
+    private void onDictSelected(String name) {
+        switchDictionary(name);
     }
 
     void manageDictionaries() {
@@ -872,170 +888,6 @@ public class MainApp extends Application {
             return;
         }
         new DictManagerDialog(this).show();
-    }
-
-    private void fillFromDictionary() {
-        if (!requireJar()) {
-            return;
-        }
-        bgOps.run("词典批量填充", "正在按词典批量填充 …", () -> project.fillFromDictionary(), count -> {
-            refreshAfterModelChange(true);
-            Dialogs.info("完成", "词典自动填充了 " + count + " 条未翻译字符串（标记为\"自动\"）。");
-        });
-    }
-
-    private void fillClassFromDictionary() {
-        if (!requireJar()) {
-            return;
-        }
-        String cls = editor.currentClass();
-        if (cls == null) {
-            Dialogs.info("提示", "请先在左侧选择一个类。");
-            return;
-        }
-        bgOps.run("词典填充", "正在按词典填充当前类 …",
-                () -> project.fillFromDictionary(List.of(cls)), count -> {
-                    refreshAfterModelChange(true);
-                    setStatus("「" + cls + "」：词典填充了 " + count + " 条");
-                });
-    }
-
-    // ---------- 动作 ----------
-
-    /** 打开文件选择框（可多组扩展名过滤）；取消返回 null。 */
-    private Path askOpenFile(String title, FileChooser.ExtensionFilter... filters) {
-        FileChooser chooser = new FileChooser();
-        chooser.setTitle(title);
-        chooser.getExtensionFilters().addAll(filters);
-        File file = chooser.showOpenDialog(stage);
-        return file == null ? null : file.toPath();
-    }
-
-    /** 保存文件选择框；取消返回 null。 */
-    private Path askSaveFile(String title, String initialName,
-                             FileChooser.ExtensionFilter... filters) {
-        FileChooser chooser = new FileChooser();
-        chooser.setTitle(title);
-        if (initialName != null) {
-            chooser.setInitialFileName(initialName);
-        }
-        chooser.getExtensionFilters().addAll(filters);
-        File file = chooser.showSaveDialog(stage);
-        return file == null ? null : file.toPath();
-    }
-
-    private void openJar() {
-        Path path = askOpenFile("选择 jar 文件",
-                new FileChooser.ExtensionFilter("Jar 文件", "*.jar"),
-                new FileChooser.ExtensionFilter("所有文件", "*.*"));
-        if (path == null) {
-            return;
-        }
-        bgOps.run("打开 jar", "正在解析 jar …", () -> {
-            project.openJar(path);
-            return true;
-        }, ok -> {
-            rebuildTree();
-            editor.showClass(null);
-            // 新 jar：旧 jar 的反编译产物/索引全部失效
-            invalidateDecompilerState();
-            updateStats();
-            String msg = "已打开 " + project.jarName() + "：共 "
-                    + project.classOrder().size() + " 个类";
-            if (!project.failed().isEmpty()) {
-                msg += "（" + project.failed().size() + " 个类解析失败，已跳过）";
-            }
-            setStatus(msg);
-        });
-    }
-
-    private void exportJar() {
-        if (!requireJar()) {
-            return;
-        }
-        Path out = askSaveFile("导出汉化 Jar", "translated_" + project.jarName(),
-                new FileChooser.ExtensionFilter("Jar 文件", "*.jar"));
-        if (out == null) {
-            return;
-        }
-        // 含全 jar SHA-256、逐类重写（内含写后校验）与整档重压缩，大 jar 耗时明显，必须后台执行
-        bgOps.run("导出汉化 Jar", "正在导出汉化 jar …", () -> project.exportJar(out, true),
-                count -> {
-                    Dialogs.info("完成", "已写入 " + count + " 个汉化的类：\n" + out);
-                    setStatus("已导出 " + count + " 个汉化的类");
-                });
-    }
-
-    private void importPack() {
-        if (!requireJar()) {
-            return;
-        }
-        Path file = askOpenFile("选择语言包",
-                new FileChooser.ExtensionFilter("JSON 文件", "*.json"),
-                new FileChooser.ExtensionFilter("所有文件", "*.*"));
-        if (file == null) {
-            return;
-        }
-        Map<String, Object> pack;
-        try {
-            pack = LangPack.readPack(file);
-        } catch (LangPack.LangPackException exc) {
-            Dialogs.error("错误", exc.getMessage());
-            return;
-        }
-        String expected = String.valueOf(pack.getOrDefault("target_jar_sha256", ""));
-        bgOps.run("应用语言包", "正在校验并应用语言包 …", () -> {
-            if (!expected.isEmpty() && !expected.equals(project.jarSha256())) {
-                return false;
-            }
-            return true;
-        }, shaMatched -> {
-            if (!shaMatched) {
-                if (!Dialogs.confirm("警告",
-                        "语言包的 SHA-256 与当前 jar 不匹配（可能不是同一版本）。\n仍要继续应用吗？")) {
-                    setStatus("已取消应用语言包");
-                    return;
-                }
-            }
-            bgOps.run("应用语言包", "正在应用语言包 …", () -> project.applyLanguagePack(pack),
-                    applied -> {
-                        refreshAfterModelChange(true);
-                        if (!project.lastMissing().isEmpty()) {
-                            showMissing();
-                            setStatus("语言包已应用：成功 " + applied + " 条，失效 "
-                                    + project.lastMissing().size() + " 条");
-                        } else {
-                            Dialogs.info("完成", "语言包已应用：" + applied + " 条翻译");
-                        }
-                    });
-        });
-    }
-
-    private void exportPack() {
-        if (!requireJar()) {
-            return;
-        }
-        Path file = askSaveFile("导出语言包", "langpack.json",
-                new FileChooser.ExtensionFilter("JSON 文件", "*.json"));
-        if (file == null) {
-            return;
-        }
-        // 作者取首选项默认值（settings.pack_author），不再每次弹窗询问
-        String author = settings.getString(Settings.Keys.PACK_AUTHOR).trim();
-        bgOps.run("导出语言包", "正在导出语言包 …", () -> {
-            project.exportPack(file, author);
-            return project.classStatus().size();
-        }, classStatusCount -> {
-            Dialogs.info("完成", "语言包已导出到：\n" + file
-                    + "\n作者：" + (author.isEmpty() ? "（未设置，可在首选项中填写）" : author)
-                    + "\n（含 " + classStatusCount + " 个类的手动状态标记）");
-            setStatus("语言包已导出");
-        });
-    }
-
-    /** 展示导入语言包时的失效条目列表（独立窗口）。 */
-    private void showMissing() {
-        new MissingEntriesWindow(this).show();
     }
 
     private SearchWindow searchWindow;
@@ -1178,7 +1030,8 @@ public class MainApp extends Application {
 
     // ---------- 其他 ----------
 
-    private boolean requireJar() {
+    /** 未打开 jar 时提示并返回 false（ioActions 各动作的前置检查）。 */
+    boolean requireJar() {
         if (!project.hasJar()) {
             Dialogs.info("提示", "请先打开一个 jar 文件。");
             return false;
@@ -1214,6 +1067,11 @@ public class MainApp extends Application {
     /** 记录一次译文变更（EditorPane 保存/清空后按生效值调用）。 */
     void recordTranslation(String cls, String orig, String before, String after) {
         undoRedo.recordTranslation(cls, orig, before, after);
+    }
+
+    /** 把一组替换变更合并为单条撤销记录（「全部替换」一步回滚）。 */
+    void recordBatchTranslation(List<Project.ReplaceChange> changes, String after) {
+        undoRedo.recordBatchTranslation(changes, after);
     }
 
     /** 记录「不翻译」切换。 */

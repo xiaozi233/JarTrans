@@ -2,7 +2,6 @@ package com.jartrans.ui;
 
 import com.jartrans.core.Settings;
 import com.jartrans.core.DictionaryManager;
-import com.jartrans.core.log.Log;
 import java.io.File;
 import java.nio.file.Path;
 import javafx.geometry.Insets;
@@ -22,8 +21,6 @@ import javafx.stage.Modality;
 
 /** 多词典管理：新建 / 重命名 / 删除 / 导入 / 导出 / 切换当前词典。对应 dict_manager_dialog.py。 */
 public class DictManagerDialog extends AppWindow {
-
-    private static final System.Logger LOG = Log.get(DictManagerDialog.class);
 
     private final DictionaryManager dicts;
     private final TableView<DictRow> table = new TableView<>();
@@ -129,17 +126,8 @@ public class DictManagerDialog extends AppWindow {
 
     /** 切换当前词典并同步全部词典窗口与主窗（新建/删除/激活三处共用）。 */
     private void switchTo(String name) {
-        try {
-            app.project().useDictionary(name);
-            app.settings().setOrIgnore(Settings.Keys.DICTIONARY, name);
-        } catch (Exception e) {
-            // 切换失败不阻断：词典已变更，界面照常刷新
-            LOG.log(System.Logger.Level.WARNING, "词典切换失败：" + name, e);
-        }
-        if (app.editor().currentClass() != null) {
-            app.editor().refreshRows();
-        }
-        syncApp();
+        // 切换协议（含主窗/各词典窗口同步）单点实现在 MainApp.switchDictionary
+        app.switchDictionary(name);
     }
 
     private void create() {

@@ -1,10 +1,14 @@
 package com.jartrans.ui;
 
+import com.jartrans.core.Project;
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * 撤销/重做控制器：把译文修改、「不翻译」标记、类状态手动标记三类操作记入
  * {@link EditHistory}，并负责回放（回放一律走 Project 的写入接口，成功后刷新界面）。
  *
- * <p>回放入口由 MainApp 转发，EditorPane / SearchWindow 的调用方式不变。</p>
+ * <p>批量操作（全部替换等）合并为一条 {@link EditHistory.Batch}，一次撤销整体回滚。</p>
  */
 final class UndoRedo {
 
@@ -21,6 +25,18 @@ final class UndoRedo {
             return;
         }
         history.push(new EditHistory.Hist("trans", cls, orig, before, after));
+    }
+
+    /** 把一组替换变更合并为单条撤销记录（「全部替换」一步回滚）。 */
+    void recordBatchTranslation(List<Project.ReplaceChange> changes, String after) {
+        if (changes.isEmpty()) {
+            return;
+        }
+        List<EditHistory.Hist> items = new ArrayList<>(changes.size());
+        for (Project.ReplaceChange c : changes) {
+            items.add(new EditHistory.Hist("trans", c.cls(), c.orig(), c.before(), after));
+        }
+        history.push(new EditHistory.Batch("trans", items));
     }
 
     /** 记录「不翻译」切换。 */
@@ -47,9 +63,9 @@ final class UndoRedo {
             app.setStatus("没有可撤销的操作");
             return;
         }
-        EditHistory.Hist h = history.takeUndo();
-        apply(h, h.before());
-        app.setStatus("已撤销：" + label(h.kind()));
+        EditHistory.Op op = history.takeUndo();
+        applyOp(op, true);
+        app.setStatus("已撤销：" + labelOf(op));
     }
 
     void redo() {
@@ -57,9 +73,16 @@ final class UndoRedo {
             app.setStatus("没有可重做的操作");
             return;
         }
-        EditHistory.Hist h = history.takeRedo();
-        apply(h, h.after());
-        app.setStatus("已重做：" + label(h.kind()));
+        EditHistory.Op op = history.takeRedo();
+        applyOp(op, false);
+        app.setStatus("已重做：" + labelOf(op));
+    }
+
+    private static String labelOf(EditHistory.Op op) {
+        if (op instanceof EditHistory.Batch b) {
+            return label(b.kind()) + "（" + b.items().size() + " 条）";
+        }
+        return label(((EditHistory.Hist) op).kind());
     }
 
     private static String label(String kind) {
@@ -69,6 +92,22 @@ final class UndoRedo {
             case "mark" -> "类状态标记";
             default -> kind;
         };
+    }
+
+    /** 回放单条或整批操作；undoing 决定写回 before（撤销）还是 after（重做）。 */
+    private void applyOp(EditHistory.Op op, boolean undoing) {
+        if (op instanceof EditHistory.Hist h) {
+            apply(h, undoing ? h.before() : h.after());
+            return;
+        }
+        EditHistory.Batch b = (EditHistory.Batch) op;
+        List<EditHistory.Hist> items = b.items();
+        for (int i = undoing ? items.size() - 1 : 0;
+                undoing ? i >= 0 : i < items.size();
+                i += undoing ? -1 : 1) {
+            EditHistory.Hist h = items.get(i);
+            apply(h, undoing ? h.before() : h.after());
+        }
     }
 
     /** 把某条历史操作的目标值写回工程并刷新界面。 */

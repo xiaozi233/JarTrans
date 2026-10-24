@@ -1,6 +1,7 @@
 package com.jartrans.ui;
 
 import java.util.ArrayDeque;
+import java.util.List;
 
 /**
  * 撤销/重做历史栈：译文修改、不翻译标记、类状态手动标记三类操作的记录容器。
@@ -15,14 +16,23 @@ public final class EditHistory {
     private static final int LIMIT = 200;
 
     /** 一条可撤销操作。kind: trans(译文) / skip(不翻译) / mark(类状态)。 */
-    public record Hist(String kind, String cls, String orig, String before, String after) {
+    public record Hist(String kind, String cls, String orig, String before, String after)
+            implements Op {
     }
 
-    private final ArrayDeque<Hist> undoStack = new ArrayDeque<>();
-    private final ArrayDeque<Hist> redoStack = new ArrayDeque<>();
+    /** 一批同源操作（如「全部替换」）：撤销/重做时按入栈逆序整体回放，一步完成。 */
+    public record Batch(String kind, List<Hist> items) implements Op {
+    }
+
+    /** 历史栈中的可撤销单元：单条（Hist）或合并批次（Batch）。 */
+    public interface Op {
+    }
+
+    private final ArrayDeque<Op> undoStack = new ArrayDeque<>();
+    private final ArrayDeque<Op> redoStack = new ArrayDeque<>();
 
     /** 压入一条新操作：清空重做栈；撤销栈超过容量时丢弃最旧的。 */
-    public void push(Hist h) {
+    public void push(Op h) {
         undoStack.addFirst(h);
         if (undoStack.size() > LIMIT) {
             undoStack.removeLast();
@@ -39,15 +49,15 @@ public final class EditHistory {
     }
 
     /** 取出最近一条待撤销操作（同时移入重做栈）。 */
-    public Hist takeUndo() {
-        Hist h = undoStack.removeFirst();
+    public Op takeUndo() {
+        Op h = undoStack.removeFirst();
         redoStack.addFirst(h);
         return h;
     }
 
     /** 取出最近一条待重做操作（同时移回撤销栈）。 */
-    public Hist takeRedo() {
-        Hist h = redoStack.removeFirst();
+    public Op takeRedo() {
+        Op h = redoStack.removeFirst();
         undoStack.addFirst(h);
         return h;
     }

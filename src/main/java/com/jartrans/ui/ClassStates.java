@@ -38,6 +38,17 @@ public final class ClassStates {
     /** 类状态下拉的显示项：「自动」+ 可手动选择的状态。 */
     public static final List<String> SELECTABLE_LABELS = selectableLabels();
 
+    /** 全部类状态键的固定展示顺序（图例、状态图等）。 */
+    public static final List<String> ALL =
+            List.of("todo", "doing", "done", "ignore", "empty");
+
+    /** 状态栏统计的固定展示顺序。 */
+    public static final List<String> STATS_ORDER =
+            List.of("done", "doing", "todo", "ignore");
+
+    /** 字符串条目状态键 → 显示文案（表格「状态」列、搜索窗口等）。 */
+    public static final Map<String, String> ENTRY_LABELS = entryLabels();
+
     private ClassStates() {
     }
 
@@ -90,6 +101,16 @@ public final class ClassStates {
         m.put("doing", "翻译中");
         m.put("done", "已完成");
         m.put("ignore", "已忽略");
+        return Collections.unmodifiableMap(m);
+    }
+
+    private static Map<String, String> entryLabels() {
+        Map<String, String> m = new LinkedHashMap<>();
+        m.put("untranslated", "未翻译");
+        m.put("translated", "已翻译");
+        m.put("auto", "自动");
+        m.put("internal", "内部·只读");
+        m.put("skipped", "不翻译");
         return Collections.unmodifiableMap(m);
     }
 }
