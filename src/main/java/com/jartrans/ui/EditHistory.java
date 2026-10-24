@@ -16,17 +16,13 @@ public final class EditHistory {
     private static final int LIMIT = 200;
 
     /** 一条可撤销操作。kind: trans(译文) / skip(不翻译) / mark(类状态)。 */
-    public record Hist(String kind, String cls, String orig, String before, String after)
-            implements Op {
-    }
+    public record Hist(String kind, String cls, String orig, String before, String after) implements Op {}
 
     /** 一批同源操作（如「全部替换」）：撤销/重做时按入栈逆序整体回放，一步完成。 */
-    public record Batch(String kind, List<Hist> items) implements Op {
-    }
+    public record Batch(String kind, List<Hist> items) implements Op {}
 
     /** 历史栈中的可撤销单元：单条（Hist）或合并批次（Batch）。 */
-    public interface Op {
-    }
+    public interface Op {}
 
     private final ArrayDeque<Op> undoStack = new ArrayDeque<>();
     private final ArrayDeque<Op> redoStack = new ArrayDeque<>();

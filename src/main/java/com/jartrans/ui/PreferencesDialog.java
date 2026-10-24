@@ -4,8 +4,6 @@ import com.jartrans.core.Settings;
 import com.jartrans.core.java.DecompilerManager;
 import com.jartrans.core.java.DecompilerType;
 import java.util.Arrays;
-
-import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
@@ -49,8 +47,7 @@ public class PreferencesDialog extends AppWindow {
     private final Label hintLabel = new Label("");
     private String recordingId; // 非 null 时正在录制该动作的新快捷键
 
-    private record ShortcutRow(String id, String label) {
-    }
+    private record ShortcutRow(String id, String label) {}
 
     public PreferencesDialog(MainApp app) {
         super(app, "首选项", 680, 620, 600, 520, Modality.WINDOW_MODAL);
@@ -68,11 +65,11 @@ public class PreferencesDialog extends AppWindow {
         legendVisible.setOnAction(e -> app.applyLegendVisible(legendVisible.isSelected()));
         hideEmpty.setSelected(app.hideEmptyEnabled());
         hideEmpty.setOnAction(e -> app.applyHideEmpty(hideEmpty.isSelected()));
-        statusFilterBox.getItems().setAll(
-                MainApp.STATE_FILTERS.stream().map(f -> f[1]).toList());
+        statusFilterBox
+                .getItems()
+                .setAll(MainApp.STATE_FILTERS.stream().map(f -> f[1]).toList());
         statusFilterBox.setValue(MainApp.stateLabelOfKey(app.statusFilterKey()));
-        statusFilterBox.setOnAction(e ->
-                app.applyStatusFilter(MainApp.stateKeyOfLabel(statusFilterBox.getValue())));
+        statusFilterBox.setOnAction(e -> app.applyStatusFilter(MainApp.stateKeyOfLabel(statusFilterBox.getValue())));
         HBox statusRow = new HBox(10, new Label("类列表默认状态筛选："), statusFilterBox);
         statusRow.setAlignment(Pos.CENTER_LEFT);
 
@@ -103,9 +100,11 @@ public class PreferencesDialog extends AppWindow {
 
         // ---------- 源码查看 ----------
         Label secSource = section("源码查看");
-        decompilerBox.getItems().setAll(
-                Arrays.stream(DecompilerType.values())
-                        .map(DecompilerType::displayName).toList());
+        decompilerBox
+                .getItems()
+                .setAll(Arrays.stream(DecompilerType.values())
+                        .map(DecompilerType::displayName)
+                        .toList());
         decompilerBox.setValue(currentDecompilerDisplayName());
         decompilerBox.setPrefWidth(180);
         decompilerBox.setOnAction(e -> applyDecompilerChoice());
@@ -114,14 +113,11 @@ public class PreferencesDialog extends AppWindow {
 
         // ---------- 快捷键 ----------
         Label secShortcut = section("快捷键（点击组合可修改）");
-        TableColumn<ShortcutRow, String> colName =
-                TableColumns.text("功能", 240, ShortcutRow::label);
-        TableColumn<ShortcutRow, String> colKey =
-                TableColumns.text("组合键", 160, r -> app.shortcutText(r.id()));
+        TableColumn<ShortcutRow, String> colName = TableColumns.text("功能", 240, ShortcutRow::label);
+        TableColumn<ShortcutRow, String> colKey = TableColumns.text("组合键", 160, r -> app.shortcutText(r.id()));
         //noinspection unchecked
         shortcutTable.getColumns().addAll(colName, colKey);
-        shortcutTable.setColumnResizePolicy(
-                TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
+        shortcutTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
         shortcutTable.setPrefHeight(180);
         shortcutTable.setPlaceholder(new Label("（无）"));
         for (String[] d : Shortcuts.DEFS) {
@@ -138,8 +134,7 @@ public class PreferencesDialog extends AppWindow {
             }
             app.resetShortcut(row.id());
             shortcutTable.refresh();
-            status("已恢复「" + row.label() + "」为默认："
-                    + app.shortcutText(row.id()));
+            status("已恢复「" + row.label() + "」为默认：" + app.shortcutText(row.id()));
         });
         Button resetAllBtn = new Button("全部恢复默认");
         resetAllBtn.setOnAction(e -> {
@@ -151,11 +146,26 @@ public class PreferencesDialog extends AppWindow {
         shortcutButtons.setAlignment(Pos.CENTER_LEFT);
 
         // ---------- 组装 ----------
-        VBox body = new VBox(10, secAppearance, themeRow, legendVisible, hideEmpty,
-                statusRow, secTranslate, onlyUntranslated, saveToDict,
-                autoSaveTrans, dblclickSource, secPack, authorRow,
-                secSource, decompilerRow, secShortcut,
-                shortcutTable, shortcutButtons, hintLabel);
+        VBox body = new VBox(
+                10,
+                secAppearance,
+                themeRow,
+                legendVisible,
+                hideEmpty,
+                statusRow,
+                secTranslate,
+                onlyUntranslated,
+                saveToDict,
+                autoSaveTrans,
+                dblclickSource,
+                secPack,
+                authorRow,
+                secSource,
+                decompilerRow,
+                secShortcut,
+                shortcutTable,
+                shortcutButtons,
+                hintLabel);
         VBox.setVgrow(shortcutTable, Priority.ALWAYS);
         ScrollPane scroller = new ScrollPane(body);
         scroller.setFitToWidth(true);
@@ -199,7 +209,8 @@ public class PreferencesDialog extends AppWindow {
     }
 
     private void applyAuthor() {
-        app.settings().setOrIgnore(Settings.Keys.PACK_AUTHOR, authorField.getText().trim());
+        app.settings()
+                .setOrIgnore(Settings.Keys.PACK_AUTHOR, authorField.getText().trim());
     }
 
     /** 下拉初始显示：当前实际生效的引擎。 */

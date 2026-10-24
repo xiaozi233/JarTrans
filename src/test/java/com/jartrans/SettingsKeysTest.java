@@ -1,8 +1,8 @@
 package com.jartrans;
 
-import com.jartrans.core.Settings;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.jartrans.core.Settings;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
@@ -12,8 +12,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
-
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
 
 /**
  * 守护约定：
@@ -24,8 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class SettingsKeysTest {
 
-    private static final Pattern USAGE = Pattern.compile(
-            "(?:settings|app\\.settings\\(\\))\\.(?:set|setQuiet|setOrIgnore|get|getBool|getString)"
+    private static final Pattern USAGE =
+            Pattern.compile("(?:settings|app\\.settings\\(\\))\\.(?:set|setQuiet|setOrIgnore|get|getBool|getString)"
                     + "\\(\"([A-Za-z_][A-Za-z0-9_]*)\"");
 
     @Test
@@ -39,15 +38,12 @@ class SettingsKeysTest {
                 while (m.find()) {
                     String key = m.group(1);
                     if (!defaults.contains(key) && !key.startsWith("key_")) {
-                        offenders.append('\n').append(key)
-                                .append("  @ ").append(p.getFileName());
+                        offenders.append('\n').append(key).append("  @ ").append(p.getFileName());
                     }
                 }
             }
         }
-        assertTrue(offenders.isEmpty(),
-                "以下 settings 键以字面量访问且未登记（应改用 Settings.Keys 常量）："
-                        + offenders);
+        assertTrue(offenders.isEmpty(), "以下 settings 键以字面量访问且未登记（应改用 Settings.Keys 常量）：" + offenders);
     }
 
     @Test
@@ -63,7 +59,6 @@ class SettingsKeysTest {
                 offenders.append('\n').append(f.getName()).append(" = ").append(key);
             }
         }
-        assertTrue(offenders.isEmpty(),
-                "Settings.Keys 以下常量未在 defaults() 登记默认值：" + offenders);
+        assertTrue(offenders.isEmpty(), "Settings.Keys 以下常量未在 defaults() 登记默认值：" + offenders);
     }
 }

@@ -36,16 +36,15 @@ public class SearchWindow extends AppWindow {
     private final TableView<SearchRow> table = new TableView<>();
     private final Label countLabel = new Label("");
     private final TextField replaceField = new TextField();
-    private final PauseTransition debounce =
-            new PauseTransition(Duration.millis(160));
+    private final PauseTransition debounce = new PauseTransition(Duration.millis(160));
     /** 异步搜索代际：只显示最新一次请求的结果（旧请求完成即丢弃）。 */
     private final AtomicInteger searchGeneration = new AtomicInteger();
     /** 状态色缓存（按调色板失效；Color.web 解析不再每行重复执行）。 */
     private final Map<String, Color> statusColors = new LinkedHashMap<>();
+
     private Map<String, String> statusColorsPalette;
 
-    private record SearchRow(String cls, String orig, String trans, String statusKey) {
-    }
+    private record SearchRow(String cls, String orig, String trans, String statusKey) {}
 
     private static final Map<String, String> SCOPE_MAP = new LinkedHashMap<>();
 
@@ -89,14 +88,11 @@ public class SearchWindow extends AppWindow {
         repAllBtn.setOnAction(e -> replaceAll());
         Label repTip = new Label("Ctrl+R 聚焦此框");
         repTip.setStyle("-fx-text-fill: -jr-muted;");
-        replaceRow.getChildren().addAll(new Label("替换为："), replaceField,
-                repSelBtn, repAllBtn, repTip);
+        replaceRow.getChildren().addAll(new Label("替换为："), replaceField, repSelBtn, repAllBtn, repTip);
 
         TableColumn<SearchRow, String> colCls = TableColumns.text("类", 240, SearchRow::cls);
-        TableColumn<SearchRow, String> colOrig =
-                TableColumns.text("原字符串", 330, r -> Texts.displayText(r.orig()));
-        TableColumn<SearchRow, String> colTrans =
-                TableColumns.text("译文", 260, r -> Texts.displayText(r.trans()));
+        TableColumn<SearchRow, String> colOrig = TableColumns.text("原字符串", 330, r -> Texts.displayText(r.orig()));
+        TableColumn<SearchRow, String> colTrans = TableColumns.text("译文", 260, r -> Texts.displayText(r.trans()));
         TableColumn<SearchRow, String> colStatus =
                 TableColumns.text("状态", 90, r -> EditorPane.STATUS_TEXT.get(r.statusKey()));
         colStatus.setCellFactory(c -> new TableCell<>() {
@@ -111,8 +107,7 @@ public class SearchWindow extends AppWindow {
         });
         //noinspection unchecked
         table.getColumns().addAll(colCls, colOrig, colTrans, colStatus);
-        table.setColumnResizePolicy(
-                TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
         // 双击跳转：行工厂里挂一次，避免旧实现在每次 updateItem 里重复设置处理器
         table.setRowFactory(tv -> {
             TableRow<SearchRow> row = new TableRow<>();
@@ -146,12 +141,12 @@ public class SearchWindow extends AppWindow {
         queryField.setOnAction(e -> doSearch());
 
         // 窗口内快捷键：Ctrl+F 聚焦搜索框、Ctrl+R 聚焦替换框
-        getScene().getAccelerators().put(
-                new KeyCodeCombination(KeyCode.F, KeyCombination.CONTROL_DOWN),
-                queryField::requestFocus);
-        getScene().getAccelerators().put(
-                new KeyCodeCombination(KeyCode.R, KeyCombination.CONTROL_DOWN),
-                replaceField::requestFocus);
+        getScene()
+                .getAccelerators()
+                .put(new KeyCodeCombination(KeyCode.F, KeyCombination.CONTROL_DOWN), queryField::requestFocus);
+        getScene()
+                .getAccelerators()
+                .put(new KeyCodeCombination(KeyCode.R, KeyCombination.CONTROL_DOWN), replaceField::requestFocus);
 
         queryField.setText(initial == null ? "" : initial);
         if (!queryField.getText().isBlank()) {
@@ -179,8 +174,8 @@ public class SearchWindow extends AppWindow {
             statusColors.clear();
             statusColorsPalette = palette;
         }
-        return statusColors.computeIfAbsent(statusKey,
-                k -> Color.web(app.theme().statusColor(k)));
+        return statusColors.computeIfAbsent(
+                statusKey, k -> Color.web(app.theme().statusColor(k)));
     }
 
     private void doSearch() {
@@ -195,19 +190,21 @@ public class SearchWindow extends AppWindow {
         int generation = searchGeneration.incrementAndGet();
         countLabel.setText("搜索中…");
         // 全库线性扫描放后台线程，大 jar 不冻结界面；按代际丢弃过期结果
-        Thread worker = new Thread(() -> {
-            List<SearchRow> rows = new ArrayList<>();
-            for (Project.SearchResult r : app.project().search(keyword, scope)) {
-                rows.add(new SearchRow(r.cls(), r.orig(), r.trans(), r.status().key));
-            }
-            javafx.application.Platform.runLater(() -> {
-                if (generation != searchGeneration.get()) {
-                    return; // 已有更新的搜索在途/完成，丢弃本次结果
-                }
-                table.getItems().setAll(rows);
-                countLabel.setText(rows.isEmpty() ? "没有匹配结果" : rows.size() + " 条结果");
-            });
-        }, "jartrans-search");
+        Thread worker = new Thread(
+                () -> {
+                    List<SearchRow> rows = new ArrayList<>();
+                    for (Project.SearchResult r : app.project().search(keyword, scope)) {
+                        rows.add(new SearchRow(r.cls(), r.orig(), r.trans(), r.status().key));
+                    }
+                    javafx.application.Platform.runLater(() -> {
+                        if (generation != searchGeneration.get()) {
+                            return; // 已有更新的搜索在途/完成，丢弃本次结果
+                        }
+                        table.getItems().setAll(rows);
+                        countLabel.setText(rows.isEmpty() ? "没有匹配结果" : rows.size() + " 条结果");
+                    });
+                },
+                "jartrans-search");
         worker.setDaemon(true);
         worker.start();
     }
@@ -219,8 +216,8 @@ public class SearchWindow extends AppWindow {
             return;
         }
         String replacement = replaceField.getText();
-        List<Project.ReplaceChange> changes = app.project().replaceTranslations(
-                List.of(new Project.ReplaceTarget(row.cls(), row.orig())), replacement);
+        List<Project.ReplaceChange> changes = app.project()
+                .replaceTranslations(List.of(new Project.ReplaceTarget(row.cls(), row.orig())), replacement);
         if (changes.isEmpty()) {
             Dialogs.info("提示", "该行无需替换（译文相同或为「不翻译」）。");
             return;
@@ -240,21 +237,25 @@ public class SearchWindow extends AppWindow {
         String replacement = replaceField.getText();
         long diff = rows.stream()
                 .filter(r -> !app.project().isSkipped(r.orig())
-                        && !app.project().effective(r.cls())
-                                .getOrDefault(r.orig(), "").equals(replacement))
+                        && !app.project()
+                                .effective(r.cls())
+                                .getOrDefault(r.orig(), "")
+                                .equals(replacement))
                 .count();
         if (diff == 0) {
             Dialogs.info("提示", "所有结果的译文都已与目标一致，无需替换。");
             return;
         }
-        if (!Dialogs.confirm("全部替换",
+        if (!Dialogs.confirm(
+                "全部替换",
                 "将把当前 " + diff + " 条匹配结果的译文全部替换为：\n\n「"
                         + Texts.displayText(replacement) + "」\n\n"
                         + "（跳过已标记「不翻译」的行；可 Ctrl+Z 一步撤销）\n确定继续吗？")) {
             return;
         }
         List<Project.ReplaceTarget> targets = rows.stream()
-                .map(r -> new Project.ReplaceTarget(r.cls(), r.orig())).toList();
+                .map(r -> new Project.ReplaceTarget(r.cls(), r.orig()))
+                .toList();
         // 跳过规则与写入由 core 单点执行；变更合并为单条撤销记录
         List<Project.ReplaceChange> changes = app.project().replaceTranslations(targets, replacement);
         app.recordBatchTranslation(changes, replacement);

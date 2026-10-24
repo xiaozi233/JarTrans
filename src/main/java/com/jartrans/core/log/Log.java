@@ -9,8 +9,7 @@ package com.jartrans.core.log;
  */
 public final class Log {
 
-    private Log() {
-    }
+    private Log() {}
 
     public static System.Logger get(Class<?> type) {
         return System.getLogger(type.getName());

@@ -1,20 +1,18 @@
 package com.jartrans;
 
-import com.jartrans.core.ModifiedUTF8;
-import org.junit.jupiter.api.Test;
-
-import java.nio.charset.StandardCharsets;
-
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import com.jartrans.core.ModifiedUTF8;
+import java.nio.charset.StandardCharsets;
+import org.junit.jupiter.api.Test;
 
 /** 对应 selftest.py 的 test_mutf8。 */
 class ModifiedUtf8Test {
 
     @Test
     void roundTrip() {
-        String[] cases = {"", "abc", "你好，世界！", "\u0000", "😀", "a\ud83d\ude00b",
-                "mix中en文", "换行\n制表\t"};
+        String[] cases = {"", "abc", "你好，世界！", "\u0000", "😀", "a\ud83d\ude00b", "mix中en文", "换行\n制表\t"};
         for (String s : cases) {
             assertEquals(s, ModifiedUTF8.decode(ModifiedUTF8.encode(s)), "round trip: " + s);
         }
@@ -22,9 +20,8 @@ class ModifiedUtf8Test {
 
     @Test
     void zeroEncoding() {
-        assertArrayEquals(new byte[]{(byte) 0xC0, (byte) 0x80},
-                ModifiedUTF8.encode("\u0000"));
-        assertEquals("\u0000", ModifiedUTF8.decode(new byte[]{(byte) 0xC0, (byte) 0x80}));
+        assertArrayEquals(new byte[] {(byte) 0xC0, (byte) 0x80}, ModifiedUTF8.encode("\u0000"));
+        assertEquals("\u0000", ModifiedUTF8.decode(new byte[] {(byte) 0xC0, (byte) 0x80}));
     }
 
     @Test
@@ -34,15 +31,13 @@ class ModifiedUtf8Test {
 
     @Test
     void invalidBytesBecomeReplacementChar() {
-        assertEquals("\uFFFD", ModifiedUTF8.decode(new byte[]{(byte) 0xFF}));
+        assertEquals("\uFFFD", ModifiedUTF8.decode(new byte[] {(byte) 0xFF}));
         // 截断序列容错，不抛异常
-        assertEquals("\uFFFD\uFFFD", ModifiedUTF8.decode(
-                new byte[]{(byte) 0xE4, (byte) 0xBD}));
+        assertEquals("\uFFFD\uFFFD", ModifiedUTF8.decode(new byte[] {(byte) 0xE4, (byte) 0xBD}));
     }
 
     @Test
     void asciiPassthrough() {
-        assertArrayEquals("abc".getBytes(StandardCharsets.US_ASCII),
-                ModifiedUTF8.encode("abc"));
+        assertArrayEquals("abc".getBytes(StandardCharsets.US_ASCII), ModifiedUTF8.encode("abc"));
     }
 }

@@ -21,6 +21,7 @@ public final class Dictionary {
     private final Map<String, String> data = new LinkedHashMap<>(); // 原字符串 -&gt; 译文
     /** search 用的平行小写索引（惰性构建）；数据变更时置空重建。 */
     private List<Map.Entry<String, String>> searchIndex;
+
     private String[] lowerKeys;
     private String[] lowerValues;
 
@@ -122,8 +123,7 @@ public final class Dictionary {
     }
 
     public void add(String orig, String trans) {
-        if (orig != null && !orig.isEmpty() && trans != null && !trans.isEmpty()
-                && !trans.equals(orig)) {
+        if (orig != null && !orig.isEmpty() && trans != null && !trans.isEmpty() && !trans.equals(orig)) {
             data.put(orig, trans);
             invalidateSearchIndex();
         }

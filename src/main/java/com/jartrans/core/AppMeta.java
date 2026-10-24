@@ -6,6 +6,5 @@ public final class AppMeta {
     public static final String APP_NAME = "JarTrans";
     public static final String APP_TAGLINE = "JAR 汉化工具";
 
-    private AppMeta() {
-    }
+    private AppMeta() {}
 }

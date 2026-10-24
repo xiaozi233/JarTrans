@@ -5,8 +5,7 @@ import java.nio.file.Path;
 /** 程序目录定位：settings.json、dictionaries/、class_status.json 的基准目录。 */
 public final class AppDirs {
 
-    private AppDirs() {
-    }
+    private AppDirs() {}
 
     /**
      * 基准目录：优先系统属性 jartrans.dir，否则用当前工作目录。
@@ -16,9 +15,7 @@ public final class AppDirs {
      */
     public static Path baseDir() {
         String prop = System.getProperty("jartrans.dir", "");
-        return (prop == null || prop.isEmpty())
-                ? Path.of(System.getProperty("user.dir"))
-                : Path.of(prop);
+        return (prop == null || prop.isEmpty()) ? Path.of(System.getProperty("user.dir")) : Path.of(prop);
     }
 
     public static Path settingsFile() {

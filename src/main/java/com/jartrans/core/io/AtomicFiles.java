@@ -8,8 +8,7 @@ import java.nio.file.StandardCopyOption;
 
 /** Writes complete files before replacing the destination, using a unique sibling temporary file. */
 public final class AtomicFiles {
-    private AtomicFiles() {
-    }
+    private AtomicFiles() {}
 
     @FunctionalInterface
     public interface Writer {
@@ -35,8 +34,7 @@ public final class AtomicFiles {
 
     public static void replace(Path source, Path destination) throws IOException {
         try {
-            Files.move(source, destination, StandardCopyOption.REPLACE_EXISTING,
-                    StandardCopyOption.ATOMIC_MOVE);
+            Files.move(source, destination, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         } catch (AtomicMoveNotSupportedException ignored) {
             Files.move(source, destination, StandardCopyOption.REPLACE_EXISTING);
         }

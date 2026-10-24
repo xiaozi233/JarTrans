@@ -18,8 +18,7 @@ public final class LangPack {
 
     public static final int FORMAT_VERSION = 1;
 
-    private LangPack() {
-    }
+    private LangPack() {}
 
     /** 语言包格式错误。 */
     public static class LangPackException extends Exception {
@@ -36,8 +35,7 @@ public final class LangPack {
     }
 
     /** 一条失效条目：类路径 + 原字符串 + 译文。 */
-    public record MissingEntry(String cls, String orig, String trans) {
-    }
+    public record MissingEntry(String cls, String orig, String trans) {}
 
     public static String computeSha256(Path path) throws IOException {
         MessageDigest digest;
@@ -60,10 +58,12 @@ public final class LangPack {
         return hex.toString();
     }
 
-    public static Map<String, Object> buildPack(String jarName, String jarSha256,
-                                                String author,
-                                                Map<String, Map<String, String>> entries,
-                                                Map<String, String> classStatus) {
+    public static Map<String, Object> buildPack(
+            String jarName,
+            String jarSha256,
+            String author,
+            Map<String, Map<String, String>> entries,
+            Map<String, String> classStatus) {
         Map<String, Object> pack = new LinkedHashMap<>();
         pack.put("format_version", (long) FORMAT_VERSION);
         pack.put("target_jar", jarName);
@@ -106,19 +106,16 @@ public final class LangPack {
      * applied = {类路径: {原字符串: 译文}}，仅含类和字符串都存在的条目；
      * missing = 失效条目列表（类或字符串已不存在）。
      */
-    public static MatchResult matchPack(Map<String, Object> pack,
-                                        Map<String, ? extends Set<String>> classTexts) {
+    public static MatchResult matchPack(Map<String, Object> pack, Map<String, ? extends Set<String>> classTexts) {
         Map<String, Map<String, String>> applied = new LinkedHashMap<>();
         List<MissingEntry> missing = new ArrayList<>();
-        Map<String, Object> entries =
-                Json.object(pack.get("entries"));
+        Map<String, Object> entries = Json.object(pack.get("entries"));
         if (entries == null) {
             return new MatchResult(applied, missing);
         }
         for (Map.Entry<String, Object> e : entries.entrySet()) {
             String cls = e.getKey();
-            Map<String, Object> pairs =
-                    Json.object(e.getValue());
+            Map<String, Object> pairs = Json.object(e.getValue());
             if (pairs == null) {
                 continue;
             }
@@ -148,9 +145,7 @@ public final class LangPack {
         return new MatchResult(applied, missing);
     }
 
-    public record MatchResult(Map<String, Map<String, String>> applied,
-                              List<MissingEntry> missing) {
-    }
+    public record MatchResult(Map<String, Map<String, String>> applied, List<MissingEntry> missing) {}
 
     static String str(Object o) {
         return o == null ? "" : String.valueOf(o);

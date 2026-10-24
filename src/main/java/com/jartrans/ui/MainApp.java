@@ -1,12 +1,10 @@
 package com.jartrans.ui;
 
 import com.jartrans.core.AppMeta;
-import com.jartrans.core.LangPack;
 import com.jartrans.core.Project;
 import com.jartrans.core.Settings;
 import com.jartrans.core.java.DecompilerManager;
-import java.io.File;
-import java.nio.file.Path;
+import com.jartrans.core.log.Log;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -15,7 +13,6 @@ import java.util.function.BiConsumer;
 import javafx.animation.PauseTransition;
 import javafx.application.Application;
 import javafx.application.Platform;
-import javafx.concurrent.Task;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -50,10 +47,8 @@ import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.shape.Circle;
-import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.util.Duration;
-import com.jartrans.core.log.Log;
 
 /**
  * JavaFX 主应用与控制器（对应 Python gui/app.py）。
@@ -77,10 +72,9 @@ public class MainApp extends Application {
     /** 重操作统一后台执行（互斥单飞：进行中拒绝并发触发）。 */
     private BackgroundOps bgOps;
     /** 输入防抖：过滤框每字符即时过滤、工具栏搜索框即时反馈。 */
-    private final PauseTransition filterDebounce =
-            new PauseTransition(Duration.millis(120));
-    private final PauseTransition searchDebounce =
-            new PauseTransition(Duration.millis(180));
+    private final PauseTransition filterDebounce = new PauseTransition(Duration.millis(120));
+
+    private final PauseTransition searchDebounce = new PauseTransition(Duration.millis(180));
 
     /** 重操作后台执行器（ProjectIoActions 等协作者使用）。 */
     BackgroundOps bgOps() {
@@ -98,44 +92,64 @@ public class MainApp extends Application {
     // ---------- FXML 控件 ----------
     @FXML
     private CheckMenuItem showInternalItem;
+
     @FXML
     private CheckMenuItem hideEmptyItem;
+
     @FXML
     private RadioMenuItem themeSystemItem;
+
     @FXML
     private RadioMenuItem themeLightItem;
+
     @FXML
     private RadioMenuItem themeDarkItem;
+
     @FXML
     private ToggleGroup themeGroup;
+
     @FXML
     private ComboBox<String> dictBox;
+
     @FXML
     private TextField searchField;
+
     @FXML
     private TextField filterField;
+
     @FXML
     private ComboBox<String> statusBox;
+
     @FXML
     private CheckBox hideEmptyCheck;
+
     @FXML
     private FlowPane legendBox;
+
     @FXML
     private TreeView<String> classTree;
+
     @FXML
     private TabPane tabPane;
+
     @FXML
     private Tab editorTab;
+
     @FXML
     private Tab sourceTab;
+
     @FXML
     private EditorPane editor;
+
     @FXML
     private SourcePanel sourcePanel;
+
     @FXML
     private Label statusLabel;
+
     @FXML
     private ProgressBar progressBar;
+
     @FXML
     private Label statsLabel;
 
@@ -184,10 +198,8 @@ public class MainApp extends Application {
         showInternalItem.setSelected(false);
         hideEmptyItem.setSelected(settings.getBool(Settings.Keys.HIDE_EMPTY));
         hideEmptyCheck.setSelected(settings.getBool(Settings.Keys.HIDE_EMPTY));
-        hideEmptyItem.selectedProperty().addListener((o, ov, nv) ->
-                hideEmptyCheck.setSelected(nv));
-        hideEmptyCheck.selectedProperty().addListener((o, ov, nv) ->
-                hideEmptyItem.setSelected(nv));
+        hideEmptyItem.selectedProperty().addListener((o, ov, nv) -> hideEmptyCheck.setSelected(nv));
+        hideEmptyCheck.selectedProperty().addListener((o, ov, nv) -> hideEmptyItem.setSelected(nv));
 
         // 词典切换
         dictBox.valueProperty().addListener((o, ov, nv) -> onDictSelected(nv));
@@ -245,8 +257,7 @@ public class MainApp extends Application {
         classTree.getSelectionModel().selectedItemProperty().addListener((o, ov, nv) -> onTreeSelect(nv));
         // 左键点树任意处即收起右键菜单（修复右键后再左键点同类不关闭）
         classTree.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
-            if (e.getButton() == MouseButton.PRIMARY
-                    && lastTreeMenu != null && lastTreeMenu.isShowing()) {
+            if (e.getButton() == MouseButton.PRIMARY && lastTreeMenu != null && lastTreeMenu.isShowing()) {
                 lastTreeMenu.hide();
             }
         });
@@ -286,8 +297,7 @@ public class MainApp extends Application {
         for (String st : ClassStates.ALL) {
             Circle dot = new Circle(4);
             dot.getStyleClass().addAll("state-dot", "cell-state-" + st);
-            Tooltip.install(dot,
-                    new Tooltip(STATE_LABEL.get(st)));
+            Tooltip.install(dot, new Tooltip(STATE_LABEL.get(st)));
             Label text = new Label(STATE_LABEL.get(st));
             text.getStyleClass().addAll("legend-txt", "cell-state-" + st);
             text.setStyle("-fx-font-size: 11px;");
@@ -467,13 +477,15 @@ public class MainApp extends Application {
 
     @FXML
     public void onAbout(ActionEvent e) {
-        Dialogs.info("关于", AppMeta.APP_NAME + " — " + AppMeta.APP_TAGLINE + "\n"
-                + "Java + JavaFX 版，核心引擎仅用 JDK 标准库实现，不依赖字节码库。\n\n"
-                + "原理：只重定向常量池中的字符串引用并追加新条目，\n"
-                + "不改动、不移动任何原有常量和字节码结构。\n"
-                + "写回前会自动做结构校验，确保 class 文件可被 JVM 正常加载。\n\n"
-                + "支持浅色/深色/跟随系统主题、多词典切换、类状态标记与过滤、\n"
-                + "内置 Vineflower / CFR / Procyon 三种反编译器，开箱即用。");
+        Dialogs.info(
+                "关于",
+                AppMeta.APP_NAME + " — " + AppMeta.APP_TAGLINE + "\n"
+                        + "Java + JavaFX 版，核心引擎仅用 JDK 标准库实现，不依赖字节码库。\n\n"
+                        + "原理：只重定向常量池中的字符串引用并追加新条目，\n"
+                        + "不改动、不移动任何原有常量和字节码结构。\n"
+                        + "写回前会自动做结构校验，确保 class 文件可被 JVM 正常加载。\n\n"
+                        + "支持浅色/深色/跟随系统主题、多词典切换、类状态标记与过滤、\n"
+                        + "内置 Vineflower / CFR / Procyon 三种反编译器，开箱即用。");
     }
 
     @FXML
@@ -528,10 +540,10 @@ public class MainApp extends Application {
         scene.getAccelerators().clear();
         put(scene, "undo", this::undoAction);
         put(scene, "redo", this::redoAction);
-        scene.getAccelerators().put(
-                new KeyCodeCombination(KeyCode.Z,
-                        KeyCombination.CONTROL_DOWN,
-                        KeyCombination.SHIFT_DOWN), this::redoAction);
+        scene.getAccelerators()
+                .put(
+                        new KeyCodeCombination(KeyCode.Z, KeyCombination.CONTROL_DOWN, KeyCombination.SHIFT_DOWN),
+                        this::redoAction);
         put(scene, "save", () -> {
             if (project.hasJar()) {
                 editor.saveTranslation();
@@ -605,9 +617,7 @@ public class MainApp extends Application {
         theme.setMode(mode);
         setThemeSelections(theme.mode());
         settings.setOrIgnore(Settings.Keys.THEME, theme.mode());
-        String suffix = theme.mode().equals(Theme.MODE_SYSTEM)
-                ? "（" + (theme.dark() ? "系统为深色" : "系统为浅色") + "）"
-                : "";
+        String suffix = theme.mode().equals(Theme.MODE_SYSTEM) ? "（" + (theme.dark() ? "系统为深色" : "系统为浅色") + "）" : "";
         setStatus("主题已切换：" + Theme.LABELS.get(theme.mode()) + suffix);
     }
 
@@ -723,10 +733,20 @@ public class MainApp extends Application {
         expandItem.setOnAction(ev -> expandAll());
         MenuItem collapseItem = new MenuItem("折叠全部");
         collapseItem.setOnAction(ev -> collapseAll());
-        menu.getItems().addAll(markItem, autoItem, todoItem, doingItem, doneItem,
-                ignoreItem, new SeparatorMenuItem(),
-                fillItem, copyItem, new SeparatorMenuItem(),
-                expandItem, collapseItem);
+        menu.getItems()
+                .addAll(
+                        markItem,
+                        autoItem,
+                        todoItem,
+                        doingItem,
+                        doneItem,
+                        ignoreItem,
+                        new SeparatorMenuItem(),
+                        fillItem,
+                        copyItem,
+                        new SeparatorMenuItem(),
+                        expandItem,
+                        collapseItem);
         lastTreeMenu = menu;
         menu.show(classTree, x, y);
     }
@@ -779,8 +799,7 @@ public class MainApp extends Application {
             return;
         }
         int count = project.fillFromDictionary(classes);
-        refreshAfterModelChange(editor.currentClass() != null
-                && classes.contains(editor.currentClass()));
+        refreshAfterModelChange(editor.currentClass() != null && classes.contains(editor.currentClass()));
         setStatus("词典填充了 " + count + " 条未翻译字符串");
     }
 
@@ -788,8 +807,7 @@ public class MainApp extends Application {
         List<String> sorted = new ArrayList<>(classes);
         sorted.sort(String::compareTo);
         String text = String.join("\n", sorted);
-        Clipboard.getSystemClipboard().setContent(
-                Map.of(DataFormat.PLAIN_TEXT, text));
+        Clipboard.getSystemClipboard().setContent(Map.of(DataFormat.PLAIN_TEXT, text));
         setStatus("已复制 " + classes.size() + " 个类路径到剪贴板");
     }
 
@@ -905,9 +923,7 @@ public class MainApp extends Application {
         }
         try {
             int n = project.search(kw, "both").size();
-            setStatus(n == 0
-                    ? "全局搜索「" + kw + "」：没有匹配结果"
-                    : "全局搜索「" + kw + "」：共 " + n + " 处匹配（回车或点按钮查看明细）");
+            setStatus(n == 0 ? "全局搜索「" + kw + "」：没有匹配结果" : "全局搜索「" + kw + "」：共 " + n + " 处匹配（回车或点按钮查看明细）");
         } catch (Exception exc) {
             setStatus("搜索失败：" + exc.getMessage());
         }
@@ -971,7 +987,8 @@ public class MainApp extends Application {
 
     public void showSourceFor(String cls, String orig) {
         // 已在源码页且正显示该类时，切页签触发的自动反编译已覆盖，避免重复
-        if (orig == null && tabPane.getSelectionModel().getSelectedItem() == sourceTab
+        if (orig == null
+                && tabPane.getSelectionModel().getSelectedItem() == sourceTab
                 && cls.equals(sourcePanel.currentClass())) {
             return;
         }
@@ -1009,8 +1026,7 @@ public class MainApp extends Application {
             }
         }
         if (target == null) {
-            setStatus("源码字符串不在翻译列表中：" + Texts.displayText(literal).substring(0,
-                    Math.min(60, literal.length())));
+            setStatus("源码字符串不在翻译列表中：" + Texts.displayText(literal).substring(0, Math.min(60, literal.length())));
             return;
         }
         tabPane.getSelectionModel().select(editorTab);

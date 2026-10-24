@@ -1,7 +1,7 @@
 package com.jartrans.ui;
 
-import com.jartrans.core.Settings;
 import com.jartrans.core.DictionaryManager;
+import com.jartrans.core.Settings;
 import java.io.File;
 import java.nio.file.Path;
 import javafx.geometry.Insets;
@@ -28,8 +28,7 @@ public class DictManagerDialog extends AppWindow {
     /** 词典结构/激活变化时刷新本窗口列表（多实例窗口保持同步）。 */
     private final Runnable dictsListener = this::refresh;
 
-    private record DictRow(String name, int count, String file) {
-    }
+    private record DictRow(String name, int count, String file) {}
 
     public DictManagerDialog(MainApp app) {
         super(app, "管理多个词典", 760, 470, 620, 400, Modality.NONE);
@@ -37,12 +36,9 @@ public class DictManagerDialog extends AppWindow {
 
         BorderPane root = rootPane();
 
-        TableColumn<DictRow, String> colName =
-                TableColumns.text("名称", 200, DictRow::name);
-        TableColumn<DictRow, String> colCount =
-                TableColumns.text("词条数", 80, r -> String.valueOf(r.count()));
-        TableColumn<DictRow, String> colFile =
-                TableColumns.text("文件", 400, DictRow::file);
+        TableColumn<DictRow, String> colName = TableColumns.text("名称", 200, DictRow::name);
+        TableColumn<DictRow, String> colCount = TableColumns.text("词条数", 80, r -> String.valueOf(r.count()));
+        TableColumn<DictRow, String> colFile = TableColumns.text("文件", 400, DictRow::file);
         //noinspection unchecked
         table.getColumns().addAll(colName, colCount, colFile);
         table.setOnMouseClicked(e -> {
@@ -74,12 +70,10 @@ public class DictManagerDialog extends AppWindow {
         HBox right = new HBox(closeBtn);
         right.setAlignment(Pos.CENTER_RIGHT);
         HBox.setHgrow(right, Priority.ALWAYS);
-        bar.getChildren().addAll(createBtn, renameBtn, removeBtn, sep1, importBtn,
-                exportBtn, sep2, activateBtn, right);
+        bar.getChildren().addAll(createBtn, renameBtn, removeBtn, sep1, importBtn, exportBtn, sep2, activateBtn, right);
         root.setCenter(new VBox(table, bar));
 
-        Label tip = new Label("词典文件保存在程序目录的 dictionaries/ 下，可直接复制分享；"
-                + "双击列表项即可切换当前词典。");
+        Label tip = new Label("词典文件保存在程序目录的 dictionaries/ 下，可直接复制分享；" + "双击列表项即可切换当前词典。");
         tip.setPadding(new Insets(4, 0, 0, 0));
         HBox foot = new HBox(infoLabel);
         foot.setPadding(new Insets(4, 0, 0, 0));
@@ -108,15 +102,18 @@ public class DictManagerDialog extends AppWindow {
         for (String name : dicts.names()) {
             Path path = dicts.pathOf(name);
             String mark = name.equals(dicts.activeName()) ? "✓ " : "";
-            table.getItems().add(new DictRow(mark + name, dicts.count(name),
-                    path == null ? "" : path.getFileName().toString()));
+            table.getItems()
+                    .add(new DictRow(
+                            mark + name,
+                            dicts.count(name),
+                            path == null ? "" : path.getFileName().toString()));
             if (name.equals(sel)) {
                 table.getSelectionModel().select(index);
             }
             index += 1;
         }
-        infoLabel.setText("共 " + dicts.names().size() + " 个词典，当前：" + dicts.activeName()
-                + "（" + dicts.count(dicts.activeName()) + " 条）");
+        infoLabel.setText("共 " + dicts.names().size() + " 个词典，当前：" + dicts.activeName() + "（"
+                + dicts.count(dicts.activeName()) + " 条）");
     }
 
     /** 刷新主窗下拉/统计，并通知所有已打开的词典窗口（含本窗口）同步列表。 */
@@ -172,9 +169,7 @@ public class DictManagerDialog extends AppWindow {
         if (name == null) {
             return;
         }
-        if (!Dialogs.confirm("确认删除",
-                "删除词典「" + name + "」？该词典的 " + dicts.count(name)
-                        + " 条词条会被一并删除，且无法恢复。")) {
+        if (!Dialogs.confirm("确认删除", "删除词典「" + name + "」？该词典的 " + dicts.count(name) + " 条词条会被一并删除，且无法恢复。")) {
             return;
         }
         try {
@@ -189,9 +184,10 @@ public class DictManagerDialog extends AppWindow {
     private void importJson() {
         FileChooser chooser = new FileChooser();
         chooser.setTitle("选择词典 JSON");
-        chooser.getExtensionFilters().addAll(
-                new FileChooser.ExtensionFilter("JSON 文件", "*.json"),
-                new FileChooser.ExtensionFilter("所有文件", "*.*"));
+        chooser.getExtensionFilters()
+                .addAll(
+                        new FileChooser.ExtensionFilter("JSON 文件", "*.json"),
+                        new FileChooser.ExtensionFilter("所有文件", "*.*"));
         File file = chooser.showOpenDialog(this);
         if (file == null) {
             return;
@@ -204,10 +200,7 @@ public class DictManagerDialog extends AppWindow {
         }
         boolean merge = false;
         if (dicts.exists(name)) {
-            merge = Dialogs.confirm("名称已存在",
-                    "已存在名为「" + name + "」的词典。\n\n"
-                            + "「是」= 合并进去（同名词条会被覆盖）\n"
-                            + "「否」= 另建一个新词典");
+            merge = Dialogs.confirm("名称已存在", "已存在名为「" + name + "」的词典。\n\n" + "「是」= 合并进去（同名词条会被覆盖）\n" + "「否」= 另建一个新词典");
         }
         DictionaryManager.ImportResult result;
         try {
@@ -217,8 +210,9 @@ public class DictManagerDialog extends AppWindow {
             return;
         }
         syncApp();
-        Dialogs.info("完成", "已" + (result.merged() ? "合并到" : "新建") + "词典「"
-                + result.name() + "」，处理 " + result.count() + " 条。");
+        Dialogs.info(
+                "完成",
+                "已" + (result.merged() ? "合并到" : "新建") + "词典「" + result.name() + "」，处理 " + result.count() + " 条。");
     }
 
     private void exportJson() {

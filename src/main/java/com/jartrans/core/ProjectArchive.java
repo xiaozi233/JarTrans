@@ -16,9 +16,9 @@ import java.util.Set;
 final class ProjectArchive {
 
     private static final System.Logger LOG = Log.get(ProjectArchive.class);
-    private record ClassInfo(ClassFile file, List<Project.TextCount> texts,
-                             Set<String> textSet, Map<String, List<String>> usage) {
-    }
+
+    private record ClassInfo(
+            ClassFile file, List<Project.TextCount> texts, Set<String> textSet, Map<String, List<String>> usage) {}
 
     private final JarReader reader;
     private final Map<String, ClassInfo> index;
@@ -27,8 +27,7 @@ final class ProjectArchive {
     private final Map<String, Set<String>> textSets;
     private final List<Project.FailedClass> failures;
 
-    private ProjectArchive(JarReader reader, Map<String, ClassInfo> index,
-                           List<Project.FailedClass> failures) {
+    private ProjectArchive(JarReader reader, Map<String, ClassInfo> index, List<Project.FailedClass> failures) {
         this.reader = reader;
         this.index = Collections.unmodifiableMap(new LinkedHashMap<>(index));
         this.order = List.copyOf(index.keySet());
@@ -70,7 +69,8 @@ final class ProjectArchive {
             }
         }
         List<Project.TextCount> texts = counts.entrySet().stream()
-                .map(e -> new Project.TextCount(e.getKey(), e.getValue())).toList();
+                .map(e -> new Project.TextCount(e.getKey(), e.getValue()))
+                .toList();
         Map<String, List<String>> usage = new LinkedHashMap<>();
         try {
             Bytecode.stringUsage(file).forEach((text, names) -> usage.put(text, List.copyOf(names)));
@@ -78,16 +78,32 @@ final class ProjectArchive {
             // Method usage is optional; a malformed method must not hide valid literals.
             LOG.log(System.Logger.Level.DEBUG, "方法引用统计降级（类结构异常）：" + name, e);
         }
-        return new ClassInfo(file, texts,
+        return new ClassInfo(
+                file,
+                texts,
                 Collections.unmodifiableSet(new LinkedHashSet<>(counts.keySet())),
                 Collections.unmodifiableMap(usage));
     }
 
-    JarReader reader() { return reader; }
-    List<String> order() { return order; }
-    Map<String, ClassFile> classes() { return classes; }
-    Map<String, Set<String>> textSets() { return textSets; }
-    List<Project.FailedClass> failures() { return failures; }
+    JarReader reader() {
+        return reader;
+    }
+
+    List<String> order() {
+        return order;
+    }
+
+    Map<String, ClassFile> classes() {
+        return classes;
+    }
+
+    Map<String, Set<String>> textSets() {
+        return textSets;
+    }
+
+    List<Project.FailedClass> failures() {
+        return failures;
+    }
 
     List<Project.TextCount> texts(String name) {
         ClassInfo info = index.get(name);

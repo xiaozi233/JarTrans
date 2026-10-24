@@ -3,7 +3,6 @@ package com.jartrans.ui;
 import com.jartrans.core.Bytecode;
 import com.jartrans.core.ClassFile;
 import com.jartrans.core.Disassembler;
-import com.jartrans.core.java.DecompilerManager;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -43,25 +42,27 @@ import javafx.util.Duration;
  */
 public class SourcePanel extends BorderPane {
 
-    private static final Pattern KW_RE = Pattern.compile(
-            "\\b(abstract|assert|boolean|break|byte|case|catch|char|class|const|continue|"
+    private static final Pattern KW_RE =
+            Pattern.compile("\\b(abstract|assert|boolean|break|byte|case|catch|char|class|const|continue|"
                     + "default|do|double|else|enum|extends|final|finally|float|for|goto|if|"
                     + "implements|import|instanceof|int|interface|long|native|new|package|"
                     + "private|protected|public|record|return|short|static|strictfp|super|"
                     + "switch|synchronized|this|throw|throws|transient|try|var|void|volatile|"
                     + "while|true|false|null)\\b");
-    private static final Pattern STR_RE =
-            Pattern.compile("\"(?:\\\\.|[^\"\\\\\\n])*\"|'(?:\\\\.|[^'\\\\\\n])*'");
+    private static final Pattern STR_RE = Pattern.compile("\"(?:\\\\.|[^\"\\\\\\n])*\"|'(?:\\\\.|[^'\\\\\\n])*'");
     private static final Pattern NUM_RE =
             Pattern.compile("\\b(0[xX][0-9a-fA-F_]+|\\d[\\d_]*(?:\\.[\\d_]+)?[fFdDlL]?)\\b");
     private static final Pattern BLOCK_RE = Pattern.compile("/\\*|\\*/");
 
     /** 渲染模式。 */
-    private enum Mode {JAVA, BYTECODE, LOADING}
+    private enum Mode {
+        JAVA,
+        BYTECODE,
+        LOADING
+    }
 
     /** 预计算的着色片段：kind 0=注释 1=字符串 2=关键字 3=数字 4=横幅整行。 */
-    private record Span(int kind, int start, int end) {
-    }
+    private record Span(int kind, int start, int end) {}
 
     private MainApp app;
     private Mode mode = Mode.BYTECODE;
@@ -71,6 +72,7 @@ public class SourcePanel extends BorderPane {
     private final List<Map.Entry<String, Path>> files = new ArrayList<>();
     /** 命中行号集合（渲染热路径按行 contains 查询，用 Set 而非 List）。 */
     private final Set<Integer> hitLines = new HashSet<>();
+
     private int currentHit = -1;
     private String pendingJump;
     private long loadingStartedAt;
@@ -128,7 +130,8 @@ public class SourcePanel extends BorderPane {
                 boolean hit = hitLines.contains(idx);
                 boolean cur = idx == currentHit && hit;
                 flow.getChildren().setAll(renderStyled(item, idx));
-                String bg = cur ? app.theme().color("syntax_cur")
+                String bg = cur
+                        ? app.theme().color("syntax_cur")
                         : hit ? app.theme().color("syntax_hl") : null;
                 setStyle(bg != null ? "-fx-background-color: " + bg + ";" : "");
                 setGraphic(flow);
@@ -160,16 +163,18 @@ public class SourcePanel extends BorderPane {
     public void display(String cls, String jumpOrig) {
         currentClass = cls;
         pendingJump = jumpOrig;
-        app.ensureClassSources(cls, (modeFlag, payload) -> Platform.runLater(() -> {
-            if (!cls.equals(currentClass)) {
-                return;
-            }
-            switch (modeFlag) {
-                case "single" -> showSingle((List<Path>) payload);
-                case "loading" -> showLoading();
-                default -> showBytecode();
-            }
-        }));
+        app.ensureClassSources(
+                cls,
+                (modeFlag, payload) -> Platform.runLater(() -> {
+                    if (!cls.equals(currentClass)) {
+                        return;
+                    }
+                    switch (modeFlag) {
+                        case "single" -> showSingle((List<Path>) payload);
+                        case "loading" -> showLoading();
+                        default -> showBytecode();
+                    }
+                }));
     }
 
     // ---------- 渲染 ----------
@@ -210,12 +215,12 @@ public class SourcePanel extends BorderPane {
             List<int[]> str = new ArrayList<>();
             if (inBlock) {
                 int end = line.indexOf("*/");
-                cmt.add(new int[]{0, end < 0 ? line.length() : end + 2});
+                cmt.add(new int[] {0, end < 0 ? line.length() : end + 2});
                 inBlock = end < 0;
             } else {
                 Matcher sm = STR_RE.matcher(line);
                 while (sm.find()) {
-                    str.add(new int[]{sm.start(), sm.end()});
+                    str.add(new int[] {sm.start(), sm.end()});
                 }
                 // 行注释（跳过字符串内的 //）
                 int idx = 0;
@@ -223,7 +228,7 @@ public class SourcePanel extends BorderPane {
                     final int p = idx;
                     boolean insideStr = str.stream().anyMatch(s -> s[0] <= p && p < s[1]);
                     if (!insideStr) {
-                        cmt.add(new int[]{idx, line.length()});
+                        cmt.add(new int[] {idx, line.length()});
                         break;
                     }
                     idx += 2;
@@ -239,10 +244,10 @@ public class SourcePanel extends BorderPane {
                     if (line.startsWith("/*", p)) {
                         int close = line.indexOf("*/", p + 2);
                         if (close < 0) {
-                            cmt.add(new int[]{p, line.length()});
+                            cmt.add(new int[] {p, line.length()});
                             inBlock = true;
                         } else {
-                            cmt.add(new int[]{p, close + 2});
+                            cmt.add(new int[] {p, close + 2});
                         }
                     }
                 }
@@ -265,15 +270,13 @@ public class SourcePanel extends BorderPane {
             }
             for (Matcher m = KW_RE.matcher(line); m.find(); ) {
                 final int p = m.start();
-                if (commentAt.apply(p) == null
-                        && str.stream().noneMatch(s -> s[0] <= p && p < s[1])) {
+                if (commentAt.apply(p) == null && str.stream().noneMatch(s -> s[0] <= p && p < s[1])) {
                     out.add(new Span(2, m.start(), m.end()));
                 }
             }
             for (Matcher m = NUM_RE.matcher(line); m.find(); ) {
                 final int p = m.start();
-                if (commentAt.apply(p) == null
-                        && str.stream().noneMatch(s -> s[0] <= p && p < s[1])) {
+                if (commentAt.apply(p) == null && str.stream().noneMatch(s -> s[0] <= p && p < s[1])) {
                     out.add(new Span(3, m.start(), m.end()));
                 }
             }
@@ -423,8 +426,7 @@ public class SourcePanel extends BorderPane {
         if (loadingTimer != null) {
             loadingTimer.stop();
         }
-        loadingTimer = new Timeline(new KeyFrame(
-                Duration.millis(500), e -> tickLoading()));
+        loadingTimer = new Timeline(new KeyFrame(Duration.millis(500), e -> tickLoading()));
         loadingTimer.setCycleCount(Timeline.INDEFINITE);
         loadingTimer.play();
         tickLoading();
@@ -477,8 +479,8 @@ public class SourcePanel extends BorderPane {
                     }
                 }
                 tagHits(variant);
-                info.setText(entry.getValue().getFileName() + "：找到 "
-                        + countMatches(content, variant) + " 处（" + entry.getKey() + "）");
+                info.setText(entry.getValue().getFileName() + "：找到 " + countMatches(content, variant) + " 处（"
+                        + entry.getKey() + "）");
                 return true;
             }
         }
@@ -561,9 +563,7 @@ public class SourcePanel extends BorderPane {
             return null;
         }
         String best = m.group(0);
-        return best.length() >= 2
-                ? Texts.javaUnescape(best.substring(1, best.length() - 1))
-                : null;
+        return best.length() >= 2 ? Texts.javaUnescape(best.substring(1, best.length() - 1)) : null;
     }
 
     public String currentClass() {

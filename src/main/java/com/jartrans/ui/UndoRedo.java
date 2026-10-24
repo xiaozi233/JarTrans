@@ -44,8 +44,7 @@ final class UndoRedo {
         if (before == after) {
             return;
         }
-        history.push(new EditHistory.Hist("skip", null, orig,
-                before ? "1" : "0", after ? "1" : "0"));
+        history.push(new EditHistory.Hist("skip", null, orig, before ? "1" : "0", after ? "1" : "0"));
     }
 
     /** 记录类状态手动标记（null 视为自动）。 */
@@ -102,9 +101,7 @@ final class UndoRedo {
         }
         EditHistory.Batch b = (EditHistory.Batch) op;
         List<EditHistory.Hist> items = b.items();
-        for (int i = undoing ? items.size() - 1 : 0;
-                undoing ? i >= 0 : i < items.size();
-                i += undoing ? -1 : 1) {
+        for (int i = undoing ? items.size() - 1 : 0; undoing ? i >= 0 : i < items.size(); i += undoing ? -1 : 1) {
             EditHistory.Hist h = items.get(i);
             apply(h, undoing ? h.before() : h.after());
         }
@@ -116,8 +113,7 @@ final class UndoRedo {
             switch (h.kind()) {
                 case "trans" -> app.project().setTranslation(h.cls(), h.orig(), target);
                 case "skip" -> app.project().setTextSkipped(h.orig(), "1".equals(target));
-                case "mark" -> app.project().setClassStatus(h.cls(),
-                        EditHistory.AUTO.equals(target) ? null : target);
+                case "mark" -> app.project().setClassStatus(h.cls(), EditHistory.AUTO.equals(target) ? null : target);
                 default -> {
                     return;
                 }

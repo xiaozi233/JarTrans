@@ -56,8 +56,7 @@ public final class ClassFile {
             case CONSTANT_Integer, CONSTANT_Float -> 4;
             case CONSTANT_Long, CONSTANT_Double -> 8;
             case CONSTANT_Class, CONSTANT_String -> 2;
-            case CONSTANT_Fieldref, CONSTANT_Methodref, CONSTANT_InterfaceMethodref,
-                 CONSTANT_NameAndType -> 4;
+            case CONSTANT_Fieldref, CONSTANT_Methodref, CONSTANT_InterfaceMethodref, CONSTANT_NameAndType -> 4;
             case CONSTANT_MethodHandle -> 3;
             case CONSTANT_MethodType -> 2;
             case CONSTANT_Dynamic, CONSTANT_InvokeDynamic -> 4;
@@ -68,15 +67,14 @@ public final class ClassFile {
 
     private static final int CP_MAX_COUNT = 0xFFFF; // constant_pool_count 是 u2，最大索引 0xFFFE
 
-    public final byte[] data;     // 原始完整字节
+    public final byte[] data; // 原始完整字节
     public final int minor;
     public final int major;
     public final Map<Integer, CpEntry> entries; // 常量池索引 -&gt; 条目（Long/Double 只占一个 key）
-    public final int count;       // 原 constant_pool_count
-    public final byte[] tail;     // 常量池之后的全部字节（原样保留）
+    public final int count; // 原 constant_pool_count
+    public final byte[] tail; // 常量池之后的全部字节（原样保留）
 
-    private ClassFile(byte[] data, int minor, int major,
-                      Map<Integer, CpEntry> entries, int count, byte[] tail) {
+    private ClassFile(byte[] data, int minor, int major, Map<Integer, CpEntry> entries, int count, byte[] tail) {
         this.data = data;
         this.minor = minor;
         this.major = major;
@@ -139,8 +137,7 @@ public final class ClassFile {
             entries.put(index, new CpEntry(index, tag, raw));
             index += (tag == CONSTANT_Long || tag == CONSTANT_Double) ? 2 : 1;
         }
-        return new ClassFile(data, minor, major, entries, count,
-                Arrays.copyOfRange(data, pos, data.length));
+        return new ClassFile(data, minor, major, entries, count, Arrays.copyOfRange(data, pos, data.length));
     }
 
     // ---------- 提取 ----------
@@ -212,10 +209,11 @@ public final class ClassFile {
     }
 
     /** 一次重写产生的全部索引变更。 */
-    private record Retarget(Map<Integer, Integer> stringTargets, // CONSTANT_String 索引 -> 新 Utf8 索引
-                            Map<String, Integer> appended,       // 新文本 -> 追加索引
-                            Map<String, byte[]> appendedRaw,     // 新文本 -> 已编码字节（写出时复用）
-                            int newCount) {                      // 新 constant_pool_count
+    private record Retarget(
+            Map<Integer, Integer> stringTargets, // CONSTANT_String 索引 -> 新 Utf8 索引
+            Map<String, Integer> appended, // 新文本 -> 追加索引
+            Map<String, byte[]> appendedRaw, // 新文本 -> 已编码字节（写出时复用）
+            int newCount) { // 新 constant_pool_count
     }
 
     /**
@@ -279,12 +277,12 @@ public final class ClassFile {
     /** 按索引变更写出新字节：文件头 + 原条目（String 改指向）+ 追加的 Utf8 + 原尾字节。 */
     private byte[] serialize(Retarget plan) {
         ByteArrayOutputStream out = new ByteArrayOutputStream(data.length + 128);
-        out.write(data, 0, 8);                        // magic + minor + major
-        out.write((plan.newCount() >>> 8) & 0xFF);    // 新 constant_pool_count
+        out.write(data, 0, 8); // magic + minor + major
+        out.write((plan.newCount() >>> 8) & 0xFF); // 新 constant_pool_count
         out.write(plan.newCount() & 0xFF);
         for (int index = 1; index < count; index++) {
             CpEntry entry = entries.get(index);
-            if (entry == null) {                      // Long/Double 的第二槽位
+            if (entry == null) { // Long/Double 的第二槽位
                 continue;
             }
             out.write(entry.tag);
@@ -407,14 +405,15 @@ public final class ClassFile {
     }
 
     public static long u4(byte[] b, int off) {
-        return (((long) (b[off] & 0xFF)) << 24) | ((b[off + 1] & 0xFF) << 16)
-                | ((b[off + 2] & 0xFF) << 8) | (b[off + 3] & 0xFF);
+        return (((long) (b[off] & 0xFF)) << 24)
+                | ((b[off + 1] & 0xFF) << 16)
+                | ((b[off + 2] & 0xFF) << 8)
+                | (b[off + 3] & 0xFF);
     }
 
     /** 以原始字节为 key（避免 String 相等但编码不同造成的误判）。 */
     static final class Bytes {
-        private Bytes() {
-        }
+        private Bytes() {}
 
         static String key(byte[] raw) {
             return new String(raw, StandardCharsets.ISO_8859_1);

@@ -1,19 +1,18 @@
 package com.jartrans;
 
-import com.jartrans.core.ClassFile;
-import com.jartrans.core.ClassFileException;
-import com.jartrans.core.CpEntry;
-import com.jartrans.core.Literal;
-import org.junit.jupiter.api.Test;
-
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.jartrans.core.ClassFile;
+import com.jartrans.core.ClassFileException;
+import com.jartrans.core.CpEntry;
+import com.jartrans.core.Literal;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.junit.jupiter.api.Test;
 
 /** 对应 selftest.py 的 test_classfile。 */
 class ClassFileTest {
@@ -60,8 +59,7 @@ class ClassFileTest {
 
     @Test
     void badFileThrows() {
-        assertThrows(ClassFileException.class,
-                () -> ClassFile.parse("not a class file at all".getBytes()));
+        assertThrows(ClassFileException.class, () -> ClassFile.parse("not a class file at all".getBytes()));
     }
 
     @Test
@@ -88,7 +86,6 @@ class ClassFileTest {
         ClassFile cf = ClassFile.parse(TestClasses.buildSampleClass());
         // 样本字面量: "Hello, 世界!"、"Press \0 Start"；其余 Utf8 为类名/属性名
         List<String> internal = cf.internalTexts(Set.of("Hello, 世界!", "Press \0 Start"));
-        assertEquals(List.of("demo/Test", "Code"), internal,
-                "内部 Utf8 应按常量池顺序返回且不含字符串字面量");
+        assertEquals(List.of("demo/Test", "Code"), internal, "内部 Utf8 应按常量池顺序返回且不含字符串字面量");
     }
 }

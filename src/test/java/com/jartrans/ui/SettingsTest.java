@@ -1,15 +1,14 @@
 package com.jartrans.ui;
 
-import com.jartrans.core.Settings;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
-import java.nio.file.Files;
-import java.nio.file.Path;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.jartrans.core.Settings;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /** settings.json 载入合并：默认值、覆盖值、多余键（如 key_*）三者共存且跨保存/重载一致。 */
 class SettingsTest {
@@ -20,11 +19,13 @@ class SettingsTest {
     @Test
     void loadMergesDefaultsOverrideAndExtraKeys() throws Exception {
         Path file = tmp.resolve("settings.json");
-        Files.writeString(file, "{\n"
-                + "  \"theme\": \"dark\",\n"
-                + "  \"key_find\": \"Ctrl+Alt+K\",\n"
-                + "  \"future_key\": \"hello\"\n"
-                + "}\n");
+        Files.writeString(
+                file,
+                "{\n"
+                        + "  \"theme\": \"dark\",\n"
+                        + "  \"key_find\": \"Ctrl+Alt+K\",\n"
+                        + "  \"future_key\": \"hello\"\n"
+                        + "}\n");
         Settings settings = new Settings(file);
 
         // 覆盖默认值
@@ -54,8 +55,8 @@ class SettingsTest {
     void getBoolParsesBooleanAndTruthyStrings() throws Exception {
         Settings settings = new Settings(tmp.resolve("settings3.json"));
         // Boolean 与缺省值
-        assertTrue(settings.getBool("save_to_dict"));        // 默认 TRUE
-        assertFalse(settings.getBool("only_untranslated"));  // 默认 FALSE
+        assertTrue(settings.getBool("save_to_dict")); // 默认 TRUE
+        assertFalse(settings.getBool("only_untranslated")); // 默认 FALSE
         // 字符串真值表
         settings.setQuiet("only_untranslated", "yes");
         assertTrue(settings.getBool("only_untranslated"));

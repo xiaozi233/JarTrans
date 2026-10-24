@@ -24,12 +24,12 @@ public final class ClassStates {
 
     /** 类列表状态筛选下拉：{状态键, 显示名}；"all" 表示不筛选。 */
     public static final List<String[]> FILTERS = List.of(
-            new String[]{"all", "全部"},
-            new String[]{"todo", "未开始"},
-            new String[]{"doing", "翻译中"},
-            new String[]{"done", "已完成"},
-            new String[]{"ignore", "已忽略"},
-            new String[]{"empty", "无字符串"});
+            new String[] {"all", "全部"},
+            new String[] {"todo", "未开始"},
+            new String[] {"doing", "翻译中"},
+            new String[] {"done", "已完成"},
+            new String[] {"ignore", "已忽略"},
+            new String[] {"empty", "无字符串"});
 
     /** 可手动标记的状态显示名（与 {@link Project#MANUAL_STATES} 同序，文案取自 LABELS）。 */
     public static final List<String> MANUAL_LABELS =
@@ -39,18 +39,15 @@ public final class ClassStates {
     public static final List<String> SELECTABLE_LABELS = selectableLabels();
 
     /** 全部类状态键的固定展示顺序（图例、状态图等）。 */
-    public static final List<String> ALL =
-            List.of("todo", "doing", "done", "ignore", "empty");
+    public static final List<String> ALL = List.of("todo", "doing", "done", "ignore", "empty");
 
     /** 状态栏统计的固定展示顺序。 */
-    public static final List<String> STATS_ORDER =
-            List.of("done", "doing", "todo", "ignore");
+    public static final List<String> STATS_ORDER = List.of("done", "doing", "todo", "ignore");
 
     /** 字符串条目状态键 → 显示文案（表格「状态」列、搜索窗口等）。 */
     public static final Map<String, String> ENTRY_LABELS = entryLabels();
 
-    private ClassStates() {
-    }
+    private ClassStates() {}
 
     /** 状态键 → 显示名；未知键返回 null。 */
     public static String labelOf(String key) {

@@ -1,21 +1,20 @@
 package com.jartrans;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.jartrans.core.ClassFile;
 import com.jartrans.core.Literal;
 import com.jartrans.core.jar.JarPacker;
 import com.jartrans.core.jar.JarReader;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /** 对应 selftest.py 的 test_jar。 */
 class JarTest {
@@ -32,9 +31,7 @@ class JarTest {
 
         ClassFile cf = ClassFile.parse(jf.readClass("demo/Test.class"));
         Path out = tmp.resolve("out.jar");
-        JarPacker.save(jf, out,
-                Map.of("demo/Test.class", cf.rewrite(Map.of("Hello, 世界!", "你好"))),
-                true);
+        JarPacker.save(jf, out, Map.of("demo/Test.class", cf.rewrite(Map.of("Hello, 世界!", "你好"))), true);
 
         JarReader jf2 = new JarReader(out);
         List<String> names = new ArrayList<>();

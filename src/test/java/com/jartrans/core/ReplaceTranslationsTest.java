@@ -29,10 +29,12 @@ class ReplaceTranslationsTest {
         p.setTranslation("a/A.class", "skipped-one", "旧译文");
         p.setTextSkipped("skipped-one", true);
 
-        List<Project.ReplaceChange> changes = p.replaceTranslations(List.of(
-                new Project.ReplaceTarget("a/A.class", "already-target"),
-                new Project.ReplaceTarget("a/A.class", "skipped-one"),
-                new Project.ReplaceTarget("a/A.class", "fresh")), "新译文");
+        List<Project.ReplaceChange> changes = p.replaceTranslations(
+                List.of(
+                        new Project.ReplaceTarget("a/A.class", "already-target"),
+                        new Project.ReplaceTarget("a/A.class", "skipped-one"),
+                        new Project.ReplaceTarget("a/A.class", "fresh")),
+                "新译文");
 
         assertEquals(1, changes.size(), "只有未跳过且译文不同的条目被替换");
         assertEquals("fresh", changes.get(0).orig());
@@ -46,9 +48,8 @@ class ReplaceTranslationsTest {
     void batchAcrossClassesKeepsChangeOrder() {
         Project p = newProject();
         p.setTranslation("b/B.class", "k", "before-b");
-        List<Project.ReplaceChange> changes = p.replaceTranslations(List.of(
-                new Project.ReplaceTarget("a/A.class", "x"),
-                new Project.ReplaceTarget("b/B.class", "k")), "R");
+        List<Project.ReplaceChange> changes = p.replaceTranslations(
+                List.of(new Project.ReplaceTarget("a/A.class", "x"), new Project.ReplaceTarget("b/B.class", "k")), "R");
 
         assertEquals(2, changes.size());
         assertEquals("before-b", changes.get(1).before(), "变更携带替换前原值（撤销用）");

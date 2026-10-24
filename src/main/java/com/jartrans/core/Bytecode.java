@@ -17,8 +17,7 @@ import java.util.Map;
  */
 public final class Bytecode {
 
-    private Bytecode() {
-    }
+    private Bytecode() {}
 
     /** 字节码解析错误。 */
     public static class BytecodeException extends Exception {
@@ -35,16 +34,13 @@ public final class Bytecode {
     }
 
     /** 一条指令：偏移、操作码、助记符、操作数原始字节。 */
-    public record Instruction(int offset, int opcode, String name, byte[] operand) {
-    }
+    public record Instruction(int offset, int opcode, String name, byte[] operand) {}
 
     /** 方法信息：名称、描述符、Code 属性中的字节码（可能为 null）。 */
-    public record MethodInfo(String name, String desc, byte[] code) {
-    }
+    public record MethodInfo(String name, String desc, byte[] code) {}
 
     /** 类结构：类名 + 字段 + 方法。 */
-    public record Structure(String className, List<String[]> fields, List<MethodInfo> methods) {
-    }
+    public record Structure(String className, List<String[]> fields, List<MethodInfo> methods) {}
 
     // ---------- 操作码表 ----------
 
@@ -53,56 +49,208 @@ public final class Bytecode {
 
     static {
         Object[][] table = {
-                {0x00, "nop"}, {0x01, "aconst_null"}, {0x02, "iconst_m1"}, {0x03, "iconst_0"},
-                {0x04, "iconst_1"}, {0x05, "iconst_2"}, {0x06, "iconst_3"}, {0x07, "iconst_4"},
-                {0x08, "iconst_5"}, {0x09, "lconst_0"}, {0x0a, "lconst_1"}, {0x0b, "fconst_0"},
-                {0x0c, "fconst_1"}, {0x0d, "fconst_2"}, {0x0e, "dconst_0"}, {0x0f, "dconst_1"},
-                {0x10, "bipush"}, {0x11, "sipush"}, {0x12, "ldc"}, {0x13, "ldc_w"}, {0x14, "ldc2_w"},
-                {0x15, "iload"}, {0x16, "lload"}, {0x17, "fload"}, {0x18, "dload"}, {0x19, "aload"},
-                {0x1a, "iload_0"}, {0x1b, "iload_1"}, {0x1c, "iload_2"}, {0x1d, "iload_3"},
-                {0x1e, "lload_0"}, {0x1f, "lload_1"}, {0x20, "lload_2"}, {0x21, "lload_3"},
-                {0x22, "fload_0"}, {0x23, "fload_1"}, {0x24, "fload_2"}, {0x25, "fload_3"},
-                {0x26, "dload_0"}, {0x27, "dload_1"}, {0x28, "dload_2"}, {0x29, "dload_3"},
-                {0x2a, "aload_0"}, {0x2b, "aload_1"}, {0x2c, "aload_2"}, {0x2d, "aload_3"},
-                {0x2e, "iaload"}, {0x2f, "laload"}, {0x30, "faload"}, {0x31, "daload"},
-                {0x32, "aaload"}, {0x33, "baload"}, {0x34, "caload"}, {0x35, "saload"},
-                {0x36, "istore"}, {0x37, "lstore"}, {0x38, "fstore"}, {0x39, "dstore"}, {0x3a, "astore"},
-                {0x3b, "istore_0"}, {0x3c, "istore_1"}, {0x3d, "istore_2"}, {0x3e, "istore_3"},
-                {0x3f, "lstore_0"}, {0x40, "lstore_1"}, {0x41, "lstore_2"}, {0x42, "lstore_3"},
-                {0x43, "fstore_0"}, {0x44, "fstore_1"}, {0x45, "fstore_2"}, {0x46, "fstore_3"},
-                {0x47, "dstore_0"}, {0x48, "dstore_1"}, {0x49, "dstore_2"}, {0x4a, "dstore_3"},
-                {0x4b, "astore_0"}, {0x4c, "astore_1"}, {0x4d, "astore_2"}, {0x4e, "astore_3"},
-                {0x4f, "iastore"}, {0x50, "lastore"}, {0x51, "fastore"}, {0x52, "dastore"},
-                {0x53, "aastore"}, {0x54, "bastore"}, {0x55, "castore"}, {0x56, "sastore"},
-                {0x57, "pop"}, {0x58, "pop2"}, {0x59, "dup"}, {0x5a, "dup_x1"}, {0x5b, "dup_x2"},
-                {0x5c, "dup2"}, {0x5d, "dup2_x1"}, {0x5e, "dup2_x2"}, {0x5f, "swap"},
-                {0x60, "iadd"}, {0x61, "ladd"}, {0x62, "fadd"}, {0x63, "dadd"}, {0x64, "isub"},
-                {0x65, "lsub"}, {0x66, "fsub"}, {0x67, "dsub"}, {0x68, "imul"}, {0x69, "lmul"},
-                {0x6a, "fmul"}, {0x6b, "dmul"}, {0x6c, "idiv"}, {0x6d, "ldiv"}, {0x6e, "fdiv"},
-                {0x6f, "ddiv"}, {0x70, "irem"}, {0x71, "lrem"}, {0x72, "frem"}, {0x73, "drem"},
-                {0x74, "ineg"}, {0x75, "lneg"}, {0x76, "fneg"}, {0x77, "dneg"},
-                {0x78, "ishl"}, {0x79, "ishr"}, {0x7a, "iushr"}, {0x7b, "lshl"}, {0x7c, "lshr"},
-                {0x7d, "lushr"}, {0x7e, "iand"}, {0x7f, "land"}, {0x80, "ior"}, {0x81, "lor"},
-                {0x82, "ixor"}, {0x83, "lxor"}, {0x84, "iinc"},
-                {0x85, "i2l"}, {0x86, "i2f"}, {0x87, "i2d"}, {0x88, "l2i"}, {0x89, "l2f"},
-                {0x8a, "l2d"}, {0x8b, "f2i"}, {0x8c, "f2l"}, {0x8d, "f2d"}, {0x8e, "d2i"},
-                {0x8f, "d2l"}, {0x90, "d2f"}, {0x91, "i2b"}, {0x92, "i2c"}, {0x93, "i2s"},
-                {0x94, "lcmp"}, {0x95, "fcmpl"}, {0x96, "fcmpg"}, {0x97, "dcmpl"}, {0x98, "dcmpg"},
-                {0x99, "ifeq"}, {0x9a, "ifne"}, {0x9b, "iflt"}, {0x9c, "ifge"}, {0x9d, "ifgt"},
-                {0x9e, "ifle"}, {0x9f, "if_icmpeq"}, {0xa0, "if_icmpne"}, {0xa1, "if_icmplt"},
-                {0xa2, "if_icmpge"}, {0xa3, "if_icmpgt"}, {0xa4, "if_icmple"},
-                {0xa5, "if_acmpeq"}, {0xa6, "if_acmpne"}, {0xa7, "goto"}, {0xa8, "jsr"}, {0xa9, "ret"},
-                {0xaa, "tableswitch"}, {0xab, "lookupswitch"},
-                {0xac, "ireturn"}, {0xad, "lreturn"}, {0xae, "freturn"}, {0xaf, "dreturn"},
-                {0xb0, "areturn"}, {0xb1, "return"},
-                {0xb2, "getstatic"}, {0xb3, "putstatic"}, {0xb4, "getfield"}, {0xb5, "putfield"},
-                {0xb6, "invokevirtual"}, {0xb7, "invokespecial"}, {0xb8, "invokestatic"},
-                {0xb9, "invokeinterface"}, {0xba, "invokedynamic"},
-                {0xbb, "new"}, {0xbc, "newarray"}, {0xbd, "anewarray"}, {0xbe, "arraylength"},
-                {0xbf, "athrow"}, {0xc0, "checkcast"}, {0xc1, "instanceof"},
-                {0xc2, "monitorenter"}, {0xc3, "monitorexit"}, {0xc4, "wide"},
-                {0xc5, "multianewarray"}, {0xc6, "ifnull"}, {0xc7, "ifnonnull"},
-                {0xc8, "goto_w"}, {0xc9, "jsr_w"},
+            {0x00, "nop"},
+            {0x01, "aconst_null"},
+            {0x02, "iconst_m1"},
+            {0x03, "iconst_0"},
+            {0x04, "iconst_1"},
+            {0x05, "iconst_2"},
+            {0x06, "iconst_3"},
+            {0x07, "iconst_4"},
+            {0x08, "iconst_5"},
+            {0x09, "lconst_0"},
+            {0x0a, "lconst_1"},
+            {0x0b, "fconst_0"},
+            {0x0c, "fconst_1"},
+            {0x0d, "fconst_2"},
+            {0x0e, "dconst_0"},
+            {0x0f, "dconst_1"},
+            {0x10, "bipush"},
+            {0x11, "sipush"},
+            {0x12, "ldc"},
+            {0x13, "ldc_w"},
+            {0x14, "ldc2_w"},
+            {0x15, "iload"},
+            {0x16, "lload"},
+            {0x17, "fload"},
+            {0x18, "dload"},
+            {0x19, "aload"},
+            {0x1a, "iload_0"},
+            {0x1b, "iload_1"},
+            {0x1c, "iload_2"},
+            {0x1d, "iload_3"},
+            {0x1e, "lload_0"},
+            {0x1f, "lload_1"},
+            {0x20, "lload_2"},
+            {0x21, "lload_3"},
+            {0x22, "fload_0"},
+            {0x23, "fload_1"},
+            {0x24, "fload_2"},
+            {0x25, "fload_3"},
+            {0x26, "dload_0"},
+            {0x27, "dload_1"},
+            {0x28, "dload_2"},
+            {0x29, "dload_3"},
+            {0x2a, "aload_0"},
+            {0x2b, "aload_1"},
+            {0x2c, "aload_2"},
+            {0x2d, "aload_3"},
+            {0x2e, "iaload"},
+            {0x2f, "laload"},
+            {0x30, "faload"},
+            {0x31, "daload"},
+            {0x32, "aaload"},
+            {0x33, "baload"},
+            {0x34, "caload"},
+            {0x35, "saload"},
+            {0x36, "istore"},
+            {0x37, "lstore"},
+            {0x38, "fstore"},
+            {0x39, "dstore"},
+            {0x3a, "astore"},
+            {0x3b, "istore_0"},
+            {0x3c, "istore_1"},
+            {0x3d, "istore_2"},
+            {0x3e, "istore_3"},
+            {0x3f, "lstore_0"},
+            {0x40, "lstore_1"},
+            {0x41, "lstore_2"},
+            {0x42, "lstore_3"},
+            {0x43, "fstore_0"},
+            {0x44, "fstore_1"},
+            {0x45, "fstore_2"},
+            {0x46, "fstore_3"},
+            {0x47, "dstore_0"},
+            {0x48, "dstore_1"},
+            {0x49, "dstore_2"},
+            {0x4a, "dstore_3"},
+            {0x4b, "astore_0"},
+            {0x4c, "astore_1"},
+            {0x4d, "astore_2"},
+            {0x4e, "astore_3"},
+            {0x4f, "iastore"},
+            {0x50, "lastore"},
+            {0x51, "fastore"},
+            {0x52, "dastore"},
+            {0x53, "aastore"},
+            {0x54, "bastore"},
+            {0x55, "castore"},
+            {0x56, "sastore"},
+            {0x57, "pop"},
+            {0x58, "pop2"},
+            {0x59, "dup"},
+            {0x5a, "dup_x1"},
+            {0x5b, "dup_x2"},
+            {0x5c, "dup2"},
+            {0x5d, "dup2_x1"},
+            {0x5e, "dup2_x2"},
+            {0x5f, "swap"},
+            {0x60, "iadd"},
+            {0x61, "ladd"},
+            {0x62, "fadd"},
+            {0x63, "dadd"},
+            {0x64, "isub"},
+            {0x65, "lsub"},
+            {0x66, "fsub"},
+            {0x67, "dsub"},
+            {0x68, "imul"},
+            {0x69, "lmul"},
+            {0x6a, "fmul"},
+            {0x6b, "dmul"},
+            {0x6c, "idiv"},
+            {0x6d, "ldiv"},
+            {0x6e, "fdiv"},
+            {0x6f, "ddiv"},
+            {0x70, "irem"},
+            {0x71, "lrem"},
+            {0x72, "frem"},
+            {0x73, "drem"},
+            {0x74, "ineg"},
+            {0x75, "lneg"},
+            {0x76, "fneg"},
+            {0x77, "dneg"},
+            {0x78, "ishl"},
+            {0x79, "ishr"},
+            {0x7a, "iushr"},
+            {0x7b, "lshl"},
+            {0x7c, "lshr"},
+            {0x7d, "lushr"},
+            {0x7e, "iand"},
+            {0x7f, "land"},
+            {0x80, "ior"},
+            {0x81, "lor"},
+            {0x82, "ixor"},
+            {0x83, "lxor"},
+            {0x84, "iinc"},
+            {0x85, "i2l"},
+            {0x86, "i2f"},
+            {0x87, "i2d"},
+            {0x88, "l2i"},
+            {0x89, "l2f"},
+            {0x8a, "l2d"},
+            {0x8b, "f2i"},
+            {0x8c, "f2l"},
+            {0x8d, "f2d"},
+            {0x8e, "d2i"},
+            {0x8f, "d2l"},
+            {0x90, "d2f"},
+            {0x91, "i2b"},
+            {0x92, "i2c"},
+            {0x93, "i2s"},
+            {0x94, "lcmp"},
+            {0x95, "fcmpl"},
+            {0x96, "fcmpg"},
+            {0x97, "dcmpl"},
+            {0x98, "dcmpg"},
+            {0x99, "ifeq"},
+            {0x9a, "ifne"},
+            {0x9b, "iflt"},
+            {0x9c, "ifge"},
+            {0x9d, "ifgt"},
+            {0x9e, "ifle"},
+            {0x9f, "if_icmpeq"},
+            {0xa0, "if_icmpne"},
+            {0xa1, "if_icmplt"},
+            {0xa2, "if_icmpge"},
+            {0xa3, "if_icmpgt"},
+            {0xa4, "if_icmple"},
+            {0xa5, "if_acmpeq"},
+            {0xa6, "if_acmpne"},
+            {0xa7, "goto"},
+            {0xa8, "jsr"},
+            {0xa9, "ret"},
+            {0xaa, "tableswitch"},
+            {0xab, "lookupswitch"},
+            {0xac, "ireturn"},
+            {0xad, "lreturn"},
+            {0xae, "freturn"},
+            {0xaf, "dreturn"},
+            {0xb0, "areturn"},
+            {0xb1, "return"},
+            {0xb2, "getstatic"},
+            {0xb3, "putstatic"},
+            {0xb4, "getfield"},
+            {0xb5, "putfield"},
+            {0xb6, "invokevirtual"},
+            {0xb7, "invokespecial"},
+            {0xb8, "invokestatic"},
+            {0xb9, "invokeinterface"},
+            {0xba, "invokedynamic"},
+            {0xbb, "new"},
+            {0xbc, "newarray"},
+            {0xbd, "anewarray"},
+            {0xbe, "arraylength"},
+            {0xbf, "athrow"},
+            {0xc0, "checkcast"},
+            {0xc1, "instanceof"},
+            {0xc2, "monitorenter"},
+            {0xc3, "monitorexit"},
+            {0xc4, "wide"},
+            {0xc5, "multianewarray"},
+            {0xc6, "ifnull"},
+            {0xc7, "ifnonnull"},
+            {0xc8, "goto_w"},
+            {0xc9, "jsr_w"},
         };
         for (Object[] row : table) {
             OPCODES[(Integer) row[0]] = (String) row[1];
@@ -112,14 +260,41 @@ public final class Bytecode {
     /** 操作码 -&gt; 固定操作数字节数（未列出即为 0；tableswitch/lookupswitch/wide 变长单独处理）。 */
     private static int opSize(int op) {
         switch (op) {
-            case 0x10, 0x12, 0x15, 0x16, 0x17, 0x18, 0x19,
-                 0x36, 0x37, 0x38, 0x39, 0x3a, 0xa9, 0xbc:
+            case 0x10, 0x12, 0x15, 0x16, 0x17, 0x18, 0x19, 0x36, 0x37, 0x38, 0x39, 0x3a, 0xa9, 0xbc:
                 return 1;
-            case 0x11, 0x13, 0x14, 0x84,
-                 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f, 0xa0, 0xa1, 0xa2, 0xa3, 0xa4, 0xa5, 0xa6,
-                 0xa7, 0xa8,
-                 0xb2, 0xb3, 0xb4, 0xb5, 0xb6, 0xb7, 0xb8, 0xbb, 0xbd,
-                 0xc0, 0xc1, 0xc6, 0xc7:
+            case 0x11,
+                    0x13,
+                    0x14,
+                    0x84,
+                    0x99,
+                    0x9a,
+                    0x9b,
+                    0x9c,
+                    0x9d,
+                    0x9e,
+                    0x9f,
+                    0xa0,
+                    0xa1,
+                    0xa2,
+                    0xa3,
+                    0xa4,
+                    0xa5,
+                    0xa6,
+                    0xa7,
+                    0xa8,
+                    0xb2,
+                    0xb3,
+                    0xb4,
+                    0xb5,
+                    0xb6,
+                    0xb7,
+                    0xb8,
+                    0xbb,
+                    0xbd,
+                    0xc0,
+                    0xc1,
+                    0xc6,
+                    0xc7:
                 return 2;
             case 0xb9, 0xba, 0xc8, 0xc9:
                 return 4;
@@ -144,8 +319,7 @@ public final class Bytecode {
                 }
                 int mod = code[i + 1] & 0xFF;
                 int length = (mod == 0x84) ? 6 : 4;
-                out.add(new Instruction(off, op, "wide",
-                        Arrays.copyOfRange(code, i, Math.min(i + length, n))));
+                out.add(new Instruction(off, op, "wide", Arrays.copyOfRange(code, i, Math.min(i + length, n))));
                 i += length;
                 continue;
             }
@@ -174,7 +348,10 @@ public final class Bytecode {
                     }
                     length = 1 + pad + 8 + 8 * (int) npairs;
                 }
-                out.add(new Instruction(off, op, op == 0xaa ? "tableswitch" : "lookupswitch",
+                out.add(new Instruction(
+                        off,
+                        op,
+                        op == 0xaa ? "tableswitch" : "lookupswitch",
                         Arrays.copyOfRange(code, i, Math.min(i + length, n))));
                 i += length;
                 continue;
@@ -222,8 +399,7 @@ public final class Bytecode {
         }
     }
 
-    private record RawAttr(int nameIndex, byte[] payload) {
-    }
+    private record RawAttr(int nameIndex, byte[] payload) {}
 
     private static List<RawAttr> readAttrs(Reader r, int end) throws BytecodeException {
         List<RawAttr> attrs = new ArrayList<>();
@@ -234,8 +410,7 @@ public final class Bytecode {
             if (r.pos + length > end) {
                 throw new BytecodeException("属性区越界");
             }
-            attrs.add(new RawAttr(nameIdx,
-                    Arrays.copyOfRange(r.data, r.pos, r.pos + length)));
+            attrs.add(new RawAttr(nameIdx, Arrays.copyOfRange(r.data, r.pos, r.pos + length)));
             r.pos += length;
         }
         return attrs;
@@ -285,7 +460,7 @@ public final class Bytecode {
             int nameIdx = r.u2();
             int descIdx = r.u2();
             readAttrs(r, end);
-            out.add(new String[]{text(cf, nameIdx), text(cf, descIdx)});
+            out.add(new String[] {text(cf, nameIdx), text(cf, descIdx)});
         }
         return out;
     }

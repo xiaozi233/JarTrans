@@ -1,23 +1,22 @@
 package com.jartrans;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.jartrans.core.AppDirs;
 import com.jartrans.core.ClassFile;
 import com.jartrans.core.Dictionary;
 import com.jartrans.core.LangPack;
 import com.jartrans.core.Project;
 import com.jartrans.core.jar.JarReader;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /** 对应 selftest.py 的 test_project：Project 端到端（语言包/词典/导出）。 */
 class ProjectTest {
@@ -72,8 +71,7 @@ class ProjectTest {
         assertFalse(texts.contains("Hello, 世界!"));
 
         // 搜索
-        assertTrue(p2.search("世界", "both").stream()
-                .anyMatch(r -> r.orig().contains("世界")));
+        assertTrue(p2.search("世界", "both").stream().anyMatch(r -> r.orig().contains("世界")));
 
         // 类状态：手动标记并持久化（写盘防抖合并，验证前强制落盘）
         p2.setClassStatus("demo/Test.class", "ignore");

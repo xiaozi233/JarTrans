@@ -1,20 +1,19 @@
 package com.jartrans;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.jartrans.core.Dictionary;
 import com.jartrans.core.json.Json;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /** 词典 JSON 的读写语义：加载丢弃空值、save 按码点排序、增删查与搜索大小写不敏感。 */
 class DictionaryTest {
@@ -40,8 +39,8 @@ class DictionaryTest {
     void addIgnoresEmptyOrSelfTranslations() throws IOException {
         Dictionary dict = new Dictionary(newFile());
         dict.add("x", "译文");
-        dict.add("x", "");     // 空译文忽略
-        dict.add("x", "x");    // 与原文相同的译文忽略
+        dict.add("x", ""); // 空译文忽略
+        dict.add("x", "x"); // 与原文相同的译文忽略
         dict.add(null, "y");
         dict.add("z", null);
         assertEquals(1, dict.size());
@@ -56,7 +55,7 @@ class DictionaryTest {
         Dictionary dict = new Dictionary(file);
         dict.add("z", "1");
         dict.add("a", "2");
-        dict.add("中", "3");   // 码点 0x4E2D > 0x7A
+        dict.add("中", "3"); // 码点 0x4E2D > 0x7A
         dict.save();
 
         Map<String, Object> parsed = Json.object(Json.readFile(file));

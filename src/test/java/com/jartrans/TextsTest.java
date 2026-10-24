@@ -1,9 +1,9 @@
 package com.jartrans;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import com.jartrans.ui.Texts;
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /** 展示/源码转义工具：displayText、javaEscape/javaUnescape 往返一致。 */
 class TextsTest {

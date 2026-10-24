@@ -14,7 +14,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import javafx.application.Platform;
 import javafx.scene.Scene;
-import javafx.util.Duration;
 
 /**
  * 主题管理：浅色 / 深色 / 跟随系统。
@@ -27,39 +26,54 @@ public final class Theme {
     public static final String MODE_LIGHT = "light";
     public static final String MODE_DARK = "dark";
     public static final List<String> MODES = List.of(MODE_SYSTEM, MODE_LIGHT, MODE_DARK);
-    public static final Map<String, String> LABELS = Map.of(
-            MODE_SYSTEM, "跟随系统", MODE_LIGHT, "浅色", MODE_DARK, "深色");
+    public static final Map<String, String> LABELS = Map.of(MODE_SYSTEM, "跟随系统", MODE_LIGHT, "浅色", MODE_DARK, "深色");
 
     // ---------- 浅色配色（与 light.css 令牌一致） ----------
     public static final Map<String, String> LIGHT = palette(
-            "#eef1f6", "#ffffff", "#f0f3f8", "#f6f8fb", "#ffffff",
-            "#23272f", "#69707e", "#d6dbe4", "#3b6ef0", "#ffffff",
-            "#d9e4ff", "#23272f", "#a4aab5", "#e7ebf2", "#f6f8fb",
-            "#c93c37", "#b57708", "#1f9d4d", "#8b93a1", "#a4aab5",
-            "#c93c37", "#1f9d4d", "#2f6de0", "#8b93a1",
-            "#7c3aed", "#0d7d3f", "#8a919c", "#b3541e", "#fff0b3", "#ffe08a", "#8a5a00");
+            "#eef1f6", "#ffffff", "#f0f3f8", "#f6f8fb", "#ffffff", "#23272f", "#69707e", "#d6dbe4", "#3b6ef0",
+            "#ffffff", "#d9e4ff", "#23272f", "#a4aab5", "#e7ebf2", "#f6f8fb", "#c93c37", "#b57708", "#1f9d4d",
+            "#8b93a1", "#a4aab5", "#c93c37", "#1f9d4d", "#2f6de0", "#8b93a1", "#7c3aed", "#0d7d3f", "#8a919c",
+            "#b3541e", "#fff0b3", "#ffe08a", "#8a5a00");
 
     // ---------- 深色配色（与 dark.css 令牌一致） ----------
     public static final Map<String, String> DARK = palette(
-            "#14161b", "#1d2129", "#262c37", "#191d24", "#101319",
-            "#e5e9f2", "#98a1b3", "#333a48", "#6e93ff", "#ffffff",
-            "#31415e", "#ffffff", "#6d7484", "#10141b", "#20252e",
-            "#ff6b66", "#ffb454", "#5fd97f", "#7d8590", "#6e7681",
-            "#ff6b66", "#5fd97f", "#79b8ff", "#7d8590",
-            "#569cd6", "#ce9178", "#6a9955", "#b5cea8", "#3d3a12", "#665918", "#e8b04b");
+            "#14161b", "#1d2129", "#262c37", "#191d24", "#101319", "#e5e9f2", "#98a1b3", "#333a48", "#6e93ff",
+            "#ffffff", "#31415e", "#ffffff", "#6d7484", "#10141b", "#20252e", "#ff6b66", "#ffb454", "#5fd97f",
+            "#7d8590", "#6e7681", "#ff6b66", "#5fd97f", "#79b8ff", "#7d8590", "#569cd6", "#ce9178", "#6a9955",
+            "#b5cea8", "#3d3a12", "#665918", "#e8b04b");
 
-    private static Map<String, String> palette(String bg, String surface, String surfaceAlt,
-                                               String headerBg, String fieldBg,
-                                               String fg, String fgMuted, String border,
-                                               String accent, String accentFg,
-                                               String selectBg, String selectFg,
-                                               String disabledFg, String sunken, String stripe,
-                                               String todo, String doing, String done,
-                                               String ignore, String empty,
-                                               String untranslated, String translated,
-                                               String auto, String internal,
-                                               String kw, String str, String cmt,
-                                               String num, String hl, String cur, String banner) {
+    private static Map<String, String> palette(
+            String bg,
+            String surface,
+            String surfaceAlt,
+            String headerBg,
+            String fieldBg,
+            String fg,
+            String fgMuted,
+            String border,
+            String accent,
+            String accentFg,
+            String selectBg,
+            String selectFg,
+            String disabledFg,
+            String sunken,
+            String stripe,
+            String todo,
+            String doing,
+            String done,
+            String ignore,
+            String empty,
+            String untranslated,
+            String translated,
+            String auto,
+            String internal,
+            String kw,
+            String str,
+            String cmt,
+            String num,
+            String hl,
+            String cur,
+            String banner) {
         Map<String, String> m = new LinkedHashMap<>();
         m.put("bg", bg);
         m.put("surface", surface);
@@ -180,8 +194,7 @@ public final class Theme {
 
     /** 按已知状态（mode + systemDark）应用主题；不探测，可在任意线程调用者的同步路径上直接执行。 */
     private void applyCurrent() {
-        palette = (mode.equals(MODE_DARK) || (mode.equals(MODE_SYSTEM) && systemDark))
-                ? DARK : LIGHT;
+        palette = (mode.equals(MODE_DARK) || (mode.equals(MODE_SYSTEM) && systemDark)) ? DARK : LIGHT;
         String url = stylesheetUrl();
         for (Scene scene : scenes) {
             scene.getStylesheets().setAll(url, SCROLLBAR_SKIN_URL);
@@ -201,9 +214,12 @@ public final class Theme {
             if (os.contains("win")) {
                 Path out = Files.createTempFile("jartrans_reg", ".txt");
                 try {
-                    Process proc = new ProcessBuilder("reg", "query",
-                            "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
-                            "/v", "AppsUseLightTheme")
+                    Process proc = new ProcessBuilder(
+                                    "reg",
+                                    "query",
+                                    "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+                                    "/v",
+                                    "AppsUseLightTheme")
                             .redirectOutput(out.toFile())
                             .redirectErrorStream(true)
                             .start();
@@ -225,7 +241,8 @@ public final class Theme {
                         // 取最后一行 REG_DWORD 值
                         for (String line : text.split("\\R")) {
                             if (line.contains("0x")) {
-                                return line.trim().endsWith("0x0") || line.trim().endsWith("0x00");
+                                return line.trim().endsWith("0x0")
+                                        || line.trim().endsWith("0x00");
                             }
                         }
                     }
@@ -235,13 +252,11 @@ public final class Theme {
                 }
             }
             if (os.contains("mac")) {
-                Process proc = new ProcessBuilder("defaults", "read", "-g",
-                        "AppleInterfaceStyle")
+                Process proc = new ProcessBuilder("defaults", "read", "-g", "AppleInterfaceStyle")
                         .redirectErrorStream(true)
                         .start();
                 proc.waitFor(5, TimeUnit.SECONDS);
-                String text = new String(proc.getInputStream().readAllBytes(),
-                        StandardCharsets.UTF_8);
+                String text = new String(proc.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
                 return text.contains("Dark");
             }
             if (os.contains("linux")) {
@@ -249,13 +264,11 @@ public final class Theme {
                 if (gtkTheme != null && (gtkTheme.contains(":dark") || gtkTheme.endsWith("-dark"))) {
                     return true;
                 }
-                Process proc = new ProcessBuilder("gsettings", "get",
-                        "org.gnome.desktop.interface", "color-scheme")
+                Process proc = new ProcessBuilder("gsettings", "get", "org.gnome.desktop.interface", "color-scheme")
                         .redirectErrorStream(true)
                         .start();
                 proc.waitFor(5, TimeUnit.SECONDS);
-                String text = new String(proc.getInputStream().readAllBytes(),
-                        StandardCharsets.UTF_8).toLowerCase();
+                String text = new String(proc.getInputStream().readAllBytes(), StandardCharsets.UTF_8).toLowerCase();
                 return text.contains("dark");
             }
         } catch (Exception e) {

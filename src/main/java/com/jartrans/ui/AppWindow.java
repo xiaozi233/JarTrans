@@ -16,8 +16,14 @@ abstract class AppWindow extends Stage {
     /** 宿主应用（子类通过它访问 settings / project / 主窗口）。 */
     protected final MainApp app;
 
-    protected AppWindow(MainApp app, String title, double width, double height,
-                        double minWidth, double minHeight, Modality modality) {
+    protected AppWindow(
+            MainApp app,
+            String title,
+            double width,
+            double height,
+            double minWidth,
+            double minHeight,
+            Modality modality) {
         this.app = app;
         setTitle(title);
         setWidth(width);

@@ -1,12 +1,10 @@
 package com.jartrans.ui;
 
 import com.jartrans.core.Project;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import javafx.scene.control.TreeItem;
 
 /**
@@ -66,8 +64,8 @@ public final class ClassTreeModel {
         nodeKind.clear();
         nodeTarget.clear();
         List<String> visible = filteredClasses(opts);
-        TreeItem<String> root = new TreeItem<>(jarName + "（" + visible.size() + "/"
-                + project.classOrder().size() + " 类）");
+        TreeItem<String> root = new TreeItem<>(
+                jarName + "（" + visible.size() + "/" + project.classOrder().size() + " 类）");
         root.setExpanded(true);
         nodeKind.put(root, TYPE_ROOT);
         Map<String, TreeItem<String>> dirs = new HashMap<>();

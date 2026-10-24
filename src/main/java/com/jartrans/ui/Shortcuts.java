@@ -1,12 +1,11 @@
 package com.jartrans.ui;
 
+import java.util.ArrayList;
+import java.util.List;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
 import javafx.scene.input.KeyEvent;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * 可自定义快捷键的定义与文本/组合键双向解析（单一来源）。
@@ -16,16 +15,15 @@ public final class Shortcuts {
 
     /** 可自定义快捷键：id / 显示名 / 默认组合键。 */
     static final List<String[]> DEFS = List.of(
-            new String[]{"undo", "撤销", "Ctrl+Z"},
-            new String[]{"redo", "重做", "Ctrl+Y"},
-            new String[]{"save", "保存译文", "Ctrl+S"},
-            new String[]{"find", "类内搜索（当前类）", "Ctrl+F"},
-            new String[]{"replace", "替换译文（当前类）", "Ctrl+R"},
-            new String[]{"gsearch", "全包搜索", "Ctrl+Alt+F"},
-            new String[]{"prefs", "打开首选项", "Ctrl+,"});
+            new String[] {"undo", "撤销", "Ctrl+Z"},
+            new String[] {"redo", "重做", "Ctrl+Y"},
+            new String[] {"save", "保存译文", "Ctrl+S"},
+            new String[] {"find", "类内搜索（当前类）", "Ctrl+F"},
+            new String[] {"replace", "替换译文（当前类）", "Ctrl+R"},
+            new String[] {"gsearch", "全包搜索", "Ctrl+Alt+F"},
+            new String[] {"prefs", "打开首选项", "Ctrl+,"});
 
-    private Shortcuts() {
-    }
+    private Shortcuts() {}
 
     /** 规范化存储文本：修饰符统一大写、按键名统一。 */
     static String normalize(String text) {
@@ -45,13 +43,14 @@ public final class Shortcuts {
             if (low.length() == 1 && Character.isLetter(low.charAt(0))) {
                 sb.append(low.toUpperCase()); // 字母键统一大写存储
             } else {
-                sb.append(switch (low) {
-                    case "ctrl", "control" -> "Ctrl";
-                    case "alt" -> "Alt";
-                    case "shift" -> "Shift";
-                    case "meta", "cmd", "command" -> "Meta";
-                    default -> low.length() == 1 ? low : p.toUpperCase();
-                });
+                sb.append(
+                        switch (low) {
+                            case "ctrl", "control" -> "Ctrl";
+                            case "alt" -> "Alt";
+                            case "shift" -> "Shift";
+                            case "meta", "cmd", "command" -> "Meta";
+                            default -> low.length() == 1 ? low : p.toUpperCase();
+                        });
             }
         }
         return sb.toString();
@@ -135,8 +134,7 @@ public final class Shortcuts {
         if (n.startsWith("DIGIT") && n.length() == 6 && Character.isDigit(n.charAt(5))) {
             return n.substring(5); // 数字 0-9
         }
-        if (n.length() >= 2 && n.charAt(0) == 'F'
-                && Character.isDigit(n.charAt(1))) {
+        if (n.length() >= 2 && n.charAt(0) == 'F' && Character.isDigit(n.charAt(1))) {
             return n; // 功能键 F1-F24
         }
         return switch (code) {
@@ -176,8 +174,7 @@ public final class Shortcuts {
             return null;
         }
         boolean fn = code.name().matches("F\\d+");
-        if (!e.isControlDown() && !e.isAltDown() && !e.isShiftDown()
-                && !e.isMetaDown() && !fn) {
+        if (!e.isControlDown() && !e.isAltDown() && !e.isShiftDown() && !e.isMetaDown() && !fn) {
             return null; // 无修饰键且非 F 键，容易与正常输入冲突，不采用
         }
         String token = keyToken(code);
@@ -244,7 +241,6 @@ public final class Shortcuts {
         if (meta) {
             mods.add(KeyCombination.META_DOWN);
         }
-        return new KeyCodeCombination(key,
-                mods.toArray(new KeyCombination.Modifier[0]));
+        return new KeyCodeCombination(key, mods.toArray(new KeyCombination.Modifier[0]));
     }
 }

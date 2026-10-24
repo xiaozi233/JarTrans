@@ -21,15 +21,13 @@ public final class JarPacker {
     private static final Pattern SIGNATURE_NAME =
             Pattern.compile("^META-INF/.*\\.(SF|RSA|DSA)$", Pattern.CASE_INSENSITIVE);
 
-    private JarPacker() {
-    }
+    private JarPacker() {}
 
     /**
      * 写出新 jar。modified: {条目名: 新字节}。
      * 签名条目（META-INF 下 .SF/.RSA/.DSA）在 stripSignature 时被移除。
      */
-    public static void save(JarReader src, Path outPath,
-                            Map<String, byte[]> modified, boolean stripSignature)
+    public static void save(JarReader src, Path outPath, Map<String, byte[]> modified, boolean stripSignature)
             throws IOException {
         if (src == null || outPath == null || modified == null) {
             throw new IllegalArgumentException("源 jar、输出路径和修改表不能为空");
@@ -37,11 +35,9 @@ public final class JarPacker {
         AtomicFiles.write(outPath, temporary -> writeArchive(src, temporary, modified, stripSignature));
     }
 
-    private static void writeArchive(JarReader src, Path outPath,
-                                     Map<String, byte[]> modified, boolean stripSignature)
+    private static void writeArchive(JarReader src, Path outPath, Map<String, byte[]> modified, boolean stripSignature)
             throws IOException {
-        try (ZipOutputStream zf = new ZipOutputStream(
-                Files.newOutputStream(outPath), StandardCharsets.UTF_8)) {
+        try (ZipOutputStream zf = new ZipOutputStream(Files.newOutputStream(outPath), StandardCharsets.UTF_8)) {
             for (JarReader.EntryInfo info : src.entriesForPacking()) {
                 String name = info.name;
                 if (stripSignature && SIGNATURE_NAME.matcher(name).matches()) {
@@ -56,7 +52,8 @@ public final class JarPacker {
                     zi.setTime(info.timeMillis);
                 }
                 int method = info.method == ZipEntry.STORED || info.method == ZipEntry.DEFLATED
-                        ? info.method : ZipEntry.DEFLATED;
+                        ? info.method
+                        : ZipEntry.DEFLATED;
                 zi.setMethod(method);
                 if (method == ZipEntry.STORED) {
                     CRC32 crc = new CRC32();

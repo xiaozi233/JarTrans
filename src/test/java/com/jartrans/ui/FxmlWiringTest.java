@@ -1,7 +1,7 @@
 package com.jartrans.ui;
 
-import javafx.fxml.FXML;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -12,9 +12,8 @@ import java.util.Arrays;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import javafx.fxml.FXML;
+import org.junit.jupiter.api.Test;
 
 /**
  * 守护主界面接线：main_view.fxml 的每个 fx:id 都必须有 MainApp 里对应的 @FXML 字段
@@ -33,8 +32,7 @@ class FxmlWiringTest {
     }
 
     private static Set<String> fxmlIds(String src) {
-        return ID_RE.matcher(src).results()
-                .map(m -> m.group(1)).collect(Collectors.toSet());
+        return ID_RE.matcher(src).results().map(m -> m.group(1)).collect(Collectors.toSet());
     }
 
     @Test
@@ -49,14 +47,14 @@ class FxmlWiringTest {
 
     @Test
     void actionHandlersExistAsMethods() throws Exception {
-        Set<String> handlers = HANDLER_RE.matcher(fxml()).results()
-                .map(m -> m.group(1)).collect(Collectors.toSet());
+        Set<String> handlers =
+                HANDLER_RE.matcher(fxml()).results().map(m -> m.group(1)).collect(Collectors.toSet());
         assertTrue(!handlers.isEmpty(), "FXML 应声明事件处理器");
         Set<String> methods = Arrays.stream(MainApp.class.getDeclaredMethods())
-                .map(Method::getName).collect(Collectors.toSet());
+                .map(Method::getName)
+                .collect(Collectors.toSet());
         for (String handler : handlers) {
-            assertTrue(methods.contains(handler),
-                    "FXML onAction 引用的方法不存在: " + handler);
+            assertTrue(methods.contains(handler), "FXML onAction 引用的方法不存在: " + handler);
         }
     }
 }

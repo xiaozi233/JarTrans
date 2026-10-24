@@ -32,19 +32,18 @@ public final class Project {
     private static final System.Logger LOG = Log.get(Project.class);
 
     /** 类的状态：无字符串 / 未开始 / 翻译中 / 已完成 / 已忽略。 */
-    public static final List<String> CLASS_STATES =
-            List.of("empty", "todo", "doing", "done", "ignore");
+    public static final List<String> CLASS_STATES = List.of("empty", "todo", "doing", "done", "ignore");
     /** 可手动标记的状态。 */
-    public static final List<String> MANUAL_STATES =
-            List.of("todo", "doing", "done", "ignore");
+    public static final List<String> MANUAL_STATES = List.of("todo", "doing", "done", "ignore");
 
     /** 一条原文 + 出现次数。 */
-    public record TextCount(String text, int count) {
-    }
+    public record TextCount(String text, int count) {}
 
     /** 一个字符串的编辑状态。 */
     public enum Status {
-        UNTRANSLATED("untranslated"), TRANSLATED("translated"), AUTO("auto");
+        UNTRANSLATED("untranslated"),
+        TRANSLATED("translated"),
+        AUTO("auto");
 
         public final String key;
 
@@ -54,10 +53,9 @@ public final class Project {
     }
 
     /** 解析失败的类：类路径 + 原因。 */
-    public record FailedClass(String name, String reason) {
-    }
+    public record FailedClass(String name, String reason) {}
 
-    private final DictionaryManager dicts;   // 可为 null（单词典模式）
+    private final DictionaryManager dicts; // 可为 null（单词典模式）
     private Dictionary dictionary;
 
     private ProjectArchive archive = ProjectArchive.empty();
@@ -66,6 +64,7 @@ public final class Project {
     private final Map<String, String> classStatus = new LinkedHashMap<>();
     /** 「不翻译」的原字符串集合：这些文本不写入导出的 jar、不套用词典/语言包译文。 */
     private final Set<String> skipTexts = new LinkedHashSet<>();
+
     private String sha256;
     /** 进度文件路径在构造时绑定（延迟写盘不得跨测试目录串写）。 */
     private final Path progressFile = AppDirs.progressFile();
@@ -258,12 +257,10 @@ public final class Project {
     }
 
     /** 批量替换的目标条目（类 + 原字符串）。 */
-    public record ReplaceTarget(String cls, String orig) {
-    }
+    public record ReplaceTarget(String cls, String orig) {}
 
     /** 一次实际发生的替换变更（撤销时需要原值）。 */
-    public record ReplaceChange(String cls, String orig, String before) {
-    }
+    public record ReplaceChange(String cls, String orig, String before) {}
 
     /**
      * 批量替换译文（类内「全部替换」与全局搜索「替换选中/全部替换」的单一实现）。
@@ -315,7 +312,7 @@ public final class Project {
     // ---------- 语言包 ----------
 
     /** 应用语言包，不覆盖用户已手动编辑的条目。返回 (成功条数, 失效条目)。
-        语言包内 skip_texts 名单与 class_status=ignore 的类会一起被尊重（不套用译文）。 */
+     * 语言包内 skip_texts 名单与 class_status=ignore 的类会一起被尊重（不套用译文）。 */
     public long applyLanguagePack(Map<String, Object> pack) {
         LangPack.MatchResult result = LangPack.matchPack(pack, archive.textSets());
         for (Map.Entry<String, Map<String, String>> e : result.applied().entrySet()) {
@@ -393,8 +390,8 @@ public final class Project {
     }
 
     public void exportPack(Path path, String author) throws IOException {
-        Map<String, Object> pack = LangPack.buildPack(jarName(), jarSha256(),
-                author, translationsForExport(), classStatus);
+        Map<String, Object> pack =
+                LangPack.buildPack(jarName(), jarSha256(), author, translationsForExport(), classStatus);
         if (!skipTexts.isEmpty()) {
             List<String> sorted = new ArrayList<>(skipTexts);
             sorted.sort(String::compareTo);
@@ -430,7 +427,7 @@ public final class Project {
         for (String c : classOrder()) {
             done += effective(c).size();
         }
-        return new long[]{total, done};
+        return new long[] {total, done};
     }
 
     /** 返回各状态的类数量。 */
@@ -559,8 +556,7 @@ public final class Project {
     }
 
     /** 跨所有类搜索。scope: 'orig' | 'trans' | 'both'。 */
-    public record SearchResult(String cls, String orig, String trans, Status status) {
-    }
+    public record SearchResult(String cls, String orig, String trans, Status status) {}
 
     public List<SearchResult> search(String keyword, String scope) {
         String q = keyword == null ? "" : keyword.toLowerCase(java.util.Locale.ROOT);

@@ -22,22 +22,21 @@ public final class Settings {
      */
     public static final class Keys {
 
-        public static final String DECOMPILER_TYPE = "decompiler_type";   // vineflower|cfr|procyon
-        public static final String THEME = "theme";                       // system|light|dark
-        public static final String DICTIONARY = "dictionary";             // 当前词典名
-        public static final String HIDE_EMPTY = "hide_empty";             // 隐藏无可翻译字符串的类
-        public static final String STATUS_FILTER = "status_filter";       // 类列表状态筛选
+        public static final String DECOMPILER_TYPE = "decompiler_type"; // vineflower|cfr|procyon
+        public static final String THEME = "theme"; // system|light|dark
+        public static final String DICTIONARY = "dictionary"; // 当前词典名
+        public static final String HIDE_EMPTY = "hide_empty"; // 隐藏无可翻译字符串的类
+        public static final String STATUS_FILTER = "status_filter"; // 类列表状态筛选
         public static final String ONLY_UNTRANSLATED = "only_untranslated"; // 翻译表格只看未翻译
-        public static final String SAVE_TO_DICT = "save_to_dict";         // 保存译文时记入词典
-        public static final String LEGEND_VISIBLE = "legend_visible";     // 左栏显示类状态图例
-        public static final String DBLCLICK_SOURCE = "dblclick_source";   // 翻译表双击跳源码
+        public static final String SAVE_TO_DICT = "save_to_dict"; // 保存译文时记入词典
+        public static final String LEGEND_VISIBLE = "legend_visible"; // 左栏显示类状态图例
+        public static final String DBLCLICK_SOURCE = "dblclick_source"; // 翻译表双击跳源码
         public static final String AUTO_SAVE_TRANSLATION = "auto_save_translation"; // 译文自动保存
-        public static final String PACK_AUTHOR = "pack_author";           // 语言包导出默认作者
+        public static final String PACK_AUTHOR = "pack_author"; // 语言包导出默认作者
         /** 自定义快捷键键前缀（key_ + 动作 id），动态键不进默认表。 */
         public static final String SHORTCUT_PREFIX = "key_";
 
-        private Keys() {
-        }
+        private Keys() {}
     }
 
     /** 外部进程反编译器时代遗留的设置键，加载时剔除（其余未知键如 key_* 仍保留）。 */
@@ -69,8 +68,7 @@ public final class Settings {
     private final Path path;
     private final Map<String, Object> data = new LinkedHashMap<>(DEFAULTS);
     /** 高频 setOrIgnore 的写盘防抖；flush() 供退出前强制落盘。 */
-    private final DeferredSaver saver =
-            new DeferredSaver("settings", SAVE_DELAY_MILLIS, this::writeSnapshotQuietly);
+    private final DeferredSaver saver = new DeferredSaver("settings", SAVE_DELAY_MILLIS, this::writeSnapshotQuietly);
 
     public Settings() {
         this(null);

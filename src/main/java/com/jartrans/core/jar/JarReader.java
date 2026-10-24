@@ -71,8 +71,7 @@ public final class JarReader {
                 try (var input = zf.getInputStream(entry)) {
                     bytes = input.readAllBytes();
                 }
-                EntryInfo info = new EntryInfo(entry.getName(), entry.getTime(),
-                        entry.getMethod(), bytes);
+                EntryInfo info = new EntryInfo(entry.getName(), entry.getTime(), entry.getMethod(), bytes);
                 infos.add(info);
                 data.put(info.name, info);
             }
@@ -133,9 +132,10 @@ public final class JarReader {
             try (var in = Files.newInputStream(path)) {
                 n = in.readNBytes(head, 0, 4);
             }
-            return n == 4 && head[0] == 'P' && head[1] == 'K'
-                    && ((head[2] == 0x03 && head[3] == 0x04)
-                    || (head[2] == 0x05 && head[3] == 0x06));
+            return n == 4
+                    && head[0] == 'P'
+                    && head[1] == 'K'
+                    && ((head[2] == 0x03 && head[3] == 0x04) || (head[2] == 0x05 && head[3] == 0x06));
         } catch (IOException e) {
             return false;
         }

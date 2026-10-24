@@ -8,8 +8,7 @@ import java.util.List;
  */
 public final class Disassembler {
 
-    private Disassembler() {
-    }
+    private Disassembler() {}
 
     /** ldc 操作数指向的常量的可读文本（仅字符串字面量返回带引号文本）。 */
     private static String cpConstantText(ClassFile cf, int idx) {
@@ -94,8 +93,7 @@ public final class Disassembler {
                         }
                         hex.append(String.format("%02x", b));
                     }
-                    String line = String.format("      %5d: %s %s%s",
-                            ins.offset(), ins.name(), hex, extra);
+                    String line = String.format("      %5d: %s %s%s", ins.offset(), ins.name(), hex, extra);
                     lines.append(stripTrailing(line)).append('\n');
                 }
             } catch (Bytecode.BytecodeException exc) {

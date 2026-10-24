@@ -12,8 +12,7 @@ import javafx.scene.control.TableColumn;
  */
 final class TableColumns {
 
-    private TableColumns() {
-    }
+    private TableColumns() {}
 
     /** 文本列。 */
     static <T> TableColumn<T, String> text(String title, double width, Function<T, String> value) {
@@ -21,13 +20,12 @@ final class TableColumns {
     }
 
     /** 内容居中的文本列（状态、次数这类短列）。 */
-    static <T> TableColumn<T, String> centered(String title, double width,
-                                               Function<T, String> value) {
+    static <T> TableColumn<T, String> centered(String title, double width, Function<T, String> value) {
         return build(title, width, value, "-fx-alignment: CENTER;");
     }
 
-    private static <T> TableColumn<T, String> build(String title, double width,
-                                                    Function<T, String> value, String alignment) {
+    private static <T> TableColumn<T, String> build(
+            String title, double width, Function<T, String> value, String alignment) {
         TableColumn<T, String> column = new TableColumn<>(title);
         column.setCellValueFactory(d -> new SimpleStringProperty(value.apply(d.getValue())));
         column.setPrefWidth(width);

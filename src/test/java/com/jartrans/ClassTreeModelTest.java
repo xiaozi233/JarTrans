@@ -1,18 +1,16 @@
 package com.jartrans;
 
-import com.jartrans.core.Project;
-import com.jartrans.ui.ClassTreeModel;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
-import java.nio.file.Path;
-import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.jartrans.core.Project;
+import com.jartrans.ui.ClassTreeModel;
+import java.nio.file.Path;
+import java.util.List;
 import javafx.scene.control.TreeItem;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /** ClassTreeModel 纯逻辑测试（TreeItem 为普通 bean，无需 JavaFX toolkit）。 */
 class ClassTreeModelTest {
@@ -33,8 +31,7 @@ class ClassTreeModelTest {
         return p;
     }
 
-    private static final ClassTreeModel.ViewOptions ALL =
-            new ClassTreeModel.ViewOptions("", "all", false);
+    private static final ClassTreeModel.ViewOptions ALL = new ClassTreeModel.ViewOptions("", "all", false);
 
     @Test
     void buildsDirTreeWithKindAndTarget() throws Exception {
@@ -82,18 +79,28 @@ class ClassTreeModelTest {
         ClassTreeModel m = new ClassTreeModel(p);
 
         assertEquals(1, m.filteredClasses(ALL).size());
-        assertEquals(1, m.filteredClasses(
-                new ClassTreeModel.ViewOptions("demo", "all", false)).size());
-        assertEquals(0, m.filteredClasses(
-                new ClassTreeModel.ViewOptions("nomatch", "all", false)).size());
+        assertEquals(
+                1,
+                m.filteredClasses(new ClassTreeModel.ViewOptions("demo", "all", false))
+                        .size());
+        assertEquals(
+                0,
+                m.filteredClasses(new ClassTreeModel.ViewOptions("nomatch", "all", false))
+                        .size());
         // 初始两字符串未译 → todo；手动 ignore 后 ignore 过滤命中、todo 清空
-        assertEquals(1, m.filteredClasses(
-                new ClassTreeModel.ViewOptions("", "todo", false)).size());
+        assertEquals(
+                1,
+                m.filteredClasses(new ClassTreeModel.ViewOptions("", "todo", false))
+                        .size());
         p.setClassStatus("demo/Test.class", "ignore");
-        assertEquals(1, m.filteredClasses(
-                new ClassTreeModel.ViewOptions("", "ignore", false)).size());
-        assertEquals(0, m.filteredClasses(
-                new ClassTreeModel.ViewOptions("", "todo", false)).size());
+        assertEquals(
+                1,
+                m.filteredClasses(new ClassTreeModel.ViewOptions("", "ignore", false))
+                        .size());
+        assertEquals(
+                0,
+                m.filteredClasses(new ClassTreeModel.ViewOptions("", "todo", false))
+                        .size());
     }
 
     @Test
@@ -115,8 +122,7 @@ class ClassTreeModelTest {
         assertTrue(node.isExpanded() && dir.isExpanded() && content.isExpanded());
 
         // 过滤中重建的目录默认展开
-        TreeItem<String> filtered = m.rebuild(p.jarName(),
-                new ClassTreeModel.ViewOptions("demo", "all", false));
+        TreeItem<String> filtered = m.rebuild(p.jarName(), new ClassTreeModel.ViewOptions("demo", "all", false));
         TreeItem<String> fdir = filtered.getChildren().get(0);
         assertTrue(fdir.isExpanded(), "过滤中目录应默认展开");
     }

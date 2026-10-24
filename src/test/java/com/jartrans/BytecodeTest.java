@@ -1,16 +1,15 @@
 package com.jartrans;
 
-import com.jartrans.core.Bytecode;
-import com.jartrans.core.ClassFile;
-import com.jartrans.core.Disassembler;
-import org.junit.jupiter.api.Test;
-
-import java.util.List;
-import java.util.Map;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.jartrans.core.Bytecode;
+import com.jartrans.core.ClassFile;
+import com.jartrans.core.Disassembler;
+import java.util.List;
+import java.util.Map;
+import org.junit.jupiter.api.Test;
 
 /** 对应 selftest.py 的 test_bytecode。 */
 class BytecodeTest {
@@ -50,7 +49,8 @@ class BytecodeTest {
 
     @Test
     void unknownOpcodeThrows() {
-        assertThrows(Bytecode.BytecodeException.class,
-                () -> Bytecode.iterInstructions(new byte[]{(byte) 0xFF, (byte) 0xFF}));
+        assertThrows(
+                Bytecode.BytecodeException.class,
+                () -> Bytecode.iterInstructions(new byte[] {(byte) 0xFF, (byte) 0xFF}));
     }
 }

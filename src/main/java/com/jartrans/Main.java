@@ -15,6 +15,5 @@ public final class Main {
         Application.launch(MainApp.class, args);
     }
 
-    private Main() {
-    }
+    private Main() {}
 }

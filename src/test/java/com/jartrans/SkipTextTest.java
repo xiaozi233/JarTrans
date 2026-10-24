@@ -1,19 +1,18 @@
 package com.jartrans;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.jartrans.core.ClassFile;
 import com.jartrans.core.LangPack;
 import com.jartrans.core.Project;
 import com.jartrans.core.jar.JarReader;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /** 不翻译名单：导出 jar 保留原文、语言包携带并导入尊重、词典填充跳过。 */
 class SkipTextTest {

@@ -1,6 +1,5 @@
 package com.jartrans.ui;
 
-import com.jartrans.core.Settings;
 import com.jartrans.core.Dictionary;
 import java.util.ArrayList;
 import java.util.List;
@@ -76,10 +75,8 @@ public class DictDialog extends AppWindow {
         });
         search.getChildren().addAll(new Label("搜索："), queryField, searchBtn, allBtn);
 
-        TableColumn<Map.Entry<String, String>, String> colOrig =
-                TableColumns.text("原字符串", 380, Map.Entry::getKey);
-        TableColumn<Map.Entry<String, String>, String> colTrans =
-                TableColumns.text("译文", 380, Map.Entry::getValue);
+        TableColumn<Map.Entry<String, String>, String> colOrig = TableColumns.text("原字符串", 380, Map.Entry::getKey);
+        TableColumn<Map.Entry<String, String>, String> colTrans = TableColumns.text("译文", 380, Map.Entry::getValue);
         //noinspection unchecked
         table.getColumns().addAll(colOrig, colTrans);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
@@ -133,9 +130,7 @@ public class DictDialog extends AppWindow {
         Dictionary dic = app.project().dictionary();
         Map<String, String> data = keyword.isEmpty() ? dic.entries() : dic.search(keyword);
         table.getItems().clear();
-        data.entrySet().stream()
-                .sorted(Map.Entry.comparingByKey())
-                .forEach(table.getItems()::add);
+        data.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(table.getItems()::add);
         String label = app.project().dictionaryLabel();
         setTitle("词典条目 — " + label);
         countLabel.setText("「" + label + "」共 " + dic.size() + " 条，当前列出 " + data.size() + " 条");

@@ -34,8 +34,7 @@ public final class DictionaryManager {
 
     private static final Pattern ILLEGAL = Pattern.compile("[<>:\"/\\\\|?*\\x00-\\x1f]");
 
-    public record Item(String name, String file) {
-    }
+    public record Item(String name, String file) {}
 
     private final Path baseDir;
     private final Path dir;
@@ -67,8 +66,7 @@ public final class DictionaryManager {
         String activeName = data == null ? "" : str(data.get("active"));
         List<Item> list = data == null ? new ArrayList<>() : parseItems(data.get("items"));
         // 丢弃文件已不存在的记录
-        list.removeIf(it -> !isSafeDictionaryPath(it.file())
-                || !Files.isRegularFile(dir.resolve(it.file())));
+        list.removeIf(it -> !isSafeDictionaryPath(it.file()) || !Files.isRegularFile(dir.resolve(it.file())));
         if (list.isEmpty()) {
             list = scanJsonFiles();
         }
@@ -252,8 +250,7 @@ public final class DictionaryManager {
         for (Item it : items) {
             taken.add(it.file().toLowerCase(Locale.ROOT));
         }
-        while (taken.contains(candidate.toLowerCase(Locale.ROOT))
-                || Files.exists(dir.resolve(candidate))) {
+        while (taken.contains(candidate.toLowerCase(Locale.ROOT)) || Files.exists(dir.resolve(candidate))) {
             index += 1;
             candidate = stem + "_" + index + ".json";
         }
@@ -325,8 +322,7 @@ public final class DictionaryManager {
             Files.deleteIfExists(dir.resolve(target.file()));
         } catch (IOException e) {
             // 删除失败则保留文件，但索引中仍移除（下次启动扫描自愈）
-            LOG.log(System.Logger.Level.WARNING, "词典文件删除失败，仅从索引移除："
-                    + dir.resolve(target.file()), e);
+            LOG.log(System.Logger.Level.WARNING, "词典文件删除失败，仅从索引移除：" + dir.resolve(target.file()), e);
         }
         items.remove(target);
         cache.remove(name);
@@ -337,17 +333,16 @@ public final class DictionaryManager {
     }
 
     /** 从外部 JSON 导入。merge=true 时并入同名（或指定名）词典。 */
-    public record ImportResult(String name, int count, boolean merged) {
-    }
+    public record ImportResult(String name, int count, boolean merged) {}
 
-    public ImportResult importFile(Path src, String name, boolean merge)
-            throws IOException, DictionaryException {
+    public ImportResult importFile(Path src, String name, boolean merge) throws IOException, DictionaryException {
         Map<String, Object> data = Json.object(Json.readFileQuiet(src));
         if (data == null) {
             throw new DictionaryException("不是有效的词典 JSON（应为 原字符串->译文 对象）。");
         }
         String base = name != null && !name.isEmpty()
-                ? name : stripExt(src.getFileName().toString());
+                ? name
+                : stripExt(src.getFileName().toString());
         if (base.isEmpty()) {
             base = DEFAULT_NAME;
         }
@@ -410,7 +405,8 @@ public final class DictionaryManager {
         } catch (RuntimeException e) {
             return false;
         }
-        return candidate.startsWith(root) && candidate.getFileName().toString().endsWith(".json")
+        return candidate.startsWith(root)
+                && candidate.getFileName().toString().endsWith(".json")
                 && !candidate.getFileName().toString().equals(INDEX_FILE);
     }
 

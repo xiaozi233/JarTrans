@@ -1,25 +1,24 @@
 package com.jartrans;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.jartrans.core.Project;
 import com.jartrans.core.Settings;
 import com.jartrans.ui.EditorPane;
 import com.jartrans.ui.MainApp;
 import com.jartrans.ui.PreferencesDialog;
 import com.jartrans.ui.SearchWindow;
-import javafx.scene.control.TextArea;
-import javafx.stage.Stage;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import javafx.scene.control.TextArea;
+import javafx.stage.Stage;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /** 回归测试：类内查找/替换、快捷键自定义持久化、全局搜索预填与首选项（FX 线程）。 */
 class UiSearchReplaceTest {
@@ -57,8 +56,7 @@ class UiSearchReplaceTest {
             List<String> matchedOrigs = new ArrayList<>();
             for (Project.TextCount tc : app.project().texts(cls)) {
                 before.put(tc.text(), app.project().effective(cls).getOrDefault(tc.text(), ""));
-                if (tc.text().toLowerCase().contains("hello")
-                        && !app.project().isSkipped(tc.text())) {
+                if (tc.text().toLowerCase().contains("hello") && !app.project().isSkipped(tc.text())) {
                     matchedOrigs.add(tc.text());
                 }
             }
@@ -70,16 +68,12 @@ class UiSearchReplaceTest {
             ed.replaceFieldNode().setText("你好，世界！");
             ed.replaceAll();
             for (String orig : matchedOrigs) {
-                assertEquals("你好，世界！",
-                        app.project().effective(cls).getOrDefault(orig, ""),
-                        "匹配行的译文应被替换");
+                assertEquals("你好，世界！", app.project().effective(cls).getOrDefault(orig, ""), "匹配行的译文应被替换");
             }
             // 未匹配行不变
             for (Map.Entry<String, String> e : before.entrySet()) {
                 if (!matchedOrigs.contains(e.getKey())) {
-                    assertEquals(e.getValue(),
-                            app.project().effective(cls).getOrDefault(e.getKey(), ""),
-                            "未匹配行不应被改动");
+                    assertEquals(e.getValue(), app.project().effective(cls).getOrDefault(e.getKey(), ""), "未匹配行不应被改动");
                 }
             }
             // 清空查找词 → 恢复全部行
@@ -139,22 +133,16 @@ class UiSearchReplaceTest {
             ed.selectRow(rowOrig); // 保证编辑区为该行
             ta.setText("自动保存测试译文");
             ed.flushEdit();
-            assertEquals("自动保存测试译文",
-                    app.project().effective(cls).getOrDefault(rowOrig, ""),
-                    "flushEdit 应把编辑区文本写入工程");
+            assertEquals("自动保存测试译文", app.project().effective(cls).getOrDefault(rowOrig, ""), "flushEdit 应把编辑区文本写入工程");
             ta.setText("切换行自动保存");
             ed.showClass(cls); // 模拟切行/切类 → 自动落库
-            assertEquals("切换行自动保存",
-                    app.project().effective(cls).getOrDefault(rowOrig, ""),
-                    "切换行/类前应自动保存译文");
+            assertEquals("切换行自动保存", app.project().effective(cls).getOrDefault(rowOrig, ""), "切换行/类前应自动保存译文");
             // 自动保存开关关闭时不再落库
             app.settings().set("auto_save_translation", false);
             ed.selectRow(rowOrig);
             ta.setText("不应保存的内容");
             ed.showClass(cls);
-            assertEquals("切换行自动保存",
-                    app.project().effective(cls).getOrDefault(rowOrig, ""),
-                    "关闭自动保存后切换不应落库");
+            assertEquals("切换行自动保存", app.project().effective(cls).getOrDefault(rowOrig, ""), "关闭自动保存后切换不应落库");
             app.settings().set("auto_save_translation", true);
 
             // --- 双击跳源码默认开启 ---

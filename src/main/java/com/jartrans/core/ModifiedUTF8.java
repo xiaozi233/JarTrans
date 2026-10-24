@@ -17,8 +17,7 @@ public final class ModifiedUTF8 {
     private static final int SURROGATE_LO_MIN = 0xDC00;
     private static final int SURROGATE_LO_MAX = 0xDFFF;
 
-    private ModifiedUTF8() {
-    }
+    private ModifiedUTF8() {}
 
     private static int encodeUnit(int cp, byte[] out, int off) {
         if (cp == 0) {
@@ -86,10 +85,14 @@ public final class ModifiedUTF8 {
                 }
             } else if ((b0 & 0xF8) == 0xF0) {
                 // 标准 4 字节序列（个别工具会写出），容错解析
-                if (i + 3 < len && (data[i + 1] & 0xC0) == 0x80
-                        && (data[i + 2] & 0xC0) == 0x80 && (data[i + 3] & 0xC0) == 0x80) {
-                    int cp = ((b0 & 0x07) << 18) | ((data[i + 1] & 0x3F) << 12)
-                            | ((data[i + 2] & 0x3F) << 6) | (data[i + 3] & 0x3F);
+                if (i + 3 < len
+                        && (data[i + 1] & 0xC0) == 0x80
+                        && (data[i + 2] & 0xC0) == 0x80
+                        && (data[i + 3] & 0xC0) == 0x80) {
+                    int cp = ((b0 & 0x07) << 18)
+                            | ((data[i + 1] & 0x3F) << 12)
+                            | ((data[i + 2] & 0x3F) << 6)
+                            | (data[i + 3] & 0x3F);
                     units[m++] = cp;
                     i += 4;
                 } else {
@@ -107,8 +110,11 @@ public final class ModifiedUTF8 {
         int j = 0;
         while (j < m) {
             int u = units[j];
-            if (u >= SURROGATE_HI_MIN && u <= SURROGATE_HI_MAX && j + 1 < m
-                    && units[j + 1] >= SURROGATE_LO_MIN && units[j + 1] <= SURROGATE_LO_MAX) {
+            if (u >= SURROGATE_HI_MIN
+                    && u <= SURROGATE_HI_MAX
+                    && j + 1 < m
+                    && units[j + 1] >= SURROGATE_LO_MIN
+                    && units[j + 1] <= SURROGATE_LO_MAX) {
                 int cp = 0x10000 + ((u - SURROGATE_HI_MIN) << 10) + (units[j + 1] - SURROGATE_LO_MIN);
                 out.appendCodePoint(cp);
                 j += 2;

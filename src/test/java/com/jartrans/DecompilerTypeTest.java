@@ -1,31 +1,34 @@
 package com.jartrans;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.jartrans.core.Settings;
 import com.jartrans.core.java.DecompilerManager;
 import com.jartrans.core.java.DecompilerType;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /** 反编译器类型识别与单类产物定位（纯逻辑，不触文件系统/反编译器）。 */
 class DecompilerTypeTest {
 
     @Test
     void enginesAreRegisteredWithVersions() {
-        assertEquals(List.of(DecompilerType.values()),
-                DecompilerManager.engines().stream().map(DecompilerManager.EngineInfo::type).toList());
-        assertTrue(DecompilerManager.engines().stream().allMatch(info -> !info.version().isBlank()));
+        assertEquals(
+                List.of(DecompilerType.values()),
+                DecompilerManager.engines().stream()
+                        .map(DecompilerManager.EngineInfo::type)
+                        .toList());
+        assertTrue(DecompilerManager.engines().stream()
+                .allMatch(info -> !info.version().isBlank()));
     }
 
     @Test
@@ -46,7 +49,9 @@ class DecompilerTypeTest {
             assertTrue(t.displayName().length() > 0);
         }
         long distinct = java.util.Arrays.stream(DecompilerType.values())
-                .map(t -> t.key).distinct().count();
+                .map(t -> t.key)
+                .distinct()
+                .count();
         assertEquals(DecompilerType.values().length, distinct, "引擎 key 不得重复");
     }
 
@@ -76,13 +81,16 @@ class DecompilerTypeTest {
         Files.writeString(classes.resolve("Outer.java"), "class Outer {}");
         Files.writeString(classes.resolve("Outer$Inner.java"), "class Inner {}");
         Files.writeString(classes.resolve("Note.txt"), "not java"); // 非 .java 忽略
-        Files.writeString(Files.createDirectories(tmp.resolve("classes/deep/nested"))
-                .resolve("X.java"), "class X {}");
+        Files.writeString(
+                Files.createDirectories(tmp.resolve("classes/deep/nested")).resolve("X.java"), "class X {}");
 
         Map<String, Path> index = DecompilerManager.buildFileIndex(tmp.resolve("classes"));
-        assertEquals(List.of("deep/nested/X.java", "pkg/Outer$Inner.java", "pkg/Outer.java"),
-                new ArrayList<>(index.keySet()), "键为相对路径(正斜杠)且按路径升序");
-        assertEquals(classes.resolve("Outer.java").toAbsolutePath(),
+        assertEquals(
+                List.of("deep/nested/X.java", "pkg/Outer$Inner.java", "pkg/Outer.java"),
+                new ArrayList<>(index.keySet()),
+                "键为相对路径(正斜杠)且按路径升序");
+        assertEquals(
+                classes.resolve("Outer.java").toAbsolutePath(),
                 index.get("pkg/Outer.java").toAbsolutePath());
         assertTrue(index.get("pkg/Outer.java").isAbsolute(), "值为绝对路径");
 
@@ -101,7 +109,6 @@ class DecompilerTypeTest {
         assertEquals(DecompilerType.CFR, sel, "首选项显式选择的引擎应优先");
 
         settings.setQuiet("decompiler_type", "");
-        assertEquals(DecompilerType.VINEFLOWER,
-                DecompilerManager.currentDecompiler(settings), "未选择时回退默认优先级");
+        assertEquals(DecompilerType.VINEFLOWER, DecompilerManager.currentDecompiler(settings), "未选择时回退默认优先级");
     }
 }

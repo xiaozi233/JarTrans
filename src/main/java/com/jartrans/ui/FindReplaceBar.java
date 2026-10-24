@@ -44,6 +44,7 @@ final class FindReplaceBar extends VBox {
     private final HBox replaceRow = new HBox(6);
     /** 每字符过滤全量重建可见行，输入防抖与主窗过滤一致（120ms）。 */
     private final PauseTransition filterDebounce = new PauseTransition(Duration.millis(120));
+
     private FindReplaceBar.Handler handler;
 
     FindReplaceBar(Handler handler) {
@@ -75,8 +76,8 @@ final class FindReplaceBar extends VBox {
         Button closeBtn = new Button("✕");
         closeBtn.getStyleClass().add("flat");
         closeBtn.setOnAction(e -> handler.onDismiss());
-        HBox row1 = new HBox(6, new Label("查找："), findField, scopeBox,
-                prevBtn, nextBtn, countLabel, replaceModeBtn, closeBtn);
+        HBox row1 = new HBox(
+                6, new Label("查找："), findField, scopeBox, prevBtn, nextBtn, countLabel, replaceModeBtn, closeBtn);
         row1.setAlignment(Pos.CENTER_LEFT);
 
         // 第二行：替换（替换模式才显示）
@@ -89,8 +90,7 @@ final class FindReplaceBar extends VBox {
         Button replaceAllBtn = new Button("全部替换");
         replaceAllBtn.getStyleClass().add("accent");
         replaceAllBtn.setOnAction(e -> handler.onReplaceAll());
-        replaceRow.getChildren().setAll(new Label("替换为："), replaceField,
-                replaceOneBtn, replaceAllBtn);
+        replaceRow.getChildren().setAll(new Label("替换为："), replaceField, replaceOneBtn, replaceAllBtn);
         replaceRow.setAlignment(Pos.CENTER_LEFT);
         showReplace(false);
 

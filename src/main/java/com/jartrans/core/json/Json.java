@@ -20,8 +20,7 @@ import java.util.Map;
  */
 public final class Json {
 
-    private Json() {
-    }
+    private Json() {}
 
     // ---------- 解析 ----------
 
@@ -74,8 +73,7 @@ public final class Json {
 
     public static void writeFile(Path path, Object value) throws IOException {
         Path absolute = path.toAbsolutePath();
-        AtomicFiles.write(absolute,
-                temporary -> Files.writeString(temporary, write(value), StandardCharsets.UTF_8));
+        AtomicFiles.write(absolute, temporary -> Files.writeString(temporary, write(value), StandardCharsets.UTF_8));
     }
 
     private static void writeValue(StringBuilder sb, Object value, int indent) {
@@ -326,8 +324,8 @@ public final class Json {
                             try {
                                 code = Integer.parseInt(hex, 16);
                             } catch (NumberFormatException nfe) {
-                                throw new IOException("JSON 解析出错：\\u 转义含非十六进制字符 "
-                                        + hex + "（位置 " + (pos - 2) + "）", nfe);
+                                throw new IOException(
+                                        "JSON 解析出错：\\u 转义含非十六进制字符 " + hex + "（位置 " + (pos - 2) + "）", nfe);
                             }
                             sb.append((char) code);
                             pos += 4;

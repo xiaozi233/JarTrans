@@ -20,8 +20,7 @@ public class MissingEntriesWindow extends AppWindow {
     private final List<LangPack.MissingEntry> missing;
 
     public MissingEntriesWindow(MainApp app) {
-        super(app, "失效条目（" + app.project().lastMissing().size() + "）",
-                880, 460, 640, 360, Modality.NONE);
+        super(app, "失效条目（" + app.project().lastMissing().size() + "）", 880, 460, 640, 360, Modality.NONE);
         this.missing = app.project().lastMissing();
 
         VBox vbox = new VBox(6);
@@ -30,8 +29,7 @@ public class MissingEntriesWindow extends AppWindow {
 
         TableView<LangPack.MissingEntry> table = new TableView<>();
         VBox.setVgrow(table, Priority.ALWAYS);
-        TableColumn<LangPack.MissingEntry, String> colCls =
-                TableColumns.text("类", 80, LangPack.MissingEntry::cls);
+        TableColumn<LangPack.MissingEntry, String> colCls = TableColumns.text("类", 80, LangPack.MissingEntry::cls);
         TableColumn<LangPack.MissingEntry, String> colOrig =
                 TableColumns.text("原字符串", 80, m -> Texts.displayText(m.orig()));
         TableColumn<LangPack.MissingEntry, String> colTrans =

@@ -1,8 +1,15 @@
 package com.jartrans;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.jartrans.ui.DictDialog;
 import com.jartrans.ui.DictManagerDialog;
 import com.jartrans.ui.MainApp;
+import java.lang.reflect.Field;
+import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javafx.application.Platform;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
@@ -14,14 +21,6 @@ import javafx.stage.Stage;
 import javafx.stage.Window;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-
-import java.lang.reflect.Field;
-import java.nio.file.Path;
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 回归测试：词典管理窗口新建词典后，各词典窗口（管理窗口自身 / 词典条目窗口的下拉与内容）
@@ -44,10 +43,8 @@ class DictWindowsSyncTest {
             TableView<?> table = tableOf(mgr);
             int before = table.getItems().size();
             createNewDictViaUi(mgr);
-            assertEquals(before + 1, table.getItems().size(),
-                    "管理窗口新建词典后列表应立即多一行");
-            assertTrue(rowsText(table).contains("✓ 测试词典"),
-                    "新词典应为当前词典且即时可见");
+            assertEquals(before + 1, table.getItems().size(), "管理窗口新建词典后列表应立即多一行");
+            assertTrue(rowsText(table).contains("✓ 测试词典"), "新词典应为当前词典且即时可见");
             assertEquals("测试词典", app.project().dicts().activeName());
             assertEquals("测试词典", app.settings().getString("dictionary"));
             mgr.close();
@@ -81,7 +78,8 @@ class DictWindowsSyncTest {
             // ① 管理窗口自身即时出现
             assertTrue(rowsText(tableOf(mgr)).contains("✓ 测试词典"));
             // ② 词典条目窗口下拉即时包含新词典并切到它
-            assertTrue(box.getItems().contains("测试词典"),
+            assertTrue(
+                    box.getItems().contains("测试词典"),
                     "listeners=" + listenersOf(app).size() + " box=" + box.getItems()
                             + " active=" + app.project().dicts().activeName()
                             + " ddTitle=" + dd.getTitle());
@@ -120,20 +118,17 @@ class DictWindowsSyncTest {
             // 在条目窗口下拉切回「默认词典」→ 管理窗口的激活标记应跟随
             comboOf(dd).setValue("默认词典");
             assertEquals("默认词典", app.project().dicts().activeName());
-            assertTrue(rowsText(tableOf(mgr)).contains("✓ 默认词典"),
-                    "切回默认词典后管理窗口应更新激活标记");
+            assertTrue(rowsText(tableOf(mgr)).contains("✓ 默认词典"), "切回默认词典后管理窗口应更新激活标记");
 
             // 在条目窗口添加一条词条 → 管理窗口该行词条数应 +1
             addEntryViaUi(dd, "hello", "你好");
-            assertTrue(rowsText(tableOf(mgr)).contains("count=1"),
-                    "添加词条后管理窗口的词条数列应更新");
+            assertTrue(rowsText(tableOf(mgr)).contains("count=1"), "添加词条后管理窗口的词条数列应更新");
 
             // 主窗顶部下拉切换 → 管理窗口激活标记同样跟随
             ComboBox<String> mainBox = mainComboOf(app);
             mainBox.setValue("测试词典");
             assertEquals("测试词典", app.project().dicts().activeName());
-            assertTrue(rowsText(tableOf(mgr)).contains("✓ 测试词典"),
-                    "主窗下拉切换后管理窗口应同步激活标记");
+            assertTrue(rowsText(tableOf(mgr)).contains("✓ 测试词典"), "主窗下拉切换后管理窗口应同步激活标记");
             assertEquals("测试词典", comboOf(dd).getValue(), "条目窗口下拉也应跟随");
 
             dd.close();
@@ -154,24 +149,26 @@ class DictWindowsSyncTest {
 
     private static void createNewDictViaUi(DictManagerDialog mgr) throws Exception {
         AtomicBoolean finished = new AtomicBoolean(false);
-        Thread driver = new Thread(() -> {
-            for (int i = 0; i < 200 && !finished.get(); i++) {
-                Platform.runLater(() -> {
-                    try {
-                        if (fillTextInputDialogs("测试词典")) {
-                            finished.set(true);
+        Thread driver = new Thread(
+                () -> {
+                    for (int i = 0; i < 200 && !finished.get(); i++) {
+                        Platform.runLater(() -> {
+                            try {
+                                if (fillTextInputDialogs("测试词典")) {
+                                    finished.set(true);
+                                }
+                            } catch (Throwable t) {
+                                t.printStackTrace();
+                            }
+                        });
+                        try {
+                            Thread.sleep(40);
+                        } catch (InterruptedException e) {
+                            return;
                         }
-                    } catch (Throwable t) {
-                        t.printStackTrace();
                     }
-                });
-                try {
-                    Thread.sleep(40);
-                } catch (InterruptedException e) {
-                    return;
-                }
-            }
-        }, "dialog-driver");
+                },
+                "dialog-driver");
         driver.setDaemon(true);
         driver.start();
         Button createBtn = findButton(mgr, "新建…");
@@ -182,8 +179,7 @@ class DictWindowsSyncTest {
     /** 自动填写当前显示中的文本输入框并确认；同时打印出现的警告内容以便诊断。 */
     private static boolean fillTextInputDialogs(String value) {
         for (Window w : Window.getWindows()) {
-            if (!w.isShowing() || w.getScene() == null
-                    || !(w.getScene().getRoot() instanceof DialogPane pane)) {
+            if (!w.isShowing() || w.getScene() == null || !(w.getScene().getRoot() instanceof DialogPane pane)) {
                 continue;
             }
             TextField tf = (TextField) pane.lookup(".text-field");
@@ -195,8 +191,7 @@ class DictWindowsSyncTest {
                     return true;
                 }
             } else if (ok != null) {
-                System.out.println("[DictWindowsSyncTest] Alert："
-                        + pane.getContentText());
+                System.out.println("[DictWindowsSyncTest] Alert：" + pane.getContentText());
                 ok.fire();
                 return true;
             }
@@ -219,8 +214,7 @@ class DictWindowsSyncTest {
 
     private static DictManagerDialog findManagerWindow(MainApp app) {
         for (Window w : Window.getWindows()) {
-            if (w instanceof DictManagerDialog d && w.isShowing()
-                    && d.getOwner() == app.stage()) {
+            if (w instanceof DictManagerDialog d && w.isShowing() && d.getOwner() == app.stage()) {
                 return d;
             }
         }

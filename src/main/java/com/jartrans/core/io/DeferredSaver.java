@@ -77,8 +77,7 @@ public final class DeferredSaver {
             try {
                 action.run();
             } catch (RuntimeException e) {
-                Log.get(DeferredSaver.class).log(System.Logger.Level.ERROR,
-                        "延迟保存执行失败（" + name + "）", e);
+                Log.get(DeferredSaver.class).log(System.Logger.Level.ERROR, "延迟保存执行失败（" + name + "）", e);
             } finally {
                 synchronized (lock) {
                     running = false;
@@ -103,8 +102,7 @@ public final class DeferredSaver {
             synchronized (lock) {
                 dirty = true; // 失败保留脏标记，下次请求或退出 flush 重试
             }
-            Log.get(DeferredSaver.class).log(System.Logger.Level.WARNING,
-                    "延迟保存失败（" + name + "），保留待写", e);
+            Log.get(DeferredSaver.class).log(System.Logger.Level.WARNING, "延迟保存失败（" + name + "），保留待写", e);
         } finally {
             synchronized (lock) {
                 running = false;

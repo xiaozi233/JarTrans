@@ -3,14 +3,11 @@ package com.jartrans.ui;
 /** 文本显示工具：转义/反转义（与 Python 版 editor.py、source_panel.py 一致）。 */
 public final class Texts {
 
-    private Texts() {
-    }
+    private Texts() {}
 
     /** 把换行/制表符转成可见形式，便于在表格单行里展示。 */
     public static String displayText(String s) {
-        return s.replace("\\", "\\\\")
-                .replace("\n", "\\n")
-                .replace("\t", "\\t");
+        return s.replace("\\", "\\\\").replace("\n", "\\n").replace("\t", "\\t");
     }
 
     /** Java 源码字面量转义。 */

@@ -61,8 +61,7 @@ public final class BackgroundOps {
             finish(scene);
             Throwable ex = task.getException();
             LOG.log(System.Logger.Level.ERROR, opTitle + "失败", ex);
-            String detail = ex.getMessage() == null || ex.getMessage().isEmpty()
-                    ? ex.toString() : ex.getMessage();
+            String detail = ex.getMessage() == null || ex.getMessage().isEmpty() ? ex.toString() : ex.getMessage();
             Dialogs.error("错误", opTitle + "失败：\n" + detail);
             setStatus(opTitle + "失败");
         });

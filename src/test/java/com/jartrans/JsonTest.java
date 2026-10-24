@@ -1,17 +1,16 @@
 package com.jartrans;
 
-import com.jartrans.core.json.Json;
-import org.junit.jupiter.api.Test;
-
-import java.io.IOException;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.jartrans.core.json.Json;
+import java.io.IOException;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import org.junit.jupiter.api.Test;
 
 /** JSON 解析/写出：BOM 容错、键序保持、整数 Double 不带小数点、非法输入报错、码点排序。 */
 class JsonTest {

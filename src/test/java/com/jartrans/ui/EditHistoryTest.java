@@ -1,10 +1,10 @@
 package com.jartrans.ui;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.junit.jupiter.api.Test;
 
 /** 撤销/重做历史栈的纯逻辑：压栈、容量上限、撤销/重做之间搬运。 */
 class EditHistoryTest {
@@ -74,9 +74,11 @@ class EditHistoryTest {
     @Test
     void batchUndoRedoRoundTripsAsSingleStep() {
         EditHistory history = new EditHistory();
-        EditHistory.Batch batch = new EditHistory.Batch("trans", java.util.List.of(
-                new EditHistory.Hist("trans", "c1", "o1", "a1", "n"),
-                new EditHistory.Hist("trans", "c2", "o2", "a2", "n")));
+        EditHistory.Batch batch = new EditHistory.Batch(
+                "trans",
+                java.util.List.of(
+                        new EditHistory.Hist("trans", "c1", "o1", "a1", "n"),
+                        new EditHistory.Hist("trans", "c2", "o2", "a2", "n")));
         history.push(batch);
         assertTrue(history.canUndo());
 

@@ -4,6 +4,8 @@ plugins {
     id("org.openjfx.javafxplugin") version "0.1.0"
     // 产出可直接 java -jar 运行的可执行 fat jar
     id("com.gradleup.shadow") version "9.4.0"
+    // 统一代码风格：gradlew spotlessApply 全量格式化，gradlew spotlessCheck 校验
+    id("com.diffplug.spotless") version "7.0.4"
 }
 
 group = "com.jartrans"
@@ -81,4 +83,20 @@ tasks.shadowJar {
 
 tasks.assemble {
     dependsOn(tasks.shadowJar)
+}
+
+spotless {
+    java {
+        target("src/*/java/**/*.java")
+        // Palantir Java Format：唯一风格决策来源（4 空格缩进、120 列、确定性 import 排序）
+        palantirJavaFormat("2.102.0")
+        removeUnusedImports()
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+    format("misc") {
+        target(".gitignore", "*.md", "config/**/*.xml")
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
 }

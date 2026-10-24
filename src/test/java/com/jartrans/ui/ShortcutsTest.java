@@ -1,13 +1,13 @@
 package com.jartrans.ui;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 
 /** 快捷键文本 ↔ 组合键解析与默认定义（纯逻辑，无需 JavaFX toolkit）。 */
 class ShortcutsTest {
@@ -35,8 +35,7 @@ class ShortcutsTest {
     @Test
     void parsedKeyAndModifiersAreExact() {
         KeyCodeCombination combo = Shortcuts.parse("Ctrl+Alt+F");
-        assertEquals(new KeyCodeCombination(KeyCode.F,
-                KeyCombination.CONTROL_DOWN, KeyCombination.ALT_DOWN), combo);
+        assertEquals(new KeyCodeCombination(KeyCode.F, KeyCombination.CONTROL_DOWN, KeyCombination.ALT_DOWN), combo);
     }
 
     @Test

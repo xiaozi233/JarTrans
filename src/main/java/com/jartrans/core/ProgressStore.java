@@ -1,13 +1,13 @@
 package com.jartrans.core;
 
 import com.jartrans.core.json.Json;
-import java.nio.file.Path;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.Map;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /** Owns the on-disk progress format, independently of the current archive and UI. */
@@ -16,8 +16,7 @@ final class ProgressStore {
     private static final int MAX_PROJECTS = 50;
     private final Path path;
 
-    record Progress(Map<String, String> classStatus, Set<String> skippedTexts) {
-    }
+    record Progress(Map<String, String> classStatus, Set<String> skippedTexts) {}
 
     ProgressStore(Path path) {
         this.path = path;

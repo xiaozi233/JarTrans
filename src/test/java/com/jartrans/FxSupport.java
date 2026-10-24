@@ -1,10 +1,9 @@
 package com.jartrans;
 
-import javafx.application.Platform;
-
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import javafx.application.Platform;
 
 /** 让多个 UI 测试在同一个 JVM 里共享唯一的 JavaFX toolkit（避免重复 startup/exit 冲突）。 */
 final class FxSupport {
@@ -13,8 +12,7 @@ final class FxSupport {
     private static volatile boolean initStarted;
     private static final CountDownLatch TOOLKIT_READY = new CountDownLatch(1);
 
-    private FxSupport() {
-    }
+    private FxSupport() {}
 
     @FunctionalInterface
     interface Body {
@@ -68,17 +66,19 @@ final class FxSupport {
             }
             initStarted = true;
         }
-        Thread t = new Thread(() -> {
-            try {
-                // 共享工具包：最后一个 Stage 隐藏/关闭不得隐式退出 FX 线程，
-                // 否则后续测试的 runLater 永远不会执行（表现为全部 FX 测试超时）
-                Platform.setImplicitExit(false);
-                Platform.startup(TOOLKIT_READY::countDown);
-            } catch (Throwable e) {
-                TOOLKIT_ERROR.set(e);
-                TOOLKIT_READY.countDown();
-            }
-        }, "fx-toolkit");
+        Thread t = new Thread(
+                () -> {
+                    try {
+                        // 共享工具包：最后一个 Stage 隐藏/关闭不得隐式退出 FX 线程，
+                        // 否则后续测试的 runLater 永远不会执行（表现为全部 FX 测试超时）
+                        Platform.setImplicitExit(false);
+                        Platform.startup(TOOLKIT_READY::countDown);
+                    } catch (Throwable e) {
+                        TOOLKIT_ERROR.set(e);
+                        TOOLKIT_READY.countDown();
+                    }
+                },
+                "fx-toolkit");
         t.setDaemon(true);
         t.start();
         awaitReady();

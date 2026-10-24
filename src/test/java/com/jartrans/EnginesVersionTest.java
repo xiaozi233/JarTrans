@@ -27,8 +27,7 @@ class EnginesVersionTest {
         for (DecompilerManager.EngineInfo info : DecompilerManager.engines()) {
             String expected = versions.get(info.type().key);
             assertNotNull(expected, "catalog [versions] 缺少 " + info.type().key);
-            assertEquals(expected, info.version(),
-                    info.type().displayName() + " 展示版本与 version catalog 不一致");
+            assertEquals(expected, info.version(), info.type().displayName() + " 展示版本与 version catalog 不一致");
         }
     }
 
@@ -43,7 +42,8 @@ class EnginesVersionTest {
             } else if (inVersions) {
                 int eq = t.indexOf('=');
                 if (eq > 0) {
-                    out.put(t.substring(0, eq).trim(),
+                    out.put(
+                            t.substring(0, eq).trim(),
                             t.substring(eq + 1).trim().replace("\"", ""));
                 }
             }

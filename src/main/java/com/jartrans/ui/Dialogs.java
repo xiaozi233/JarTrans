@@ -11,8 +11,7 @@ import javafx.stage.Window;
 /** 消息框/输入框统一封装（对齐 tkinter messagebox/simpledialog 的行为）。 */
 public final class Dialogs {
 
-    private Dialogs() {
-    }
+    private Dialogs() {}
 
     public static void info(String title, String message) {
         alert(Alert.AlertType.INFORMATION, title, message).showAndWait();
@@ -27,8 +26,8 @@ public final class Dialogs {
     }
 
     public static boolean confirm(String title, String message) {
-        return alert(Alert.AlertType.CONFIRMATION, title, message)
-                .showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK;
+        return alert(Alert.AlertType.CONFIRMATION, title, message).showAndWait().orElse(ButtonType.CANCEL)
+                == ButtonType.OK;
     }
 
     /** 构造与应用主题一致的提示框（标题/正文设置方式全应用统一）。 */

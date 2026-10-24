@@ -22,8 +22,7 @@ class TranslationStoreTest {
         store.set(CLS, "a", "甲", false);
         Map<String, String> first = store.effective(CLS);
         assertSame(first, store.effective(CLS), "未变更时应复用同一快照");
-        assertThrows(UnsupportedOperationException.class, () -> first.put("b", "乙"),
-                "快照必须只读（缓存实例被共享）");
+        assertThrows(UnsupportedOperationException.class, () -> first.put("b", "乙"), "快照必须只读（缓存实例被共享）");
     }
 
     @Test

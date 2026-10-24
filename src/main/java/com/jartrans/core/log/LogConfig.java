@@ -22,23 +22,20 @@ public final class LogConfig {
     /** 轮转文件数。 */
     static final int FILE_COUNT = 5;
 
-    private LogConfig() {
-    }
+    private LogConfig() {}
 
     public static void init() {
         Path dir = AppDirs.baseDir().resolve("logs");
         try {
             Files.createDirectories(dir);
-            FileHandler handler = new FileHandler(dir.resolve("jartrans.log").toString(),
-                    FILE_LIMIT, FILE_COUNT, true);
+            FileHandler handler = new FileHandler(dir.resolve("jartrans.log").toString(), FILE_LIMIT, FILE_COUNT, true);
             handler.setEncoding("UTF-8");
             handler.setFormatter(new SimpleFormatter());
             Logger root = Logger.getLogger("");
             root.addHandler(handler);
             root.setLevel(Level.INFO);
         } catch (IOException e) {
-            Log.get(LogConfig.class)
-                    .log(System.Logger.Level.WARNING, "日志文件初始化失败，仅输出到控制台", e);
+            Log.get(LogConfig.class).log(System.Logger.Level.WARNING, "日志文件初始化失败，仅输出到控制台", e);
         }
     }
 }

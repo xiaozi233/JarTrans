@@ -1,14 +1,13 @@
 package com.jartrans.ui;
 
-import com.jartrans.core.Settings;
 import com.jartrans.core.Project;
+import com.jartrans.core.Settings;
 import com.jartrans.core.log.Log;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javafx.animation.PauseTransition;
-import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
@@ -50,6 +49,7 @@ public class EditorPane extends BorderPane {
 
     /** 状态色缓存（按调色板失效；Color.web 解析不再每行渲染重复执行）。 */
     private final Map<String, Color> statusColors = new LinkedHashMap<>();
+
     private Map<String, String> statusColorsPalette;
 
     /** 表格行模型。 */
@@ -61,8 +61,7 @@ public class EditorPane extends BorderPane {
         public final String methods;
         public final boolean internal;
 
-        Row(String orig, String trans, String statusKey, String count,
-            String methods, boolean internal) {
+        Row(String orig, String trans, String statusKey, String count, String methods, boolean internal) {
             this.orig = orig;
             this.trans = trans;
             this.statusKey = statusKey;
@@ -81,6 +80,7 @@ public class EditorPane extends BorderPane {
     private boolean editingInternal;
     /** 当前类的全部行（未经查找过滤），查找栏过滤后显示在表格里的子集。 */
     private final List<Row> allRows = new ArrayList<>();
+
     private final ObservableList<Row> rows = FXCollections.observableArrayList();
     private final TableView<Row> table = new TableView<>(rows);
     private final TextArea editor = new TextArea();
@@ -128,8 +128,7 @@ public class EditorPane extends BorderPane {
     });
 
     // ---------- 译文自动保存（输入停顿或切换行/类时落库） ----------
-    private final PauseTransition autoSave =
-            new PauseTransition(Duration.millis(700));
+    private final PauseTransition autoSave = new PauseTransition(Duration.millis(700));
     /** 编辑区文本是否已被用户改过（尚未落库）。 */
     private boolean editDirty;
     /** 程序化加载文本（setEditor/回显）时抑制“视为用户修改”。 */
@@ -163,8 +162,7 @@ public class EditorPane extends BorderPane {
         classStateBox.getSelectionModel().selectFirst();
         classStateBox.valueProperty().addListener((o, ov, nv) -> onClassStateBox());
         stateDot.getStyleClass().add("state-dot");
-        head.getChildren().addAll(new Label("类状态："), classStateBox, stateDot,
-                new Separator(), onlyUntranslated);
+        head.getChildren().addAll(new Label("类状态："), classStateBox, stateDot, new Separator(), onlyUntranslated);
         onlyUntranslated.setOnAction(e -> {
             setQuiet(Settings.Keys.ONLY_UNTRANSLATED, onlyUntranslated.isSelected());
             refreshRows();
@@ -181,32 +179,28 @@ public class EditorPane extends BorderPane {
             statusColors.clear();
             statusColorsPalette = palette;
         }
-        return statusColors.computeIfAbsent(statusKey, k -> Color.web(
-                "skipped".equals(k) ? app.theme().color("fg_muted")
-                        : app.theme().statusColor(k)));
+        return statusColors.computeIfAbsent(
+                statusKey,
+                k -> Color.web(
+                        "skipped".equals(k)
+                                ? app.theme().color("fg_muted")
+                                : app.theme().statusColor(k)));
     }
 
     /** 中央翻译表格：列定义、行着色、选择联动与右键菜单。 */
     private void buildTableArea() {
         // ---- 表格 ----
-        TableColumn<Row, String> colOrig =
-                TableColumns.text("原字符串", 340, r -> Texts.displayText(r.orig));
-        TableColumn<Row, String> colTrans =
-                TableColumns.text("译文", 260, r -> Texts.displayText(r.trans));
-        TableColumn<Row, String> colStatus =
-                TableColumns.centered("状态", 70, r -> STATUS_TEXT.get(r.statusKey));
-        TableColumn<Row, String> colCount =
-                TableColumns.centered("次数", 42, r -> r.count);
-        TableColumn<Row, String> colMethods =
-                TableColumns.text("所在方法", 130, r -> r.methods);
+        TableColumn<Row, String> colOrig = TableColumns.text("原字符串", 340, r -> Texts.displayText(r.orig));
+        TableColumn<Row, String> colTrans = TableColumns.text("译文", 260, r -> Texts.displayText(r.trans));
+        TableColumn<Row, String> colStatus = TableColumns.centered("状态", 70, r -> STATUS_TEXT.get(r.statusKey));
+        TableColumn<Row, String> colCount = TableColumns.centered("次数", 42, r -> r.count);
+        TableColumn<Row, String> colMethods = TableColumns.text("所在方法", 130, r -> r.methods);
 
-        List<TableColumn<Row, String>> allCols =
-                List.of(colOrig, colTrans, colStatus, colCount, colMethods);
+        List<TableColumn<Row, String>> allCols = List.of(colOrig, colTrans, colStatus, colCount, colMethods);
         //noinspection unchecked
         table.getColumns().addAll(allCols);
         // 拖列宽只动相邻右列（不影响左侧栏目的宽度，总宽不变）
-        table.setColumnResizePolicy(
-                TableView.CONSTRAINED_RESIZE_POLICY_NEXT_COLUMN);
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_NEXT_COLUMN);
         table.setRowFactory(tv -> new TableRow<>() {
             @Override
             protected void updateItem(Row item, boolean empty) {
@@ -219,8 +213,7 @@ public class EditorPane extends BorderPane {
         });
         table.getSelectionModel().selectedItemProperty().addListener((o, ov, nv) -> onSelect());
         // 支持 Shift/Ctrl 多选，配合右键批量操作
-        table.getSelectionModel().setSelectionMode(
-                SelectionMode.MULTIPLE);
+        table.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         // 左键点表格任意处都收起上下文菜单（修复右键后再左键不关闭的问题）
         table.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
             if (e.getButton() == MouseButton.PRIMARY) {
@@ -233,8 +226,7 @@ public class EditorPane extends BorderPane {
             }
         });
         table.setOnMouseClicked(e -> {
-            if (e.getClickCount() == 2 && app != null
-                    && app.settings().getBool(Settings.Keys.DBLCLICK_SOURCE)) {
+            if (e.getClickCount() == 2 && app != null && app.settings().getBool(Settings.Keys.DBLCLICK_SOURCE)) {
                 viewInSource();
             }
         });
@@ -251,8 +243,7 @@ public class EditorPane extends BorderPane {
                 long visible = allCols.stream().filter(TableColumn::isVisible).count();
                 colMenu.getItems().clear();
                 for (TableColumn<Row, String> c : allCols) {
-                    CheckMenuItem mi =
-                            new CheckMenuItem(c.getText());
+                    CheckMenuItem mi = new CheckMenuItem(c.getText());
                     mi.setSelected(c.isVisible());
                     mi.setDisable(c.isVisible() && visible == 1); // 至少保留一列
                     mi.setOnAction(ev -> {
@@ -370,10 +361,10 @@ public class EditorPane extends BorderPane {
         if (keyword.isEmpty()) {
             return true;
         }
-        boolean hitOrig = !"trans".equals(scope)
-                && r.orig.toLowerCase().contains(keyword);
+        boolean hitOrig = !"trans".equals(scope) && r.orig.toLowerCase().contains(keyword);
         boolean hitTrans = !"orig".equals(scope)
-                && r.trans != null && r.trans.toLowerCase().contains(keyword);
+                && r.trans != null
+                && r.trans.toLowerCase().contains(keyword);
         return hitOrig || hitTrans;
     }
 
@@ -439,8 +430,7 @@ public class EditorPane extends BorderPane {
     }
 
     private boolean canEditRow(Row r) {
-        return r != null && !r.internal
-                && !app.project().isSkipped(r.orig);
+        return r != null && !r.internal && !app.project().isSkipped(r.orig);
     }
 
     /** 替换当前选中的匹配行译文，然后跳到下一个。 */
@@ -460,8 +450,8 @@ public class EditorPane extends BorderPane {
             return;
         }
         String replacement = findBar.replacement();
-        List<Project.ReplaceChange> changes = app.project().replaceTranslations(
-                List.of(new Project.ReplaceTarget(currentClass, row.orig)), replacement);
+        List<Project.ReplaceChange> changes = app.project()
+                .replaceTranslations(List.of(new Project.ReplaceTarget(currentClass, row.orig)), replacement);
         if (changes.isEmpty()) {
             findNext();
             return;
@@ -483,9 +473,9 @@ public class EditorPane extends BorderPane {
             return;
         }
         String replacement = findBar.replacement();
-        if (findBar.keyword().isEmpty() && !Dialogs.confirm("全部替换",
-                "当前没有输入查找词，将把本类全部行译文替换为：\n\n「"
-                        + Texts.displayText(replacement) + "」\n\n确定继续吗？")) {
+        if (findBar.keyword().isEmpty()
+                && !Dialogs.confirm(
+                        "全部替换", "当前没有输入查找词，将把本类全部行译文替换为：\n\n「" + Texts.displayText(replacement) + "」\n\n确定继续吗？")) {
             return;
         }
         List<Project.ReplaceTarget> targets = new ArrayList<>();
@@ -602,8 +592,7 @@ public class EditorPane extends BorderPane {
             status = app.project().status(currentClass, orig).key;
         }
         String methods = internal ? "" : String.join(", ", app.project().methodNames(currentClass, orig));
-        return new Row(orig, trans, status, internal ? "" : String.valueOf(cnt),
-                methods, internal);
+        return new Row(orig, trans, status, internal ? "" : String.valueOf(cnt), methods, internal);
     }
 
     public boolean selectRow(String orig) {
@@ -777,7 +766,8 @@ public class EditorPane extends BorderPane {
         while (n != null && !(n instanceof TableRow)) {
             n = n.getParent();
         }
-        if (n instanceof TableRow<?> row && row.getItem() instanceof Row item
+        if (n instanceof TableRow<?> row
+                && row.getItem() instanceof Row item
                 && !table.getSelectionModel().getSelectedItems().contains(item)) {
             table.getSelectionModel().select(item);
         }
@@ -791,22 +781,16 @@ public class EditorPane extends BorderPane {
             return;
         }
         String label = rowsSel.size() > 1 ? "（" + rowsSel.size() + " 行）" : "";
-        long skippedCnt = rowsSel.stream()
-                .filter(r -> app.project().isSkipped(r.orig)).count();
+        long skippedCnt =
+                rowsSel.stream().filter(r -> app.project().isSkipped(r.orig)).count();
         rowMenu.getItems().clear();
-        MenuItem keep = new MenuItem(
-                skippedCnt == rowsSel.size()
-                        ? "恢复翻译" + label
-                        : "保留原文（不翻译）" + label);
-        keep.setOnAction(e -> bulkSkip(rowsSel,
-                !(skippedCnt == rowsSel.size())));
-        MenuItem clear = new MenuItem(
-                "清空译文" + label);
+        MenuItem keep = new MenuItem(skippedCnt == rowsSel.size() ? "恢复翻译" + label : "保留原文（不翻译）" + label);
+        keep.setOnAction(e -> bulkSkip(rowsSel, !(skippedCnt == rowsSel.size())));
+        MenuItem clear = new MenuItem("清空译文" + label);
         clear.setOnAction(e -> bulkClear(rowsSel));
-        MenuItem copy = new MenuItem(
-                rowsSel.size() == 1 ? "复制原字符串" : "复制首个原字符串");
-        copy.setOnAction(e -> Clipboard.getSystemClipboard().setContent(
-                Map.of(DataFormat.PLAIN_TEXT, rowsSel.get(0).orig)));
+        MenuItem copy = new MenuItem(rowsSel.size() == 1 ? "复制原字符串" : "复制首个原字符串");
+        copy.setOnAction(
+                e -> Clipboard.getSystemClipboard().setContent(Map.of(DataFormat.PLAIN_TEXT, rowsSel.get(0).orig)));
         rowMenu.getItems().addAll(keep, clear, copy);
         rowMenu.show(table, x, y);
     }
@@ -828,8 +812,7 @@ public class EditorPane extends BorderPane {
             n++;
         }
         refreshAfterBulk(rowsSel.get(0).orig);
-        app.setStatus(n == 0 ? "无需变更" : "已将 " + n + " 条文本设为"
-                + (skip ? "「不翻译」" : "可翻译"));
+        app.setStatus(n == 0 ? "无需变更" : "已将 " + n + " 条文本设为" + (skip ? "「不翻译」" : "可翻译"));
     }
 
     /** 批量清空译文。 */

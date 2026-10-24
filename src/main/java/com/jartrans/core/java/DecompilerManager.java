@@ -23,29 +23,33 @@ public final class DecompilerManager {
 
     private static final System.Logger LOG = Log.get(DecompilerManager.class);
 
-    public static final Path CACHE_ROOT =
-            Paths.get(System.getProperty("java.io.tmpdir"), "jartrans_decomp");
+    public static final Path CACHE_ROOT = Paths.get(System.getProperty("java.io.tmpdir"), "jartrans_decomp");
     private static final Map<DecompilerType, DecompilerEngine> ENGINES = Map.of(
             DecompilerType.VINEFLOWER, new VineflowerEngine(),
             DecompilerType.CFR, new CfrEngine(),
             DecompilerType.PROCYON, new ProcyonEngine());
     private static final ConcurrentHashMap<String, ReentrantLock> OUTPUT_LOCKS = new ConcurrentHashMap<>();
 
-    private DecompilerManager() { }
+    private DecompilerManager() {}
 
     public static class DecompileException extends Exception {
         private static final long serialVersionUID = 1L;
 
-        public DecompileException(String message) { super(message); }
+        public DecompileException(String message) {
+            super(message);
+        }
 
-        public DecompileException(String message, Throwable cause) { super(message, cause); }
+        public DecompileException(String message, Throwable cause) {
+            super(message, cause);
+        }
     }
 
     /** 引擎元数据；实现始终来自应用 classpath。 */
-    public record EngineInfo(DecompilerType type, String version) { }
+    public record EngineInfo(DecompilerType type, String version) {}
 
     public static List<EngineInfo> engines() {
-        return List.of(new EngineInfo(DecompilerType.VINEFLOWER, "1.12.0"),
+        return List.of(
+                new EngineInfo(DecompilerType.VINEFLOWER, "1.12.0"),
                 new EngineInfo(DecompilerType.CFR, "0.152"),
                 new EngineInfo(DecompilerType.PROCYON, "0.6.0"));
     }
@@ -99,11 +103,16 @@ public final class DecompilerManager {
      * 单类及内部类按需反编译，依赖字节从原 JAR 加载；只缓存本次返回的源码。
      * 同一 JAR/引擎串行执行，等待锁期间可以取消；运行中的引擎自然收尾。
      */
-    public static List<Path> decompileClasses(String jarPath, String sha256,
-                                              Collection<String> classNames, DecompilerType type)
+    public static List<Path> decompileClasses(
+            String jarPath, String sha256, Collection<String> classNames, DecompilerType type)
             throws DecompileException {
-        if (jarPath == null || jarPath.isBlank() || sha256 == null || sha256.isBlank()
-                || classNames == null || classNames.isEmpty() || type == null) {
+        if (jarPath == null
+                || jarPath.isBlank()
+                || sha256 == null
+                || sha256.isBlank()
+                || classNames == null
+                || classNames.isEmpty()
+                || type == null) {
             throw new DecompileException("反编译参数不完整");
         }
         Path out;
@@ -125,8 +134,10 @@ public final class DecompilerManager {
         try {
             Map<String, String> sources;
             try (ZipFile jar = new ZipFile(jarPath)) {
-                List<String> found = classNames.stream().distinct()
-                        .filter(name -> jar.getEntry(name + ".class") != null).toList();
+                List<String> found = classNames.stream()
+                        .distinct()
+                        .filter(name -> jar.getEntry(name + ".class") != null)
+                        .toList();
                 if (found.isEmpty()) {
                     throw new DecompileException("jar 中未找到指定类：" + classNames);
                 }
@@ -151,8 +162,13 @@ public final class DecompilerManager {
     }
 
     private static Path sourcePath(Path out, String name) {
-        if (name == null || name.isBlank() || name.contains("\\") || name.startsWith("/")
-                || name.contains(":") || name.contains(".") || name.contains("//")) {
+        if (name == null
+                || name.isBlank()
+                || name.contains("\\")
+                || name.startsWith("/")
+                || name.contains(":")
+                || name.contains(".")
+                || name.contains("//")) {
             throw new IllegalArgumentException("无效的类内部名：" + name);
         }
         Path file = out.resolve(name + ".java").normalize();
@@ -169,9 +185,9 @@ public final class DecompilerManager {
             return index;
         }
         try (Stream<Path> walk = Files.walk(outDir)) {
-            walk.filter(p -> p.getFileName().toString().endsWith(".java")).sorted()
-                    .forEach(p -> index.put(outDir.relativize(p).toString().replace('\\', '/'),
-                            p.toAbsolutePath()));
+            walk.filter(p -> p.getFileName().toString().endsWith(".java"))
+                    .sorted()
+                    .forEach(p -> index.put(outDir.relativize(p).toString().replace('\\', '/'), p.toAbsolutePath()));
         } catch (IOException e) {
             // 返回已建立的索引。
             LOG.log(System.Logger.Level.WARNING, "反编译产物索引构建失败：" + outDir, e);
@@ -183,9 +199,11 @@ public final class DecompilerManager {
         String base = classPath.substring(0, classPath.length() - ".class".length());
         String external = base + ".java";
         List<String> inners = index.keySet().stream()
-                .filter(k -> k.startsWith(base + "$") && k.endsWith(".java")).sorted().toList();
+                .filter(k -> k.startsWith(base + "$") && k.endsWith(".java"))
+                .sorted()
+                .toList();
         return new SourceFiles(index.containsKey(external) ? external : null, inners);
     }
 
-    public record SourceFiles(String external, List<String> inners) { }
+    public record SourceFiles(String external, List<String> inners) {}
 }

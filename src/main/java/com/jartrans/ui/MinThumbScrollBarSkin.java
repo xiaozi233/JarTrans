@@ -79,8 +79,7 @@ public class MinThumbScrollBarSkin extends ScrollBarSkin {
     }
 
     /** 滑块起点 = 轨道起点 + 滑行范围(轨道长-滑块长) × value/max 比例。 */
-    private static double position(double trackStart, double trackLength,
-                                   double thumbLength, ScrollBar bar) {
+    private static double position(double trackStart, double trackLength, double thumbLength, ScrollBar bar) {
         double range = trackLength - thumbLength;
         if (range <= 0) {
             return trackStart;

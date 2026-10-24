@@ -69,8 +69,10 @@ final class DecompileController {
         }
         DecompilerType type = DecompilerManager.currentDecompiler(app.settings());
         String inner = internalName(cls);
-        List<String> names = app.project().classOrder().stream().map(DecompileController::internalName)
-                .filter(n -> n.equals(inner) || n.startsWith(inner + "$")).toList();
+        List<String> names = app.project().classOrder().stream()
+                .map(DecompileController::internalName)
+                .filter(n -> n.equals(inner) || n.startsWith(inner + "$"))
+                .toList();
         String jarPath = app.project().jarPath().toString();
         long taskGeneration = generation;
         app.setStatus("正在反编译 " + inner + " …");
