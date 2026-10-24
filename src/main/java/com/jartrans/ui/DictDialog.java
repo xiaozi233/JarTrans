@@ -31,6 +31,8 @@ public class DictDialog extends AppWindow {
     private final Label countLabel = new Label("");
     /** 词典结构/激活变化（如在「管理多个词典」里新建）后同步本窗口的下拉与内容。 */
     private final Runnable dictsListener;
+    /** 程序化同步下拉期间为 true，避免 setAll/setValue 触发的值监听再次进入切换流程。 */
+    private boolean syncingDictBox;
 
     public DictDialog(MainApp app) {
         super(app, "词典条目", 820, 560, 620, 420, Modality.NONE);
@@ -38,8 +40,13 @@ public class DictDialog extends AppWindow {
             if (app.project().dicts() == null) {
                 return;
             }
-            dictBox.getItems().setAll(app.project().dicts().names());
-            dictBox.setValue(app.project().dicts().activeName());
+            syncingDictBox = true;
+            try {
+                dictBox.getItems().setAll(app.project().dicts().names());
+                dictBox.setValue(app.project().dicts().activeName());
+            } finally {
+                syncingDictBox = false;
+            }
             refresh();
         };
 
@@ -49,9 +56,19 @@ public class DictDialog extends AppWindow {
         top.setPadding(new Insets(0, 0, 6, 0));
         top.setAlignment(Pos.CENTER_LEFT);
         if (app.project().dicts() != null) {
-            dictBox.getItems().setAll(app.project().dicts().names());
-            dictBox.getSelectionModel().select(app.project().dicts().activeName());
-            dictBox.valueProperty().addListener((o, ov, nv) -> switchDict());
+            syncingDictBox = true;
+            try {
+                dictBox.getItems().setAll(app.project().dicts().names());
+                dictBox.getSelectionModel().select(app.project().dicts().activeName());
+            } finally {
+                syncingDictBox = false;
+            }
+            dictBox.valueProperty().addListener((o, ov, nv) -> {
+                if (syncingDictBox) {
+                    return;
+                }
+                switchDict();
+            });
             Button manageBtn = new Button("管理多个词典…");
             manageBtn.setOnAction(e -> app.manageDictionaries());
             top.getChildren().addAll(new Label("当前词典："), dictBox, manageBtn);
@@ -124,8 +141,15 @@ public class DictDialog extends AppWindow {
     }
 
     private void switchDict() {
+        String name = dictBox.getValue();
+        // 已是当前词典时不再触发 notify（否则会经监听器再次同步下拉，形成递归）
+        if (name == null
+                || app.project().dicts() == null
+                || name.equals(app.project().dicts().activeName())) {
+            return;
+        }
         // 切换协议（含主窗/各词典窗口同步）单点实现在 MainApp.switchDictionary
-        app.switchDictionary(dictBox.getValue());
+        app.switchDictionary(name);
     }
 
     private void refresh() {
