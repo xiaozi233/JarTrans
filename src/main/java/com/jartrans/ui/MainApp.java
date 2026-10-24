@@ -898,6 +898,9 @@ public class MainApp extends Application {
     }
 
     private void onDictSelected(String name) {
+        if (dicts.isAdjusting()) {
+            return; // syncBox 程序化设置 items/value 触发的回流，忽略
+        }
         switchDictionary(name);
     }
 

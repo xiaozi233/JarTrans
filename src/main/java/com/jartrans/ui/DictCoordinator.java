@@ -14,6 +14,12 @@ final class DictCoordinator {
 
     private final MainApp app;
     private final List<Runnable> listeners = new ArrayList<>();
+    /**
+     * 正在程序化同步下拉（items/value）时为 true。ComboBox 在 items.setAll 时
+     * 可能触发 value 变化，而 value 监听会走 switchDictionary → notifyChanged →
+     * syncBox，形成无限递归（CI 上必现）。同步期间让监听器直接忽略。
+     */
+    private boolean adjusting;
 
     DictCoordinator(MainApp app) {
         this.app = app;
@@ -22,15 +28,25 @@ final class DictCoordinator {
     /** 主窗下拉：多词典模式列全部词典并选中激活项；单词典模式禁用并显示名称。 */
     void syncBox() {
         ComboBox<String> box = app.dictBox();
-        if (app.project().dicts() == null) {
-            box.setDisable(true);
-            box.getItems().clear();
-            box.setValue(app.project().dictionaryLabel());
-            return;
+        adjusting = true;
+        try {
+            if (app.project().dicts() == null) {
+                box.setDisable(true);
+                box.getItems().clear();
+                box.setValue(app.project().dictionaryLabel());
+                return;
+            }
+            box.setDisable(false);
+            box.getItems().setAll(app.project().dicts().names());
+            box.setValue(app.project().dicts().activeName());
+        } finally {
+            adjusting = false;
         }
-        box.setDisable(false);
-        box.getItems().setAll(app.project().dicts().names());
-        box.setValue(app.project().dicts().activeName());
+    }
+
+    /** 是否正在程序化同步下拉（监听器应忽略此时的值变化）。 */
+    boolean isAdjusting() {
+        return adjusting;
     }
 
     /** 注册词典变化回调（词典条目/管理窗口在构造时调用，窗口隐藏时注销）。 */
