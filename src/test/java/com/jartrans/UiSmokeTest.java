@@ -1,8 +1,10 @@
 package com.jartrans;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.jartrans.ui.MainApp;
+import com.jartrans.ui.Theme;
 import java.nio.file.Path;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -25,13 +27,16 @@ class UiSmokeTest {
             loader.setController(app);
             Parent root = loader.load();
             assertNotNull(root);
-            // 校验主题 CSS 与关键控件可实例化
+            // Theme.attach 必须挂载「结构 base.css + 当前调色板 + 滚动条皮肤」三份样式
             Scene scene = new Scene(root, 1320, 840);
-            scene.getStylesheets()
-                    .setAll(MainApp.class
-                            .getResource("/com/jartrans/ui/light.css")
-                            .toExternalForm());
+            Theme theme = new Theme(Theme.MODE_LIGHT);
+            theme.attach(scene);
             scene.getRoot().applyCss();
+            var sheets = scene.getStylesheets();
+            assertTrue(sheets.stream().anyMatch(u -> u.endsWith("/base.css")), "缺结构样式 base.css");
+            assertTrue(sheets.stream().anyMatch(u -> u.endsWith("/light.css")), "缺浅色调色板 light.css");
+            assertTrue(sheets.stream().anyMatch(u -> u.endsWith("/scrollbar-skin.css")), "缺滚动条皮肤");
+            theme.stop();
             assertNotNull(app.editor());
             assertNotNull(app.sourcePane());
         });
