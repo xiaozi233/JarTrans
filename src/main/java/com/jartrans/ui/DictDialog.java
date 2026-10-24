@@ -65,6 +65,7 @@ public class DictDialog extends AppWindow {
         HBox search = new HBox(6);
         search.setPadding(new Insets(0, 0, 6, 0));
         queryField.setPrefWidth(280);
+        queryField.setPromptText("按原字符串或译文搜索");
         queryField.setOnAction(e -> refresh());
         Button searchBtn = new Button("搜索");
         searchBtn.setOnAction(e -> refresh());
@@ -82,6 +83,7 @@ public class DictDialog extends AppWindow {
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
         // 多选：删除按钮可批量删除选中词条
         table.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+        table.setPlaceholder(EmptyStates.create("还没有词条", "在下方填写原字符串与译文后点「添加 / 更新」"));
         table.getSelectionModel().selectedItemProperty().addListener((o, ov, nv) -> {
             if (nv != null) {
                 origField.setText(nv.getKey());
@@ -104,6 +106,7 @@ public class DictDialog extends AppWindow {
         Button saveBtn = new Button("添加 / 更新");
         saveBtn.setOnAction(e -> saveEntry());
         Button delBtn = new Button("删除选中");
+        delBtn.getStyleClass().add("danger");
         delBtn.setOnAction(e -> deleteEntry());
         VBox btnBox = new VBox(4, saveBtn, delBtn);
         form.getChildren().addAll(origBox, transBox, btnBox);

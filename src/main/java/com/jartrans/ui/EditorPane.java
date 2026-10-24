@@ -201,6 +201,7 @@ public class EditorPane extends BorderPane {
         table.getColumns().addAll(allCols);
         // 拖列宽只动相邻右列（不影响左侧栏目的宽度，总宽不变）
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_NEXT_COLUMN);
+        table.setPlaceholder(EmptyStates.create("从左侧选择一个类", "选中类后在这里编辑译文；双击任意行可跳到源码"));
         table.setRowFactory(tv -> new TableRow<>() {
             @Override
             protected void updateItem(Row item, boolean empty) {
@@ -283,7 +284,7 @@ public class EditorPane extends BorderPane {
         useDictBtn.setOnAction(e -> useDictionary());
         Button clearBtn = new Button("清空译文");
         clearBtn.setOnAction(e -> clearTranslation());
-        hint.setStyle("-fx-text-fill: -jr-muted;");
+        hint.getStyleClass().add("hint");
         buttons.getChildren().addAll(saveBtn, useDictBtn, clearBtn, saveDict, hint);
         saveDict.setOnAction(e -> setQuiet(Settings.Keys.SAVE_TO_DICT, saveDict.isSelected()));
 
@@ -295,7 +296,8 @@ public class EditorPane extends BorderPane {
         editor.setPrefRowCount(4);
         editor.setMinHeight(72);
         editor.setWrapText(true);
-        editor.setStyle("-fx-font-family: 'Microsoft YaHei UI', monospace;");
+        editor.getStyleClass().add("translation-editor");
+        editor.setPromptText("在此输入译文（自动保存已开启，Ctrl+S 可立即保存）");
 
         vSplit.getItems().add(editBox);
 
@@ -559,11 +561,13 @@ public class EditorPane extends BorderPane {
         allRows.clear();
         rows.clear();
         if (cls == null || app == null || !app.project().classes().containsKey(cls)) {
+            table.setPlaceholder(EmptyStates.create("从左侧选择一个类", "选中类后在这里编辑译文；双击任意行可跳到源码"));
             setEditor(null, false);
             refreshClassStateUi();
             applyFindFilter();
             return;
         }
+        table.setPlaceholder(EmptyStates.create("该类没有可翻译字符串", "可在「查看」菜单勾选显示内部 UTF8 条目（只读）"));
         Project p = app.project();
         Map<String, String> eff = p.effective(cls);
         for (Project.TextCount tc : p.texts(cls)) {

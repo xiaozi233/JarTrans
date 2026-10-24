@@ -41,8 +41,8 @@
     -fx-background-color: -jr-button-bg;
     -fx-text-fill: -jr-fg;
     -fx-border-color: -jr-border;
-    -fx-border-radius: 6;
-    -fx-background-radius: 6;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
     -fx-padding: 5 12 5 12;
     -fx-cursor: hand;
 }
@@ -80,14 +80,28 @@
     -fx-opacity: 0.4;
 }
 
+/* 危险操作（删除类不可逆动作）：红色描边/文字，hover 红色淡底 */
+.button.danger {
+    -fx-text-fill: -jr-danger;
+    -fx-border-color: -jr-danger;
+    -fx-background-color: transparent;
+}
+.button.danger:hover {
+    -fx-background-color: -jr-danger-soft;
+    -fx-border-color: -jr-danger;
+}
+.button.danger:pressed {
+    -fx-background-color: -jr-danger-soft;
+}
+
 /* ---------- 文本输入 ---------- */
 .text-field {
     -fx-background-color: -jr-field-bg;
     -fx-text-fill: -jr-fg;
     -fx-prompt-text-fill: -jr-disabled;
     -fx-border-color: -jr-border;
-    -fx-border-radius: 6;
-    -fx-background-radius: 6;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
     -fx-padding: 6 10 6 10;
 }
 .text-field:hover {
@@ -102,8 +116,8 @@
     -fx-text-fill: -jr-fg;
     -fx-prompt-text-fill: -jr-disabled;
     -fx-border-color: -jr-border;
-    -fx-border-radius: 6;
-    -fx-background-radius: 6;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
     -fx-background-insets: 0;
 }
 .text-area:hover {
@@ -121,8 +135,8 @@
 .combo-box-base {
     -fx-background-color: -jr-field-bg;
     -fx-border-color: -jr-border;
-    -fx-border-radius: 6;
-    -fx-background-radius: 6;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
     -fx-padding: 4 6 4 10;
 }
 .combo-box-base:hover {
@@ -144,10 +158,9 @@
 .combo-box-popup .list-view {
     -fx-background-color: -jr-surface;
     -fx-border-color: -jr-border;
-    -fx-border-radius: 8;
-    -fx-background-radius: 8;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
     -fx-padding: 4;
-    -fx-effect: dropshadow(gaussian, -jr-shadow, 16, 0, 0, 4);
 }
 .combo-box-popup .list-cell {
     -fx-background-color: transparent;
@@ -191,8 +204,8 @@
 .list-view {
     -fx-background-color: -jr-surface;
     -fx-border-color: -jr-border;
-    -fx-border-radius: 8;
-    -fx-background-radius: 8;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
     -fx-background-insets: 0;
 }
 .virtual-flow > .corner {
@@ -225,7 +238,7 @@
 /* 表格 */
 .table-view .column-header-background {
     -fx-background-color: -jr-surface-alt;
-    -fx-background-radius: 8 8 0 0;
+    -fx-background-radius: 6 6 0 0;
     -fx-border-color: transparent transparent -jr-border transparent;
 }
 .table-view .column-header-background .filler {
@@ -253,9 +266,6 @@
     -fx-border-color: transparent;
     -fx-cell-size: 30px;
     -fx-text-fill: -jr-fg;
-}
-.table-row-cell:odd {
-    -fx-background-color: -jr-stripe;
 }
 .table-row-cell:filled:hover {
     -fx-background-color: -jr-accent-soft;
@@ -309,7 +319,7 @@
 .tab-pane .tab {
     -fx-background-color: transparent;
     -fx-background-insets: 0;
-    -fx-padding: 7 16 7 16;
+    -fx-padding: 6 14 6 14;
     -fx-border-color: transparent transparent transparent transparent;
     -fx-border-width: 0 0 2 0;
 }
@@ -351,7 +361,7 @@
 }
 .titled-pane > .title {
     -fx-background-color: -jr-surface-alt;
-    -fx-background-radius: 7 7 0 0;
+    -fx-background-radius: 5 5 0 0;
     -fx-background-insets: 0;
     -fx-padding: 7 12 7 12;
     -fx-border-color: transparent transparent -jr-border transparent;
@@ -366,7 +376,7 @@
 }
 .titled-pane > .content {
     -fx-background-color: -jr-surface;
-    -fx-background-radius: 0 0 7 7;
+    -fx-background-radius: 0 0 5 5;
     -fx-border-color: transparent;
 }
 
@@ -389,10 +399,9 @@
 .context-menu {
     -fx-background-color: -jr-surface;
     -fx-border-color: -jr-border;
-    -fx-border-radius: 8;
-    -fx-background-radius: 8;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
     -fx-padding: 4;
-    -fx-effect: dropshadow(gaussian, -jr-shadow, 16, 0, 0, 4);
 }
 .menu-item {
     -fx-background-radius: 6;
@@ -423,6 +432,31 @@
 }
 
 /* ---------- 工具栏 / 状态栏 ---------- */
+/* 工具栏内的次要按钮走「幽灵」样式：默认无边框，hover 才出现底色，
+   让工具栏只剩一个视觉重音（accent 主按钮），符合扁平/简洁原则 */
+.tool-bar .button {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+.tool-bar .button:hover {
+    -fx-background-color: -jr-surface-alt;
+    -fx-border-color: transparent;
+}
+.tool-bar .button:pressed {
+    -fx-background-color: -jr-sunken;
+}
+.tool-bar .button.accent {
+    -fx-background-color: -jr-accent;
+    -fx-border-color: transparent;
+}
+.tool-bar .button.accent:hover {
+    -fx-background-color: -jr-accent-hover;
+    -fx-border-color: transparent;
+}
+.tool-bar .button.accent:pressed {
+    -fx-background-color: -jr-accent-pressed;
+    -fx-border-color: transparent;
+}
 .tool-bar {
     -fx-background-color: -jr-bg;
     -fx-padding: 6 8 6 8;
@@ -436,9 +470,7 @@
 }
 .status-bar .label {
     -fx-text-fill: -jr-muted;
-}
-.tool-bar > .tool-bar-overflow-button > .arrow {
-    -fx-background-color: -jr-muted;
+    -fx-font-size: 12px;
 }
 
 /* ---------- 分隔线 ---------- */
@@ -519,10 +551,9 @@
     -fx-background-color: -jr-tooltip-bg;
     -fx-text-fill: -jr-fg;
     -fx-border-color: -jr-border;
-    -fx-border-radius: 6;
-    -fx-background-radius: 6;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
     -fx-padding: 6 10 6 10;
-    -fx-effect: dropshadow(gaussian, -jr-shadow, 10, 0, 0, 2);
 }
 
 /* ---------- 系统对话框（Alert / TextInputDialog） ---------- */
@@ -543,6 +574,34 @@
     -fx-text-fill: -jr-fg;
 }
 .dialog-pane .button-bar .details-button {
+    -fx-text-fill: -jr-muted;
+}
+
+/* ---------- 排版层级（13px 正文 / 15px 区块标题 / 12px 说明） ---------- */
+.section-title {
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -jr-fg;
+    -fx-padding: 10 0 2 0;
+}
+.hint {
+    -fx-font-size: 12px;
+    -fx-text-fill: -jr-muted;
+}
+
+/* 译文编辑区：中英文混排字体（等宽仅用于源码视图） */
+.translation-editor {
+    -fx-font-family: "Microsoft YaHei UI", "PingFang SC", sans-serif;
+}
+
+/* ---------- 空状态（表格/列表占位） ---------- */
+.empty-title {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -jr-fg;
+}
+.empty-hint {
+    -fx-font-size: 12px;
     -fx-text-fill: -jr-muted;
 }
 

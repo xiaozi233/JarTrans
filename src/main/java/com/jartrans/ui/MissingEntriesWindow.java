@@ -37,9 +37,11 @@ public class MissingEntriesWindow extends AppWindow {
         //noinspection unchecked
         table.getColumns().addAll(colCls, colOrig, colTrans);
         table.getItems().setAll(missing);
+        table.setPlaceholder(EmptyStates.create("没有失效条目", "导入语言包后，类或字符串已不存在的条目会显示在这里"));
         vbox.getChildren().add(table);
 
         Button toDict = new Button("全部存入词典（供新版本复用）");
+        toDict.getStyleClass().add("accent");
         toDict.setOnAction(ev -> {
             for (LangPack.MissingEntry m : missing) {
                 if (!m.trans().isEmpty()) {

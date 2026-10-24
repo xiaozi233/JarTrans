@@ -53,6 +53,7 @@ public class PreferencesDialog extends AppWindow {
         super(app, "首选项", 680, 620, 600, 520, Modality.WINDOW_MODAL);
 
         BorderPane root = rootPane(12);
+        hintLabel.getStyleClass().add("hint");
 
         // ---------- 外观 ----------
         Label secAppearance = section("外观");
@@ -195,8 +196,7 @@ public class PreferencesDialog extends AppWindow {
 
     private Label section(String text) {
         Label l = new Label(text);
-        l.setStyle("-fx-font-weight: bold; -fx-font-size: 12px; -fx-text-fill: -jr-accent;");
-        l.setPadding(new Insets(4, 0, 0, 0));
+        l.getStyleClass().add("section-title");
         return l;
     }
 

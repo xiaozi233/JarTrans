@@ -34,6 +34,9 @@
     -jr-button-hover-bg: -jr-surface-alt;
     -jr-button-pressed-bg: derive(-jr-surface-alt, -8%);
     -jr-accent-pressed: derive(-jr-accent, -12%);
+    -jr-danger: #c0392b;
+    -jr-danger-hover: #a93226;
+    -jr-danger-soft: rgba(192, 57, 43, 0.10);
     -jr-scroll-track: rgba(0, 0, 0, 0.08);
     -jr-scroll-thumb: #a8b0bf;
     -jr-scroll-thumb-hover: #8f99ab;

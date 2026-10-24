@@ -87,7 +87,7 @@ public class SearchWindow extends AppWindow {
         repAllBtn.getStyleClass().add("accent");
         repAllBtn.setOnAction(e -> replaceAll());
         Label repTip = new Label("Ctrl+R 聚焦此框");
-        repTip.setStyle("-fx-text-fill: -jr-muted;");
+        repTip.getStyleClass().add("hint");
         replaceRow.getChildren().addAll(new Label("替换为："), replaceField, repSelBtn, repAllBtn, repTip);
 
         TableColumn<SearchRow, String> colCls = TableColumns.text("类", 240, SearchRow::cls);
@@ -108,6 +108,7 @@ public class SearchWindow extends AppWindow {
         //noinspection unchecked
         table.getColumns().addAll(colCls, colOrig, colTrans, colStatus);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
+        table.setPlaceholder(EmptyStates.create("输入关键词开始搜索", "范围可选原字符串 / 译文；回车直接搜索"));
         // 双击跳转：行工厂里挂一次，避免旧实现在每次 updateItem 里重复设置处理器
         table.setRowFactory(tv -> {
             TableRow<SearchRow> row = new TableRow<>();
@@ -125,7 +126,8 @@ public class SearchWindow extends AppWindow {
         VBox.setVgrow(table, Priority.ALWAYS);
         root.setCenter(center);
 
-        Label tip = new Label("双击结果跳转到对应类的字符串。批量替换会写入撤销历史（Ctrl+Z 可回退）。");
+        Label tip = new Label("双击结果跳转到对应类的字符串。批量替换会写入撤销历史（Ctrl+Z 可一步回退）。");
+        tip.getStyleClass().add("hint");
         tip.setPadding(new Insets(6, 0, 0, 0));
         root.setBottom(tip);
 

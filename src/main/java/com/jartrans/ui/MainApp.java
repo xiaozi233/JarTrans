@@ -18,10 +18,12 @@ import javafx.fxml.FXMLLoader;
 import javafx.geometry.Pos;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.RadioMenuItem;
 import javafx.scene.control.SelectionMode;
@@ -40,6 +42,7 @@ import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
 import javafx.scene.shape.Circle;
 import javafx.stage.Stage;
 import javafx.util.Duration;
@@ -165,6 +168,36 @@ public class MainApp extends Application {
     @FXML
     private Label statsLabel;
 
+    @FXML
+    private Button openJarBtn;
+
+    @FXML
+    private Button exportJarBtn;
+
+    @FXML
+    private Button importPackBtn;
+
+    @FXML
+    private Button exportPackBtn;
+
+    @FXML
+    private MenuItem globalSearchItem;
+
+    @FXML
+    private MenuItem findInClassItem;
+
+    @FXML
+    private MenuItem replaceInClassItem;
+
+    @FXML
+    private VBox treePlaceholder;
+
+    @FXML
+    private Label treePlaceholderTitle;
+
+    @FXML
+    private Label treePlaceholderHint;
+
     // 类树状态与过滤/构建/查询逻辑（纯模型，不碰 TreeView 控件）
     private ClassTreeModel treeModel;
 
@@ -176,14 +209,20 @@ public class MainApp extends Application {
         this.settings = new Settings();
         this.theme = new Theme(settings.getString(Settings.Keys.THEME));
         this.project = new Project();
-        this.bgOps = new BackgroundOps(stage, this::setStatus);
+        this.bgOps = new BackgroundOps(stage, this::setStatus, busy -> {
+            if (busy) {
+                progressBar.setProgress(ProgressBar.INDETERMINATE_PROGRESS);
+            } else {
+                updateStats(); // 恢复为翻译进度
+            }
+        });
 
         FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/jartrans/ui/main_view.fxml"));
         loader.setController(this);
         Parent root = loader.load();
 
         stage.setTitle(AppMeta.APP_NAME + " — " + AppMeta.APP_TAGLINE);
-        stage.setMinWidth(980);
+        stage.setMinWidth(1100);
         stage.setMinHeight(620);
         Scene scene = new Scene(root, 1320, 840);
         this.mainScene = scene;
@@ -195,6 +234,8 @@ public class MainApp extends Application {
         stage.setOnCloseRequest(e -> onClose());
 
         initUi();
+        updateJarDependentActions();
+        updateTreePlaceholder();
     }
 
     // ---------- 初始化 ----------
@@ -564,6 +605,25 @@ public class MainApp extends Application {
         put(scene, "replace", this::openReplaceInClass);
         put(scene, "gsearch", this::openSearch);
         put(scene, "prefs", this::openPreferences);
+        refreshMenuShortcutHints();
+    }
+
+    /**
+     * 菜单里的快捷键文案按当前绑定刷新：用户自定义快捷键后不再显示过期提示
+     * （FXML 里只写动作名，提示由这里统一补全）。
+     */
+    private void refreshMenuShortcutHints() {
+        globalSearchItem.setText("全包搜索 (" + shortcutText("gsearch") + ")");
+        findInClassItem.setText("当前类内搜索 (" + shortcutText("find") + ")");
+        replaceInClassItem.setText("当前类内替换译文 (" + shortcutText("replace") + ")");
+    }
+
+    /** 未打开 jar 时禁用依赖工程内容的工具栏动作；打开成功后恢复。 */
+    void updateJarDependentActions() {
+        boolean hasJar = project.hasJar();
+        exportJarBtn.setDisable(!hasJar);
+        importPackBtn.setDisable(!hasJar);
+        exportPackBtn.setDisable(!hasJar);
     }
 
     private void put(Scene scene, String id, Runnable action) {
@@ -657,6 +717,7 @@ public class MainApp extends Application {
         TreeItem<String> newRoot = new TreeItem<>("");
         classTree.setRoot(newRoot);
         if (!project.hasJar()) {
+            updateTreePlaceholder();
             return;
         }
         String keep = editor.currentClass();
@@ -672,6 +733,25 @@ public class MainApp extends Application {
                     classTree.scrollTo(row);
                 }
             }
+        }
+        updateTreePlaceholder();
+    }
+
+    /** 类树空状态：未打开 jar 或过滤后无匹配类时显示引导文案。 */
+    private void updateTreePlaceholder() {
+        boolean empty =
+                classTree.getRoot() == null || classTree.getRoot().getChildren().isEmpty();
+        treePlaceholder.setVisible(empty);
+        treePlaceholder.setManaged(empty);
+        if (!empty) {
+            return;
+        }
+        if (project.hasJar()) {
+            treePlaceholderTitle.setText("没有匹配的类");
+            treePlaceholderHint.setText("调整过滤词或「状态」筛选，或在「查看」菜单勾选隐藏空类");
+        } else {
+            treePlaceholderTitle.setText("先打开一个 Jar");
+            treePlaceholderHint.setText("菜单「文件 → 打开 Jar」，或点工具栏的「打开 Jar」");
         }
     }
 

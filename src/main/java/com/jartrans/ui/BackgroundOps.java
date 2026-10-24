@@ -21,11 +21,19 @@ public final class BackgroundOps {
 
     private final Window owner;
     private final Consumer<String> status;
+    /** 忙碌态可视化（如状态栏进度条显隐）；为 null 时忽略。 */
+    private final Consumer<Boolean> busyIndicator;
+
     private final AtomicBoolean busy = new AtomicBoolean();
 
     public BackgroundOps(Window owner, Consumer<String> status) {
+        this(owner, status, null);
+    }
+
+    public BackgroundOps(Window owner, Consumer<String> status, Consumer<Boolean> busyIndicator) {
         this.owner = owner;
         this.status = status;
+        this.busyIndicator = busyIndicator;
     }
 
     /** 是否有后台操作正在进行（调用方可用它禁用相关菜单动作）。 */
@@ -43,6 +51,9 @@ public final class BackgroundOps {
             return;
         }
         setStatus(busyStatus);
+        if (busyIndicator != null) {
+            busyIndicator.accept(true);
+        }
         Scene scene = owner.getScene();
         if (scene != null) {
             scene.setCursor(Cursor.WAIT);
@@ -72,6 +83,9 @@ public final class BackgroundOps {
 
     private void finish(Scene scene) {
         busy.set(false);
+        if (busyIndicator != null) {
+            busyIndicator.accept(false);
+        }
         if (scene != null) {
             scene.setCursor(Cursor.DEFAULT);
         }

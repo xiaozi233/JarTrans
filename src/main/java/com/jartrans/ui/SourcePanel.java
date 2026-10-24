@@ -82,6 +82,7 @@ public class SourcePanel extends BorderPane {
     private final ComboBox<String> fileBox = new ComboBox<>();
     private final TextField searchField = new TextField();
     private final Label info = new Label("");
+
     private final Label loadingLabel = new Label("");
     private final Button cancelBtn = new Button("取消反编译");
     private final HBox loadingBar = new HBox(8);
@@ -101,16 +102,17 @@ public class SourcePanel extends BorderPane {
         bar.setAlignment(Pos.CENTER_LEFT);
         fileBox.setPrefWidth(380);
         fileBox.valueProperty().addListener((o, ov, nv) -> onPickFile());
-        searchField.setPromptText("搜索");
+        searchField.setPromptText("搜索源码（回车下一个）");
         searchField.setPrefWidth(200);
         searchField.setOnAction(e -> findNext());
         Button nextBtn = new Button("下一个");
         nextBtn.setOnAction(e -> findNext());
-        info.setStyle("-fx-text-fill: -jr-muted;");
+        info.getStyleClass().add("hint");
         HBox.setHgrow(info, Priority.ALWAYS);
         bar.getChildren().addAll(fileBox, new Label("搜索:"), searchField, nextBtn, info);
         setTop(bar);
 
+        listView.setPlaceholder(EmptyStates.create("尚未选择类", "在左侧选择类后自动反编译；双击翻译行可直接跳转"));
         listView.setCellFactory(v -> new ListCell<>() {
             private final TextFlow flow = new TextFlow();
 

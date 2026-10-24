@@ -37,6 +37,7 @@ final class ProjectIoActions {
                             return true;
                         },
                         ok -> {
+                            app.updateJarDependentActions();
                             app.rebuildTree();
                             app.editor().showClass(null);
                             // 新 jar：旧 jar 的反编译产物/索引全部失效

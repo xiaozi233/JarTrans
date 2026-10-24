@@ -18,11 +18,12 @@
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.control.ToggleGroup?>
 <?import javafx.scene.control.CheckBox?>
-<?import javafx.scene.control.ToolBar?>
+<?import javafx.scene.control.Tooltip?>
 <?import javafx.scene.control.TreeView?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.FlowPane?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 <?import com.jartrans.ui.EditorPane?>
 <?import com.jartrans.ui.SourcePanel?>
@@ -90,31 +91,59 @@
                     <MenuItem text="清理反编译缓存" onAction="#onClearDecompileCache"/>
                 </Menu>
                 <Menu text="搜索">
-                    <MenuItem text="全包搜索 (Ctrl+Alt+F)" onAction="#onGlobalSearch"/>
-                    <MenuItem text="当前类内搜索 (Ctrl+F)" onAction="#onFindInClass"/>
-                    <MenuItem text="当前类内替换译文 (Ctrl+R)" onAction="#onReplaceInClass"/>
+                    <MenuItem fx:id="globalSearchItem" text="全包搜索" onAction="#onGlobalSearch"/>
+                    <MenuItem fx:id="findInClassItem" text="当前类内搜索" onAction="#onFindInClass"/>
+                    <MenuItem fx:id="replaceInClassItem" text="当前类内替换译文" onAction="#onReplaceInClass"/>
                 </Menu>
                 <Menu text="帮助">
                     <MenuItem text="关于" onAction="#onAbout"/>
                 </Menu>
             </MenuBar>
-            <ToolBar>
-                <Button text="打开 Jar" onAction="#onOpenJar" styleClass="accent"/>
-                <Button text="导出汉化 Jar" onAction="#onExportJar"/>
+            <HBox styleClass="tool-bar" spacing="6" alignment="CENTER_LEFT">
+                <Button fx:id="openJarBtn" text="打开 Jar" onAction="#onOpenJar" styleClass="accent">
+                    <tooltip>
+                        <Tooltip text="选择要汉化的 jar 并解析可翻译字符串"/>
+                    </tooltip>
+                </Button>
+                <Button fx:id="exportJarBtn" text="导出汉化 Jar" onAction="#onExportJar">
+                    <tooltip>
+                        <Tooltip text="把当前译文写回 jar（写回前逐类校验结构）"/>
+                    </tooltip>
+                </Button>
                 <Separator orientation="VERTICAL"/>
-                <Button text="导入语言包" onAction="#onImportPack"/>
-                <Button text="导出语言包" onAction="#onExportPack"/>
+                <Button fx:id="importPackBtn" text="导入语言包" onAction="#onImportPack">
+                    <tooltip>
+                        <Tooltip text="应用 JSON 语言包（会校验目标 jar 的 SHA-256）"/>
+                    </tooltip>
+                </Button>
+                <Button fx:id="exportPackBtn" text="导出语言包" onAction="#onExportPack">
+                    <tooltip>
+                        <Tooltip text="把当前译文导出为 JSON 语言包，可分享或复用到新版本"/>
+                    </tooltip>
+                </Button>
                 <Separator orientation="VERTICAL"/>
                 <Label text="词典："/>
                 <ComboBox fx:id="dictBox" prefWidth="170"/>
-                <Button text="管理…" onAction="#onManageDictionaries"/>
+                <Button text="管理…" onAction="#onManageDictionaries">
+                    <tooltip>
+                        <Tooltip text="新建 / 重命名 / 删除 / 导入导出词典，或切换当前词典"/>
+                    </tooltip>
+                </Button>
                 <Separator orientation="VERTICAL"/>
-                <TextField fx:id="searchField" promptText="全局搜索" prefWidth="220"
+                <TextField fx:id="searchField" promptText="全局搜索（Ctrl+Alt+F）" prefWidth="200" minWidth="140"
                            onAction="#onOpenSearch"/>
-                <Button text="全局搜索" onAction="#onOpenSearch"/>
+                <Button text="搜索…" onAction="#onOpenSearch">
+                    <tooltip>
+                        <Tooltip text="在全部类中搜索原字符串/译文（回车或 Ctrl+Alt+F）"/>
+                    </tooltip>
+                </Button>
                 <Separator orientation="VERTICAL"/>
-                <Button text="首选项…" onAction="#onOpenPreferences"/>
-            </ToolBar>
+                <Button text="首选项…" onAction="#onOpenPreferences">
+                    <tooltip>
+                        <Tooltip text="主题、过滤、反编译器与快捷键（Ctrl+,）"/>
+                    </tooltip>
+                </Button>
+            </HBox>
         </VBox>
     </top>
 
@@ -125,13 +154,13 @@
                     <Label text="类列表" styleClass="pane-header" maxWidth="Infinity"/>
                 </top>
                 <center>
-                    <VBox spacing="6">
+                    <VBox spacing="8">
                         <padding>
-                            <Insets top="6" right="8" bottom="8" left="8"/>
+                            <Insets top="8" right="8" bottom="8" left="8"/>
                         </padding>
-                        <HBox spacing="6" alignment="CENTER_LEFT">
+                        <HBox spacing="8" alignment="CENTER_LEFT">
                             <Label text="过滤："/>
-                            <TextField fx:id="filterField" HBox.hgrow="ALWAYS"
+                            <TextField fx:id="filterField" promptText="按类名过滤" HBox.hgrow="ALWAYS"
                                        onAction="#onFilterChanged"/>
                             <Button text="清除" onAction="#onClearFilter"/>
                         </HBox>
@@ -141,16 +170,22 @@
                             <Label text="状态："/>
                             <ComboBox fx:id="statusBox" prefWidth="116"/>
                         </HBox>
-                        <FlowPane fx:id="legendBox" hgap="10" vgap="3" alignment="CENTER_LEFT"/>
-                        <TreeView fx:id="classTree" VBox.vgrow="ALWAYS"/>
+                        <FlowPane fx:id="legendBox" hgap="12" vgap="4" alignment="CENTER_LEFT"/>
+                        <StackPane VBox.vgrow="ALWAYS">
+                            <TreeView fx:id="classTree"/>
+                            <VBox fx:id="treePlaceholder" alignment="CENTER" spacing="6" mouseTransparent="true">
+                                <Label fx:id="treePlaceholderTitle" text="先打开一个 Jar" styleClass="empty-title"/>
+                                <Label fx:id="treePlaceholderHint" text="或点工具栏的「打开 Jar」" styleClass="empty-hint" wrapText="true" textAlignment="CENTER" maxWidth="240"/>
+                            </VBox>
+                        </StackPane>
                     </VBox>
                 </center>
             </BorderPane>
             <TabPane fx:id="tabPane" tabClosingPolicy="UNAVAILABLE">
-                <Tab text="  翻译  " fx:id="editorTab">
+                <Tab text="翻译" fx:id="editorTab">
                     <EditorPane fx:id="editor"/>
                 </Tab>
-                <Tab text="  源码  " fx:id="sourceTab">
+                <Tab text="源码" fx:id="sourceTab">
                     <SourcePanel fx:id="sourcePanel"/>
                 </Tab>
             </TabPane>

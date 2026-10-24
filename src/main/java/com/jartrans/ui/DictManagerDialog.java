@@ -54,6 +54,7 @@ public class DictManagerDialog extends AppWindow {
         Button renameBtn = new Button("重命名…");
         renameBtn.setOnAction(e -> rename());
         Button removeBtn = new Button("删除");
+        removeBtn.getStyleClass().add("danger");
         removeBtn.setOnAction(e -> remove());
         Button importBtn = new Button("导入 JSON…");
         importBtn.setOnAction(e -> importJson());
@@ -71,9 +72,11 @@ public class DictManagerDialog extends AppWindow {
         right.setAlignment(Pos.CENTER_RIGHT);
         HBox.setHgrow(right, Priority.ALWAYS);
         bar.getChildren().addAll(createBtn, renameBtn, removeBtn, sep1, importBtn, exportBtn, sep2, activateBtn, right);
+        table.setPlaceholder(EmptyStates.create("还没有词典", "点「新建」创建词典，或导入已有 JSON"));
         root.setCenter(new VBox(table, bar));
 
         Label tip = new Label("词典文件保存在程序目录的 dictionaries/ 下，可直接复制分享；" + "双击列表项即可切换当前词典。");
+        tip.getStyleClass().add("hint");
         tip.setPadding(new Insets(4, 0, 0, 0));
         HBox foot = new HBox(infoLabel);
         foot.setPadding(new Insets(4, 0, 0, 0));
