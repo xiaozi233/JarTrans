@@ -39,6 +39,40 @@
 
 Windows 下也可直接双击 `run.bat`。
 
+## 开发者指南
+
+完整架构（模块依赖/数据流/关键不变量/技术债）见 [docs/architecture.md](docs/architecture.md)。
+变更记录见 [CHANGELOG.md](CHANGELOG.md)。
+
+```bash
+./gradlew check            # 测试 + 格式校验 + main 源码卫生门禁（CI 同款）
+./gradlew spotlessApply    # 按 Palantir Java Format 全量格式化（提交前必跑）
+./gradlew spotlessCheck    # 仅校验格式
+```
+
+- **风格**：Palantir Java Format 是唯一决策来源（4 空格缩进、120 列、确定性
+  import 排序）；`.editorconfig` 覆盖编辑器层。全量格式化提交已登记
+  `.git-blame-ignore-revs`，`git blame --ignore-revs-file=.git-blame-ignore-revs`
+  可跳过定位原始作者。
+- **日志**：统一 `core/log/Log`（System.Logger 门面，JUL 落盘到
+  `logs/jartrans.log`，5×1MB 轮转）；main 源码禁止 `System.out`/`printStackTrace`
+  （`enforceMainHygiene` 门禁强制）。
+- **依赖**：版本唯一来源 `gradle/libs.versions.toml`；`EnginesVersionTest`
+  守护反编译器展示版本与 catalog 一致。
+- **提交**：Conventional Commits（`feat:`/`fix:`/`refactor:`/`test:`/`docs:`
+  /`perf:`/`chore:`），一个提交一个意图；行为变更同步更新 CHANGELOG。
+- **守护测试**：新增设置键必须登记 `Settings.defaults()`（SettingsKeysTest）、
+  FXML fx:id 与控制器双向一致（FxmlWiringTest）、状态键贯穿 UI/CSS
+  （StateKeyConsistencyTest / ThemeTokenTest）。
+- **CI**：推送即跑 `gradlew check` + `shadowJar`（windows-latest，UI 测试
+  无需 headless 依赖）。
+
+## 后续方向
+
+- jpackage 原生安装包；i18n 资源化（当前界面文案为中文硬编码，集中收敛于
+  ClassStates 等常量类）；
+- CSS 双主题收敛为 base.css + 调色板令牌（见 docs/architecture.md 技术债清单）。
+
 ## 目录结构
 
 ```

@@ -1,6 +1,6 @@
 plugins {
-    id("java")
-    id("application")
+    java
+    application
     id("org.openjfx.javafxplugin") version "0.1.0"
     // 产出可直接 java -jar 运行的可执行 fat jar
     id("com.gradleup.shadow") version "9.4.0"
@@ -99,4 +99,35 @@ spotless {
         trimTrailingWhitespace()
         endWithNewline()
     }
+}
+
+// main 源码卫生门禁：禁止控制台诊断输出（日志走 core/log/Log）与制表符缩进。
+// 命名/导入等风格规则由 Spotless（Palantir Java Format）在格式化时统一处理；
+// checkstyle 的 Gradle Ant 执行器与当前 Gradle 9.1 + JDK 25 组合不兼容，暂缓接入。
+val enforceMainHygiene =
+    tasks.register("enforceMainHygiene") {
+        doLast {
+            val offenders = mutableListOf<String>()
+            fileTree("src/main/java") {
+                include("**/*.java")
+            }.forEach { f ->
+                val text = f.readText()
+                if (Regex("System\\.(out|err)\\.print").containsMatchIn(text)) {
+                    offenders.add("${f.name}: System.out/err 输出（用 core/log/Log）")
+                }
+                if (Regex("printStackTrace\\s*\\(").containsMatchIn(text)) {
+                    offenders.add("${f.name}: printStackTrace（用 core/log/Log）")
+                }
+                if (text.contains('\t')) {
+                    offenders.add("${f.name}: 制表符缩进（用 4 空格）")
+                }
+            }
+            require(offenders.isEmpty()) {
+                "main 源码卫生检查未通过：\n" + offenders.joinToString("\n")
+            }
+        }
+    }
+
+tasks.check {
+    dependsOn(enforceMainHygiene)
 }
