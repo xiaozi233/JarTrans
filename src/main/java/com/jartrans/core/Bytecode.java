@@ -3,6 +3,7 @@ package com.jartrans.core;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -47,7 +48,8 @@ public final class Bytecode {
 
     // ---------- 操作码表 ----------
 
-    private static final Map<Integer, String> OPCODES = new LinkedHashMap<>();
+    /** 操作码 -> 助记符（数组直查，避免装箱 Map 查找）。 */
+    private static final String[] OPCODES = new String[256];
 
     static {
         Object[][] table = {
@@ -103,7 +105,7 @@ public final class Bytecode {
                 {0xc8, "goto_w"}, {0xc9, "jsr_w"},
         };
         for (Object[] row : table) {
-            OPCODES.put((Integer) row[0], (String) row[1]);
+            OPCODES[(Integer) row[0]] = (String) row[1];
         }
     }
 
@@ -177,7 +179,7 @@ public final class Bytecode {
                 i += length;
                 continue;
             }
-            String name = OPCODES.get(op);
+            String name = OPCODES[op];
             if (name == null) {
                 throw new BytecodeException(String.format("未知/保留操作码 0x%02x（偏移 %d）", op, off));
             }
@@ -318,12 +320,12 @@ public final class Bytecode {
 
     /** {字符串文本: [方法名, ...]}，方法按出现顺序去重。解析失败时返回空表。 */
     public static Map<String, List<String>> stringUsage(ClassFile cf) {
-        Map<String, List<String>> usage = new LinkedHashMap<>();
+        Map<String, LinkedHashSet<String>> usage = new LinkedHashMap<>();
         Structure structure;
         try {
             structure = parseStructure(cf);
         } catch (BytecodeException e) {
-            return usage;
+            return Map.of();
         }
         for (MethodInfo method : structure.methods()) {
             byte[] code = method.code();
@@ -340,16 +342,15 @@ public final class Bytecode {
                     if (text == null) {
                         continue;
                     }
-                    List<String> names = usage.computeIfAbsent(text, k -> new ArrayList<>());
-                    if (!names.contains(method.name())) {
-                        names.add(method.name());
-                    }
+                    usage.computeIfAbsent(text, k -> new LinkedHashSet<>()).add(method.name());
                 }
             } catch (BytecodeException e) {
                 // 该方法解析失败则跳过，不影响其它方法
             }
         }
-        return usage;
+        Map<String, List<String>> out = new LinkedHashMap<>();
+        usage.forEach((text, names) -> out.put(text, List.copyOf(names)));
+        return out;
     }
 
     /** ldc(0x12) 返回 1 字节操作数索引；ldc_w(0x13) 返回 2 字节索引；其它返回 -1。 */

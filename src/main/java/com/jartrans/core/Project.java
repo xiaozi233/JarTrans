@@ -1,5 +1,6 @@
 package com.jartrans.core;
 
+import com.jartrans.core.io.DeferredSaver;
 import com.jartrans.core.jar.JarPacker;
 import com.jartrans.core.jar.JarReader;
 import com.jartrans.core.json.Json;
@@ -66,6 +67,14 @@ public final class Project {
     /** 「不翻译」的原字符串集合：这些文本不写入导出的 jar、不套用词典/语言包译文。 */
     private final Set<String> skipTexts = new LinkedHashSet<>();
     private String sha256;
+    /** 进度文件路径在构造时绑定（延迟写盘不得跨测试目录串写）。 */
+    private final Path progressFile = AppDirs.progressFile();
+    /** 进度写盘防抖：连续标记/跳过的读改写合并为一次，flushProgress 强制落盘。 */
+    private final DeferredSaver progressSaver =
+            new DeferredSaver("progress", SAVE_DELAY_MILLIS, this::writeProgressQuietly);
+
+    /** 与 Settings 的写盘延迟一致。 */
+    private static final long SAVE_DELAY_MILLIS = 300;
 
     public Project() {
         this(null, null);
@@ -218,7 +227,8 @@ public final class Project {
 
     /** 按「不翻译」名单过滤后的生效译文表（这些文本在导出/填充/导入时不参与）。 */
     public Map<String, String> effectiveForExport(String cls) {
-        Map<String, String> eff = effective(cls);
+        // effective() 返回的是共享只读快照，过滤前必须复制
+        Map<String, String> eff = new LinkedHashMap<>(effective(cls));
         eff.keySet().removeIf(skipTexts::contains);
         return eff;
     }
@@ -230,7 +240,7 @@ public final class Project {
 
     // ---------- 编辑 ----------
 
-    /** 该类当前生效的译文表（用户编辑覆盖自动填充，空译文视为未翻译）。 */
+    /** 该类当前生效的译文表（用户编辑覆盖自动填充，空译文视为未翻译）。只读快照，调用方不得修改。 */
     public Map<String, String> effective(String cls) {
         return translations.effective(cls);
     }
@@ -491,16 +501,29 @@ public final class Project {
     }
 
     private void loadProgress() {
-        ProgressStore.Progress progress = new ProgressStore(AppDirs.progressFile()).load(progressKey());
+        ProgressStore.Progress progress = new ProgressStore(progressFile).load(progressKey());
         classStatus.clear();
         classStatus.putAll(progress.classStatus());
         skipTexts.clear();
         skipTexts.addAll(progress.skippedTexts());
     }
 
+    /** 标记进度有变更，延迟合并落盘（见 progressSaver）。 */
     private void saveProgress() {
+        progressSaver.requestSave();
+    }
+
+    /** 立即写出挂起的进度变更（切档前/退出前调用）。 */
+    public void flushProgress() {
+        progressSaver.flush();
+    }
+
+    private void writeProgressQuietly() {
         try {
-            new ProgressStore(AppDirs.progressFile()).save(progressKey(), classStatus, skipTexts);
+            // 快照后交给落盘线程，避免与界面线程的标记操作并发遍历
+            Map<String, String> statuses = new LinkedHashMap<>(classStatus);
+            Set<String> skipped = new LinkedHashSet<>(skipTexts);
+            new ProgressStore(progressFile).save(progressKey(), statuses, skipped);
         } catch (IOException e) {
             LOG.log(System.Logger.Level.WARNING, "翻译进度写盘失败", e);
         }

@@ -75,9 +75,10 @@ class ProjectTest {
         assertTrue(p2.search("世界", "both").stream()
                 .anyMatch(r -> r.orig().contains("世界")));
 
-        // 类状态：手动标记并持久化
+        // 类状态：手动标记并持久化（写盘防抖合并，验证前强制落盘）
         p2.setClassStatus("demo/Test.class", "ignore");
         assertEquals("ignore", p2.classState("demo/Test.class"));
+        p2.flushProgress();
         assertTrue(Files.exists(AppDirs.progressFile()));
     }
 

@@ -80,6 +80,8 @@ class SkipTextTest {
         assertTrue(pack.containsKey("skip_texts"), "语言包应携带 skip_texts");
         assertEquals(List.of(B), pack.get("skip_texts"));
 
+        // 进度写盘是防抖合并的：跨会话验证前先强制落盘
+        p.flushProgress();
         Project p2 = new Project();
         p2.openJar(jar);
         p2.applyLanguagePack(pack);

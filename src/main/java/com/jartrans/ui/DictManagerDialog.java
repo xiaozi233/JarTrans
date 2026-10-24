@@ -1,5 +1,6 @@
 package com.jartrans.ui;
 
+import com.jartrans.core.Settings;
 import com.jartrans.core.DictionaryManager;
 import com.jartrans.core.log.Log;
 import java.io.File;
@@ -130,7 +131,7 @@ public class DictManagerDialog extends AppWindow {
     private void switchTo(String name) {
         try {
             app.project().useDictionary(name);
-            app.settings().setOrIgnore("dictionary", name);
+            app.settings().setOrIgnore(Settings.Keys.DICTIONARY, name);
         } catch (Exception e) {
             // 切换失败不阻断：词典已变更，界面照常刷新
             LOG.log(System.Logger.Level.WARNING, "词典切换失败：" + name, e);
@@ -173,7 +174,7 @@ public class DictManagerDialog extends AppWindow {
             return;
         }
         if (dicts.activeName().equals(newName.trim())) {
-            app.settings().setOrIgnore("dictionary", newName.trim());
+            app.settings().setOrIgnore(Settings.Keys.DICTIONARY, newName.trim());
         }
         syncApp();
     }

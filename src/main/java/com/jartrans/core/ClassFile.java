@@ -87,6 +87,13 @@ public final class ClassFile {
 
     // ---------- 解析 ----------
 
+    /**
+     * 解析 class 字节。
+     *
+     * 所有权约定：本方法借用（不复制）调用方的数组作为 {@link #data} 只读原始字节，
+     * 解析后调用方不得再修改该数组；常量池条目与 tail 均为独立拷贝。
+     * 传入前每个类字节在加载链路上已有一份完整拷贝，这里不再整块复制。
+     */
     public static ClassFile parse(byte[] data) throws ClassFileException {
         if (data.length < 10) {
             throw new ClassFileException("文件太小，不是有效的 class 文件");
@@ -132,8 +139,8 @@ public final class ClassFile {
             entries.put(index, new CpEntry(index, tag, raw));
             index += (tag == CONSTANT_Long || tag == CONSTANT_Double) ? 2 : 1;
         }
-        return new ClassFile(Arrays.copyOf(data, data.length), minor, major,
-                entries, count, Arrays.copyOfRange(data, pos, data.length));
+        return new ClassFile(data, minor, major, entries, count,
+                Arrays.copyOfRange(data, pos, data.length));
     }
 
     // ---------- 提取 ----------
@@ -207,6 +214,7 @@ public final class ClassFile {
     /** 一次重写产生的全部索引变更。 */
     private record Retarget(Map<Integer, Integer> stringTargets, // CONSTANT_String 索引 -> 新 Utf8 索引
                             Map<String, Integer> appended,       // 新文本 -> 追加索引
+                            Map<String, byte[]> appendedRaw,     // 新文本 -> 已编码字节（写出时复用）
                             int newCount) {                      // 新 constant_pool_count
     }
 
@@ -224,6 +232,7 @@ public final class ClassFile {
         }
 
         Map<String, Integer> appended = new LinkedHashMap<>();
+        Map<String, byte[]> appendedRaw = new LinkedHashMap<>();
         Map<Integer, Integer> stringTargets = new LinkedHashMap<>();
         int nextIndex = count;
         for (CpEntry entry : entries.values()) {
@@ -252,6 +261,7 @@ public final class ClassFile {
                     newIndex = nextIndex;
                     nextIndex += 1;
                     appended.put(newText, newIndex);
+                    appendedRaw.put(newText, raw);
                 }
                 reuse.put(Bytes.key(raw), newIndex);
             }
@@ -263,7 +273,7 @@ public final class ClassFile {
         if (nextIndex > CP_MAX_COUNT) {
             throw new ClassFileException("常量池条目数超过 65535，无法追加新条目");
         }
-        return new Retarget(stringTargets, appended, nextIndex);
+        return new Retarget(stringTargets, appended, appendedRaw, nextIndex);
     }
 
     /** 按索引变更写出新字节：文件头 + 原条目（String 改指向）+ 追加的 Utf8 + 原尾字节。 */
@@ -292,7 +302,7 @@ public final class ClassFile {
             }
         }
         for (String text : plan.appended().keySet()) {
-            byte[] raw = ModifiedUTF8.encode(text);
+            byte[] raw = plan.appendedRaw().get(text);
             out.write(CONSTANT_Utf8);
             out.write((raw.length >>> 8) & 0xFF);
             out.write(raw.length & 0xFF);

@@ -89,6 +89,7 @@ class UiSearchReplaceTest {
             assertFalse(app.applyShortcut("gsearch", "Ctrl+Alt+K"), "重复组合应被拒绝");
             app.resetShortcut("find");
             assertEquals("Ctrl+F", app.shortcutText("find"));
+            app.settings().flush(); // setOrIgnore 延迟合并落盘，跨实例验证前强制写出
             assertEquals("Ctrl+F", new Settings().getString("key_find"));
 
             // --- 全局搜索窗口：预填关键词并即时出结果 ---

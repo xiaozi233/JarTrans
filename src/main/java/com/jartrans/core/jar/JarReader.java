@@ -113,8 +113,13 @@ public final class JarReader {
         return List.copyOf(out);
     }
 
+    /**
+     * 读取类字节用于 ClassFile.parse（不拷贝）。
+     * parse 会取得数组所有权；jar 快照持有原缓冲，本方法约定调用方只读。
+     */
     public byte[] readClass(String name) {
-        return readEntry(name);
+        EntryInfo info = data.get(name);
+        return info == null ? null : info.data;
     }
 
     /** 判断文件是否为 zip/jar（PK 魔数）。 */

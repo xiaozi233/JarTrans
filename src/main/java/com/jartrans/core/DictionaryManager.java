@@ -44,6 +44,8 @@ public final class DictionaryManager {
     private List<Item> items = new ArrayList<>();
     private String active = "";
     private final Map<String, Dictionary> cache = new LinkedHashMap<>();
+    /** 上次写出的 index 序列化内容；内容未变时跳过写盘（启动不再无条件重写）。 */
+    private String lastIndexText;
 
     public DictionaryManager(Path baseDir) throws IOException {
         this.baseDir = baseDir;
@@ -77,7 +79,16 @@ public final class DictionaryManager {
         items = new ArrayList<>(list);
         List<String> names = names();
         active = names.contains(activeName) ? activeName : names.get(0);
+        lastIndexText = readIndexText();
         saveIndex();
+    }
+
+    private String readIndexText() {
+        try {
+            return Files.exists(indexPath) ? Files.readString(indexPath) : null;
+        } catch (IOException e) {
+            return null;
+        }
     }
 
     /** 解析 index.json 的 items 数组；条目缺名或缺文件时跳过。 */
@@ -134,7 +145,18 @@ public final class DictionaryManager {
         }
     }
 
+    /** 写出 index.json；内容与上次写出一致时跳过写盘。 */
     public void saveIndex() throws IOException {
+        Map<String, Object> idx = indexMap();
+        String content = Json.write(idx);
+        if (content.equals(lastIndexText) && Files.exists(indexPath)) {
+            return;
+        }
+        Json.writeFile(indexPath, idx);
+        lastIndexText = content;
+    }
+
+    private Map<String, Object> indexMap() {
         Map<String, Object> idx = new LinkedHashMap<>();
         idx.put("active", active);
         List<Map<String, Object>> list = new ArrayList<>();
@@ -145,7 +167,7 @@ public final class DictionaryManager {
             list.add(m);
         }
         idx.put("items", list);
-        Json.writeFile(indexPath, idx);
+        return idx;
     }
 
     // ---------- 查询 ----------

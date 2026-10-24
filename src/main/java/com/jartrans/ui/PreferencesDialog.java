@@ -1,5 +1,6 @@
 package com.jartrans.ui;
 
+import com.jartrans.core.Settings;
 import com.jartrans.core.java.DecompilerManager;
 import com.jartrans.core.java.DecompilerType;
 import java.util.Arrays;
@@ -77,18 +78,18 @@ public class PreferencesDialog extends AppWindow {
 
         // ---------- 翻译 ----------
         Label secTranslate = section("翻译");
-        onlyUntranslated.setSelected(app.settings().getBool("only_untranslated"));
+        onlyUntranslated.setSelected(app.settings().getBool(Settings.Keys.ONLY_UNTRANSLATED));
         onlyUntranslated.setOnAction(e -> app.editor().applyOnlyUntranslated(onlyUntranslated.isSelected()));
-        saveToDict.setSelected(app.settings().getBool("save_to_dict"));
+        saveToDict.setSelected(app.settings().getBool(Settings.Keys.SAVE_TO_DICT));
         saveToDict.setOnAction(e -> app.editor().applySaveDict(saveToDict.isSelected()));
-        autoSaveTrans.setSelected(app.settings().getBool("auto_save_translation"));
-        autoSaveTrans.setOnAction(e -> setSetting("auto_save_translation", autoSaveTrans.isSelected()));
-        dblclickSource.setSelected(app.settings().getBool("dblclick_source"));
-        dblclickSource.setOnAction(e -> setSetting("dblclick_source", dblclickSource.isSelected()));
+        autoSaveTrans.setSelected(app.settings().getBool(Settings.Keys.AUTO_SAVE_TRANSLATION));
+        autoSaveTrans.setOnAction(e -> setSetting(Settings.Keys.AUTO_SAVE_TRANSLATION, autoSaveTrans.isSelected()));
+        dblclickSource.setSelected(app.settings().getBool(Settings.Keys.DBLCLICK_SOURCE));
+        dblclickSource.setOnAction(e -> setSetting(Settings.Keys.DBLCLICK_SOURCE, dblclickSource.isSelected()));
 
         // ---------- 语言包 ----------
         Label secPack = section("语言包");
-        authorField.setText(app.settings().getString("pack_author"));
+        authorField.setText(app.settings().getString(Settings.Keys.PACK_AUTHOR));
         authorField.setPromptText("导出语言包时写入 author 字段（可留空）");
         authorField.setPrefWidth(260);
         authorField.setOnAction(e -> applyAuthor());
@@ -198,7 +199,7 @@ public class PreferencesDialog extends AppWindow {
     }
 
     private void applyAuthor() {
-        app.settings().setOrIgnore("pack_author", authorField.getText().trim());
+        app.settings().setOrIgnore(Settings.Keys.PACK_AUTHOR, authorField.getText().trim());
     }
 
     /** 下拉初始显示：当前实际生效的引擎。 */
@@ -214,7 +215,7 @@ public class PreferencesDialog extends AppWindow {
         }
         for (DecompilerType t : DecompilerType.values()) {
             if (t.displayName().equals(chosen)) {
-                app.settings().setOrIgnore("decompiler_type", t.key);
+                app.settings().setOrIgnore(Settings.Keys.DECOMPILER_TYPE, t.key);
                 app.invalidateDecompilerState();
                 status("反编译器已切换为 " + t.displayName() + "（重新打开源码页生效）");
                 return;

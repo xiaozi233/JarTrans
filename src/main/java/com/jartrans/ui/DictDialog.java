@@ -1,5 +1,6 @@
 package com.jartrans.ui;
 
+import com.jartrans.core.Settings;
 import com.jartrans.core.Dictionary;
 import com.jartrans.core.log.Log;
 import java.util.ArrayList;
@@ -136,7 +137,7 @@ public class DictDialog extends AppWindow {
         } catch (Exception e) {
             LOG.log(System.Logger.Level.WARNING, "词典切换失败：" + name, e);
         }
-        app.settings().setOrIgnore("dictionary", name);
+        app.settings().setOrIgnore(Settings.Keys.DICTIONARY, name);
         if (app.editor().currentClass() != null) {
             app.editor().refreshRows();
         }

@@ -1,5 +1,6 @@
 package com.jartrans.ui;
 
+import com.jartrans.core.Settings;
 import com.jartrans.core.Project;
 import com.jartrans.core.log.Log;
 import java.util.ArrayList;
@@ -139,8 +140,8 @@ public class EditorPane extends BorderPane {
 
     public void setApp(MainApp app) {
         this.app = app;
-        onlyUntranslated.setSelected(app.settings().getBool("only_untranslated"));
-        saveDict.setSelected(app.settings().getBool("save_to_dict"));
+        onlyUntranslated.setSelected(app.settings().getBool(Settings.Keys.ONLY_UNTRANSLATED));
+        saveDict.setSelected(app.settings().getBool(Settings.Keys.SAVE_TO_DICT));
     }
 
     private void buildUi() {
@@ -164,7 +165,7 @@ public class EditorPane extends BorderPane {
         head.getChildren().addAll(new Label("类状态："), classStateBox, stateDot,
                 new Separator(), onlyUntranslated);
         onlyUntranslated.setOnAction(e -> {
-            setQuiet("only_untranslated", onlyUntranslated.isSelected());
+            setQuiet(Settings.Keys.ONLY_UNTRANSLATED, onlyUntranslated.isSelected());
             refreshRows();
         });
 
@@ -223,7 +224,7 @@ public class EditorPane extends BorderPane {
         });
         table.setOnMouseClicked(e -> {
             if (e.getClickCount() == 2 && app != null
-                    && app.settings().getBool("dblclick_source")) {
+                    && app.settings().getBool(Settings.Keys.DBLCLICK_SOURCE)) {
                 viewInSource();
             }
         });
@@ -283,7 +284,7 @@ public class EditorPane extends BorderPane {
         clearBtn.setOnAction(e -> clearTranslation());
         hint.setStyle("-fx-text-fill: -jr-muted;");
         buttons.getChildren().addAll(saveBtn, useDictBtn, clearBtn, saveDict, hint);
-        saveDict.setOnAction(e -> setQuiet("save_to_dict", saveDict.isSelected()));
+        saveDict.setOnAction(e -> setQuiet(Settings.Keys.SAVE_TO_DICT, saveDict.isSelected()));
 
         VBox editBox = new VBox(buttons, editor);
         // 左右不留内缩：让编辑框与上方表格同宽（表格即 vSplit 全宽）；
@@ -310,7 +311,7 @@ public class EditorPane extends BorderPane {
                 editDirty = false;
                 return;
             }
-            if (!app.settings().getBool("auto_save_translation")) {
+            if (!app.settings().getBool(Settings.Keys.AUTO_SAVE_TRANSLATION)) {
                 editDirty = false;
                 return;
             }
@@ -896,7 +897,7 @@ public class EditorPane extends BorderPane {
         if (onlyUntranslated.isSelected() != v) {
             onlyUntranslated.setSelected(v);
         }
-        setQuiet("only_untranslated", v);
+        setQuiet(Settings.Keys.ONLY_UNTRANSLATED, v);
         refreshRows();
     }
 
@@ -905,7 +906,7 @@ public class EditorPane extends BorderPane {
         if (saveDict.isSelected() != v) {
             saveDict.setSelected(v);
         }
-        setQuiet("save_to_dict", v);
+        setQuiet(Settings.Keys.SAVE_TO_DICT, v);
     }
 
     /** 首选项联动：恢复当前选中行（供撤销/外部刷新后回看）。 */

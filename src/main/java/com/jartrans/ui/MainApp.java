@@ -141,7 +141,7 @@ public class MainApp extends Application {
     public void start(Stage stage) throws Exception {
         this.stage = stage;
         this.settings = new Settings();
-        this.theme = new Theme(settings.getString("theme"));
+        this.theme = new Theme(settings.getString(Settings.Keys.THEME));
         this.project = new Project();
 
         FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/jartrans/ui/main_view.fxml"));
@@ -173,8 +173,8 @@ public class MainApp extends Application {
         setThemeSelections(mode);
 
         showInternalItem.setSelected(false);
-        hideEmptyItem.setSelected(settings.getBool("hide_empty"));
-        hideEmptyCheck.setSelected(settings.getBool("hide_empty"));
+        hideEmptyItem.setSelected(settings.getBool(Settings.Keys.HIDE_EMPTY));
+        hideEmptyCheck.setSelected(settings.getBool(Settings.Keys.HIDE_EMPTY));
         hideEmptyItem.selectedProperty().addListener((o, ov, nv) ->
                 hideEmptyCheck.setSelected(nv));
         hideEmptyCheck.selectedProperty().addListener((o, ov, nv) ->
@@ -186,7 +186,7 @@ public class MainApp extends Application {
 
         // 状态筛选
         statusBox.getItems().setAll(STATE_FILTERS.stream().map(f -> f[1]).toList());
-        statusBox.setValue(stateLabelOfKey(settings.getString("status_filter")));
+        statusBox.setValue(stateLabelOfKey(settings.getString(Settings.Keys.STATUS_FILTER)));
         statusBox.valueProperty().addListener((o, ov, nv) -> onStatusFilterChanged());
 
         // 过滤框即时过滤：每输入一个字符立即重建类列表，无需回车
@@ -476,7 +476,7 @@ public class MainApp extends Application {
 
     /** 当前生效的快捷键文本（未自定义时为默认值）。 */
     public String shortcutText(String id) {
-        String stored = settings.getString("key_" + id);
+        String stored = settings.getString(Settings.Keys.SHORTCUT_PREFIX + id);
         return stored.isBlank() ? Shortcuts.defaultFor(id) : stored;
     }
 
@@ -494,19 +494,19 @@ public class MainApp extends Application {
                 return false; // 已被其它动作占用
             }
         }
-        settings.setOrIgnore("key_" + id, norm);
+        settings.setOrIgnore(Settings.Keys.SHORTCUT_PREFIX + id, norm);
         registerShortcuts(mainScene);
         return true;
     }
 
     public void resetShortcut(String id) {
-        settings.setOrIgnore("key_" + id, Shortcuts.defaultFor(id));
+        settings.setOrIgnore(Settings.Keys.SHORTCUT_PREFIX + id, Shortcuts.defaultFor(id));
         registerShortcuts(mainScene);
     }
 
     public void resetAllShortcuts() {
         for (String[] d : Shortcuts.DEFS) {
-            settings.setOrIgnore("key_" + d[0], d[2]);
+            settings.setOrIgnore(Settings.Keys.SHORTCUT_PREFIX + d[0], d[2]);
         }
         registerShortcuts(mainScene);
     }
@@ -595,7 +595,7 @@ public class MainApp extends Application {
     private void setThemeMode(String mode) {
         theme.setMode(mode);
         setThemeSelections(theme.mode());
-        settings.setOrIgnore("theme", theme.mode());
+        settings.setOrIgnore(Settings.Keys.THEME, theme.mode());
         String suffix = theme.mode().equals(Theme.MODE_SYSTEM)
                 ? "（" + (theme.dark() ? "系统为深色" : "系统为浅色") + "）"
                 : "";
@@ -854,7 +854,7 @@ public class MainApp extends Application {
             // 切换失败不阻断：下拉已切换，界面照常刷新
             LOG.log(System.Logger.Level.WARNING, "词典切换失败：" + name, e);
         }
-        settings.setOrIgnore("dictionary", name);
+        settings.setOrIgnore(Settings.Keys.DICTIONARY, name);
         setStatus("已切换到词典「" + name + "」（" + project.dictionary().size() + " 条）");
         if (editor.currentClass() != null) {
             editor.refreshRows();
@@ -1024,7 +1024,7 @@ public class MainApp extends Application {
             return;
         }
         // 作者取首选项默认值（settings.pack_author），不再每次弹窗询问
-        String author = settings.getString("pack_author").trim();
+        String author = settings.getString(Settings.Keys.PACK_AUTHOR).trim();
         try {
             project.exportPack(file, author);
             Dialogs.info("完成", "语言包已导出到：\n" + file
@@ -1189,11 +1189,11 @@ public class MainApp extends Application {
     }
 
     private void persistHideEmpty() {
-        settings.setOrIgnore("hide_empty", hideEmptyCheck.isSelected());
+        settings.setOrIgnore(Settings.Keys.HIDE_EMPTY, hideEmptyCheck.isSelected());
     }
 
     private void onStatusFilterChanged() {
-        settings.setOrIgnore("status_filter", stateFilterKey());
+        settings.setOrIgnore(Settings.Keys.STATUS_FILTER, stateFilterKey());
         rebuildTree();
         updateStats();
     }
@@ -1289,11 +1289,11 @@ public class MainApp extends Application {
     }
 
     public boolean legendVisible() {
-        return settings.getBool("legend_visible");
+        return settings.getBool(Settings.Keys.LEGEND_VISIBLE);
     }
 
     public void applyLegendVisible(boolean v) {
-        settings.setOrIgnore("legend_visible", v);
+        settings.setOrIgnore(Settings.Keys.LEGEND_VISIBLE, v);
         buildLegend();
     }
 
@@ -1311,13 +1311,16 @@ public class MainApp extends Application {
     }
 
     private void onClose() {
-        settings.setOrIgnore("theme", theme.mode());
+        settings.setOrIgnore(Settings.Keys.THEME, theme.mode());
         // 译文自动保存：退出前冲刷编辑区未落库内容
         try {
             editor.flushEdit();
         } catch (Exception e) {
             LOG.log(System.Logger.Level.WARNING, "退出前冲刷译文失败", e);
         }
+        // 防抖的设置/进度写盘在退出前强制落盘
+        project.flushProgress();
+        settings.flush();
         cancelDecompile();
         DecompilerManager.cleanupOnExit();
         Platform.exit();

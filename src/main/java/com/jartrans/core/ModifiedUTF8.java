@@ -41,22 +41,18 @@ public final class ModifiedUTF8 {
         return 3;
     }
 
-    /** str -&gt; Modified UTF-8 字节。孤代理按单个码元编码（与 JVM 行为一致）。 */
+    /**
+     * str -&gt; Modified UTF-8 字节。
+     *
+     * 按 UTF-16 码元逐个编码：BMP 之上的增补字符在 String 里本来就是代理对
+     * （两个 char，各 ≤0xDFFF），每个代理各自编成 3 字节，即 JVM 要求的 CESU-8 形式。
+     */
     public static byte[] encode(String text) {
         int max = text.length() * 3;
         byte[] out = new byte[max];
         int n = 0;
         for (int i = 0; i < text.length(); i++) {
-            int cp = text.charAt(i);
-            if (cp >= 0x10000) {
-                cp -= 0x10000;
-                int hi = SURROGATE_HI_MIN + (cp >> 10);
-                int lo = SURROGATE_LO_MIN + (cp & 0x3FF);
-                n += encodeUnit(hi, out, n);
-                n += encodeUnit(lo, out, n);
-            } else {
-                n += encodeUnit(cp, out, n);
-            }
+            n += encodeUnit(text.charAt(i), out, n);
         }
         return Arrays.copyOf(out, n);
     }

@@ -4,6 +4,7 @@ import com.jartrans.core.Settings;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -15,9 +16,11 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 守护约定：代码里通过 settings.get/getBool/getString/set/setQuiet 访问的
- * 字面量键都必须登记在 Settings.defaults()（动态快捷键键以 key_ 为前缀豁免），
- * 避免新设置键缺失默认值而退化为 getBool 的隐式 false。
+ * 守护约定：
+ * 1）代码里仍以字面量访问 settings 的键必须登记在 Settings.defaults()
+ *    （动态快捷键以 key_ 前缀豁免）——常量化之后正常不应再出现；
+ * 2）Settings.Keys 的每个键常量（前缀常量除外）都必须有默认值，
+ *    避免新设置键缺失默认值而退化为 getBool 的隐式 false。
  */
 class SettingsKeysTest {
 
@@ -43,7 +46,24 @@ class SettingsKeysTest {
             }
         }
         assertTrue(offenders.isEmpty(),
-                "以下 settings 键未在 Settings.defaults() 登记（动态键应以 key_ 开头）："
+                "以下 settings 键以字面量访问且未登记（应改用 Settings.Keys 常量）："
                         + offenders);
+    }
+
+    @Test
+    void everyKeysConstantIsRegisteredInDefaults() throws ReflectiveOperationException {
+        Set<String> defaults = Settings.defaults().keySet();
+        StringBuilder offenders = new StringBuilder();
+        for (Field f : Settings.Keys.class.getDeclaredFields()) {
+            if (!f.getType().equals(String.class) || f.getName().equals("SHORTCUT_PREFIX")) {
+                continue;
+            }
+            String key = (String) f.get(null);
+            if (!defaults.contains(key)) {
+                offenders.append('\n').append(f.getName()).append(" = ").append(key);
+            }
+        }
+        assertTrue(offenders.isEmpty(),
+                "Settings.Keys 以下常量未在 defaults() 登记默认值：" + offenders);
     }
 }

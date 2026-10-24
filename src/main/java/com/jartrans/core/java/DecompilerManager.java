@@ -51,7 +51,7 @@ public final class DecompilerManager {
     }
 
     public static DecompilerType currentDecompiler(Settings settings) {
-        DecompilerType selected = DecompilerType.fromKey(settings.getString("decompiler_type"));
+        DecompilerType selected = DecompilerType.fromKey(settings.getString(Settings.Keys.DECOMPILER_TYPE));
         return selected == null ? DecompilerType.VINEFLOWER : selected;
     }
 
@@ -66,8 +66,15 @@ public final class DecompilerManager {
         return cacheDir(sha).resolve(type.key).resolve("classes");
     }
 
-    public static void clearAllCache() { deleteRecursively(CACHE_ROOT); }
-    public static void cleanupOnExit() { clearAllCache(); }
+    public static void clearAllCache() {
+        deleteRecursively(CACHE_ROOT);
+        // 锁对象随缓存目录一起释放，避免换 N 个 jar 后遗留 N×3 把无主锁
+        OUTPUT_LOCKS.clear();
+    }
+
+    public static void cleanupOnExit() {
+        clearAllCache();
+    }
 
     private static void deleteRecursively(Path target) {
         if (!Files.exists(target)) {
