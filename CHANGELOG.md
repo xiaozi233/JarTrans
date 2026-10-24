@@ -15,7 +15,10 @@
   `gradlew check`（测试 + 格式校验 + 卫生门禁）与 `shadowJar` 打包。
 - 开发者文档：`docs/architecture.md`（模块依赖/数据流/关键不变量/技术债）。
 - 代码风格门禁：Spotless + Palantir Java Format（`gradlew spotlessApply`）、
-  `.editorconfig`、main 源码卫生检查（禁控制台输出/制表符）。
+  `.editorconfig`、Checkstyle 保守规则集（main 源码：命名/导入/禁控制台输出/
+  禁制表符，接入 `gradlew check`）。
+- 构建工具链升级：Gradle wrapper 9.1.0 → 9.8.2（JDK 25 下验证），
+  shadow 插件 9.4.0 → 9.6.1。
 - 测试补盲：TranslationStore 缓存失效、DeferredSaver、replaceTranslations
   规则、Json 畸形输入契约、词典损坏备份、EditHistory 批量撤销。
 

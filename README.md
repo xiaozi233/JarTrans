@@ -45,9 +45,10 @@ Windows 下也可直接双击 `run.bat`。
 变更记录见 [CHANGELOG.md](CHANGELOG.md)。
 
 ```bash
-./gradlew check            # 测试 + 格式校验 + main 源码卫生门禁（CI 同款）
+./gradlew check            # 测试 + Spotless 格式校验 + Checkstyle（CI 同款）
 ./gradlew spotlessApply    # 按 Palantir Java Format 全量格式化（提交前必跑）
 ./gradlew spotlessCheck    # 仅校验格式
+./gradlew checkstyleMain   # 仅静态检查（命名/导入/禁控制台输出）
 ```
 
 - **风格**：Palantir Java Format 是唯一决策来源（4 空格缩进、120 列、确定性
@@ -56,7 +57,10 @@ Windows 下也可直接双击 `run.bat`。
   可跳过定位原始作者。
 - **日志**：统一 `core/log/Log`（System.Logger 门面，JUL 落盘到
   `logs/jartrans.log`，5×1MB 轮转）；main 源码禁止 `System.out`/`printStackTrace`
-  （`enforceMainHygiene` 门禁强制）。
+  （Checkstyle 门禁强制）。
+- **静态检查**：Checkstyle 保守规则集见 `config/checkstyle/checkstyle.xml`
+  （修改配置时必须保留 DOCTYPE，否则 Gradle 只会给出无法定位的
+  "Unable to create Root Module"）。
 - **依赖**：版本唯一来源 `gradle/libs.versions.toml`；`EnginesVersionTest`
   守护反编译器展示版本与 catalog 一致。
 - **提交**：Conventional Commits（`feat:`/`fix:`/`refactor:`/`test:`/`docs:`

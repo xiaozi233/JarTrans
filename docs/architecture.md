@@ -67,13 +67,25 @@ ui               JavaFX 界面（MainApp 装配 + 各面板/窗口/控制器）
   StateKeyConsistencyTest（状态键贯穿 UI/Theme/CSS）、ThemeTokenTest（调色板与
   CSS 令牌同步）、EnginesVersionTest（引擎版本与 version catalog 一致）。
 
+## 构建与静态检查
+
+- Gradle 9.8.2 wrapper（JDK 25 运行验证）；Spotless（Palantir Java Format）
+  负责格式，Checkstyle 负责命名/导入/控制台输出/制表符禁令，二者接入 `check`。
+- **Checkstyle 配置必须带 DOCTYPE**（`<!DOCTYPE module PUBLIC "-//Checkstyle//DTD
+  Checkstyle Configuration 1.3//EN" "...">`）。缺失时 Gradle 只报一句
+  `Unable to create Root Module`（真实原因是被 Ant 任务吞掉的 DTD 校验错误），
+  排查时不要先怀疑构建环境——用 `checkstyle-<ver>.jar` 直接跑 CLI 可看到完整堆栈。
+- 代理：Gradle 下载按用户级 `~/.gradle/gradle.properties` 的 `systemProp.*` 配置
+  （本机指向系统代理），仓库内的 `gradle.properties` 只放构建参数。
+
 ## 已知技术债（按优先级）
 
 1. MainApp 仍约 1120 行（装配/类树/统计/快捷键/转发）；右键菜单与词典协调
    已抽出（TreeContextMenu / DictCoordinator / ProjectIoActions / BackgroundOps），
    继续拆分可从「统计/图例/首选项联动」入手。
-2. checkstyle 的 Gradle Ant 执行器与本机 Gradle 9.1 + JDK 25 组合不兼容，
-   暂以 `enforceMainHygiene` 门禁替代（控制台输出/制表符禁令）。
+2. `javafx` Gradle 插件（0.1.0，latest）在 Gradle 9.8 会触发
+   `Configuration.setVisible` 弃用警告（Gradle 11 移除）；等待插件更新或
+   改为手写 JavaFX 依赖/模块配置。
 3. ClassFile/CpEntry 的字段已收为包级可见并经访问器对外（约定只读），
    完整的不可变只读视图（防御性拷贝）待做——当前热路径按约定保证只读。
 4. DecompilerManager 为静态门面（缓存根/锁全局），不可注入，多实例场景受限。

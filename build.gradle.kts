@@ -3,9 +3,11 @@ plugins {
     application
     id("org.openjfx.javafxplugin") version "0.1.0"
     // 产出可直接 java -jar 运行的可执行 fat jar
-    id("com.gradleup.shadow") version "9.4.0"
+    id("com.gradleup.shadow") version "9.6.1"
     // 统一代码风格：gradlew spotlessApply 全量格式化，gradlew spotlessCheck 校验
     id("com.diffplug.spotless") version "7.0.4"
+    // 静态检查（保守规则集；风格细节由 Spotless 负责）
+    checkstyle
 }
 
 group = "com.jartrans"
@@ -48,6 +50,8 @@ tasks.withType<JavaCompile>().configureEach {
 
 tasks.test {
     useJUnitPlatform()
+    // JDK 25 对 JavaFX 原生库访问的提示（与 run.bat 的启动参数一致）
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
     testLogging {
         events("passed", "skipped", "failed")
         showStandardStreams = false
@@ -101,33 +105,15 @@ spotless {
     }
 }
 
-// main 源码卫生门禁：禁止控制台诊断输出（日志走 core/log/Log）与制表符缩进。
-// 命名/导入等风格规则由 Spotless（Palantir Java Format）在格式化时统一处理；
-// checkstyle 的 Gradle Ant 执行器与当前 Gradle 9.1 + JDK 25 组合不兼容，暂缓接入。
-val enforceMainHygiene =
-    tasks.register("enforceMainHygiene") {
-        doLast {
-            val offenders = mutableListOf<String>()
-            fileTree("src/main/java") {
-                include("**/*.java")
-            }.forEach { f ->
-                val text = f.readText()
-                if (Regex("System\\.(out|err)\\.print").containsMatchIn(text)) {
-                    offenders.add("${f.name}: System.out/err 输出（用 core/log/Log）")
-                }
-                if (Regex("printStackTrace\\s*\\(").containsMatchIn(text)) {
-                    offenders.add("${f.name}: printStackTrace（用 core/log/Log）")
-                }
-                if (text.contains('\t')) {
-                    offenders.add("${f.name}: 制表符缩进（用 4 空格）")
-                }
-            }
-            require(offenders.isEmpty()) {
-                "main 源码卫生检查未通过：\n" + offenders.joinToString("\n")
-            }
-        }
-    }
-
-tasks.check {
-    dependsOn(enforceMainHygiene)
+checkstyle {
+    toolVersion = "14.3.0"
+    configFile = file("config/checkstyle/checkstyle.xml")
 }
+
+// 测试代码允许诊断输出与既有宽松写法，静态检查只约束 main
+tasks.checkstyleTest {
+    enabled = false
+}
+
+// main 的命名/导入/禁控制台输出等规则由 checkstyle（checkstyleMain）统一执行；
+// 风格细节（缩进/换行/import 排序）由 Spotless 负责，两者职责不重叠。
