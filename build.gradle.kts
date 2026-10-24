@@ -55,6 +55,8 @@ tasks.test {
     testLogging {
         events("passed", "skipped", "failed")
         showStandardStreams = false
+        // CI 上 UI 测试失败时输出完整栈（含 JavaFX 内部帧），便于定位
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
     }
 }
 
