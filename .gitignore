@@ -29,3 +29,6 @@ tools/
 
 # WorkBuddy 工具数据（记忆/会话状态，非项目源码）
 .workbuddy/
+
+# ZCode 会话数据（计划/本地状态，非项目源码）
+.zcode/
