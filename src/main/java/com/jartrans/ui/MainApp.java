@@ -102,6 +102,8 @@ public class MainApp extends Application {
     private final TreeContextMenu treeMenu = new TreeContextMenu(this);
     /** 词典监听器与主窗下拉/统计同步。 */
     private final DictCoordinator dicts = new DictCoordinator(this);
+    /** FX 线程无响应看门狗（卡死时把线程栈写入日志）。 */
+    private final FxWatchdog watchdog = new FxWatchdog();
     /** 词典结构/激活词典变化时需要同步的窗口回调（词典条目窗口、词典管理窗口多实例）。 */
 
     // ---------- FXML 控件 ----------
@@ -230,6 +232,7 @@ public class MainApp extends Application {
         initUi();
         updateJarDependentActions();
         updateTreePlaceholder();
+        watchdog.start();
     }
 
     // ---------- 初始化 ----------
@@ -1191,6 +1194,7 @@ public class MainApp extends Application {
         // 防抖的设置/进度写盘在退出前强制落盘
         project.flushProgress();
         settings.flush();
+        watchdog.stop();
         cancelDecompile();
         DecompilerManager.cleanupOnExit();
         Platform.exit();

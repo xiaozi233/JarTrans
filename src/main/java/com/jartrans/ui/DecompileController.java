@@ -9,7 +9,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
+import javafx.animation.PauseTransition;
 import javafx.concurrent.Task;
+import javafx.util.Duration;
 
 /** 源码页编排：异步调用内置引擎，缓存单类结果并处理取消。 */
 final class DecompileController {
@@ -47,13 +49,6 @@ final class DecompileController {
             then.accept("bytecode", null);
             return;
         }
-        String sha;
-        try {
-            sha = app.project().jarSha256();
-        } catch (IOException e) {
-            then.accept("bytecode", null);
-            return;
-        }
         List<Path> cached = singleClassFiles.get(cls);
         if (cached != null && cached.stream().allMatch(Files::isRegularFile)) {
             then.accept("single", cached);
@@ -76,15 +71,32 @@ final class DecompileController {
         String jarPath = app.project().jarPath().toString();
         long taskGeneration = generation;
         app.setStatus("正在反编译 " + inner + " …");
+        boolean[] timedOut = {false};
         Task<List<Path>> task = new Task<>() {
             @Override
             protected List<Path> call() throws Exception {
+                // SHA-256 需要全量读取 jar：放在工作线程，避免大 jar/慢盘时冻结界面
+                String sha = app.project().jarSha256();
+                if (sha == null || sha.isEmpty()) {
+                    throw new IOException("无法计算 jar 摘要");
+                }
                 return DecompilerManager.decompileClasses(jarPath, sha, names, type);
             }
         };
+        // 兜底超时：个别混淆类可能让引擎长时间不返回；到点取消并回退字节码视图，
+        // 避免界面永远停在「正在反编译」。
+        PauseTransition timeout = new PauseTransition(Duration.seconds(60));
+        timeout.setOnFinished(ev -> {
+            if (activeTask == task) {
+                timedOut[0] = true;
+                task.cancel(true);
+            }
+        });
+        timeout.playFromStart();
         activeTask = task;
         activeClass = cls;
         task.setOnSucceeded(ev -> {
+            timeout.stop();
             if (taskGeneration != generation || activeTask != task) {
                 return;
             }
@@ -100,6 +112,7 @@ final class DecompileController {
             then.accept("single", files);
         });
         task.setOnFailed(ev -> {
+            timeout.stop();
             if (taskGeneration != generation || activeTask != task) {
                 return;
             }
@@ -112,11 +125,12 @@ final class DecompileController {
             then.accept("bytecode", null);
         });
         task.setOnCancelled(ev -> {
+            timeout.stop();
             if (taskGeneration != generation || activeTask != task) {
                 return;
             }
             activeTask = null;
-            app.setStatus("已取消反编译");
+            app.setStatus(timedOut[0] ? "反编译超时（60 秒），已回退字节码视图" : "已取消反编译");
             then.accept("bytecode", null);
         });
         Thread worker = new Thread(task, "decompile-class");

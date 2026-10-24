@@ -26,6 +26,7 @@ import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
+import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.TextField;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.BorderPane;
@@ -100,16 +101,25 @@ public class SourcePanel extends BorderPane {
         HBox bar = new HBox(8);
         bar.setPadding(new Insets(0, 0, 4, 0));
         bar.setAlignment(Pos.CENTER_LEFT);
-        fileBox.setPrefWidth(380);
+        fileBox.setPrefWidth(240);
+        fileBox.setMinWidth(140);
+        fileBox.setMaxWidth(320);
+        fileBox.setPromptText("源文件");
         fileBox.valueProperty().addListener((o, ov, nv) -> onPickFile());
-        searchField.setPromptText("搜索源码（回车下一个）");
-        searchField.setPrefWidth(200);
+        searchField.setPromptText("在本类源码中查找（回车跳到下一处）");
+        searchField.setPrefWidth(220);
+        searchField.setMinWidth(120);
         searchField.setOnAction(e -> findNext());
-        Button nextBtn = new Button("下一个");
+        Button nextBtn = new Button("查找下一个");
         nextBtn.setOnAction(e -> findNext());
         info.getStyleClass().add("hint");
+        // 说明文字可能很长：只让这一项被压缩省略，绝不挤压左侧控件（否则按钮会被挤成「…」）
+        info.setTextOverrun(OverrunStyle.ELLIPSIS);
+        info.setMinWidth(0);
+        info.setMaxWidth(Double.MAX_VALUE);
+        info.setAlignment(Pos.CENTER_RIGHT);
         HBox.setHgrow(info, Priority.ALWAYS);
-        bar.getChildren().addAll(fileBox, new Label("搜索:"), searchField, nextBtn, info);
+        bar.getChildren().addAll(new Label("文件："), fileBox, new Label("查找："), searchField, nextBtn, info);
         setTop(bar);
 
         listView.setPlaceholder(EmptyStates.create("尚未选择类", "在左侧选择类后自动反编译；双击翻译行可直接跳转"));
@@ -373,7 +383,8 @@ public class SourcePanel extends BorderPane {
         try {
             String content = Files.readString(path, StandardCharsets.UTF_8);
             render(content, null);
-            info.setText(path.toString());
+            // 不展示反编译缓存的绝对路径（对用户无意义，且会挤坏工具条）
+            info.setText("反编译源码（只读）");
         } catch (Exception exc) {
             render("// 无法读取源码文件：" + exc.getMessage(), null);
         }

@@ -170,7 +170,12 @@
                     <EditorPane fx:id="editor"/>
                 </Tab>
                 <Tab text="源码" fx:id="sourceTab">
-                    <SourcePanel fx:id="sourcePanel"/>
+                    <tooltip>
+                        <Tooltip text="反编译源码（只读）：对照原文与译文使用；双击翻译行可直接跳转到这里"/>
+                    </tooltip>
+                    <content>
+                        <SourcePanel fx:id="sourcePanel"/>
+                    </content>
                 </Tab>
             </TabPane>
         </SplitPane>
