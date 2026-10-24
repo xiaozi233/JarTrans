@@ -1,5 +1,6 @@
 package com.jartrans.ui;
 
+import javafx.animation.PauseTransition;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
@@ -10,6 +11,7 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.util.Duration;
 
 /**
  * 类内查找/替换栏（Ctrl+F / Ctrl+R）。
@@ -40,9 +42,13 @@ final class FindReplaceBar extends VBox {
     private final Label countLabel = new Label("");
     private final TextField replaceField = new TextField();
     private final HBox replaceRow = new HBox(6);
+    /** 每字符过滤全量重建可见行，输入防抖与主窗过滤一致（120ms）。 */
+    private final PauseTransition filterDebounce = new PauseTransition(Duration.millis(120));
+    private FindReplaceBar.Handler handler;
 
     FindReplaceBar(Handler handler) {
         super(4);
+        this.handler = handler;
         setPadding(new Insets(0, 2, 6, 2));
         getStyleClass().add("find-bar");
         setVisible(false);
@@ -90,8 +96,13 @@ final class FindReplaceBar extends VBox {
 
         getChildren().setAll(row1, replaceRow);
 
-        findField.textProperty().addListener((o, ov, nv) -> handler.onFilterChanged());
-        scopeBox.valueProperty().addListener((o, ov, nv) -> handler.onFilterChanged());
+        filterDebounce.setOnFinished(e -> handler.onFilterChanged());
+        findField.textProperty().addListener((o, ov, nv) -> filterDebounce.playFromStart());
+        // 范围切换是离散操作，立即过滤
+        scopeBox.valueProperty().addListener((o, ov, nv) -> {
+            filterDebounce.stop();
+            handler.onFilterChanged();
+        });
         findField.setOnKeyPressed(e -> {
             if (e.getCode() == KeyCode.ENTER) {
                 if (e.isShiftDown()) {
@@ -154,9 +165,19 @@ final class FindReplaceBar extends VBox {
         }
     }
 
+    /** 立即应用挂起的过滤（测试与程序化设置关键词后同步生效用）。 */
+    void flushFilter() {
+        boolean pending = filterDebounce.getStatus() == javafx.animation.Animation.Status.RUNNING;
+        filterDebounce.stop();
+        if (pending) {
+            handler.onFilterChanged();
+        }
+    }
+
     /** 收起查找栏并清空关键词（清空会触发一次过滤回调，由宿主决定后续）。 */
     void closeBar() {
         findField.clear();
+        filterDebounce.stop();
         setVisible(false);
         setManaged(false);
         showReplace(false);

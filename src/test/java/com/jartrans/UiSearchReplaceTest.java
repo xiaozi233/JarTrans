@@ -31,9 +31,12 @@ class UiSearchReplaceTest {
     void findReplaceShortcutsAndSearchWindow() throws Exception {
         System.setProperty("jartrans.dir", tmp.resolve("appdir").toString());
         Path jar = TestClasses.writeSampleJar(tmp, "sample.jar", true);
+        final MainApp[] appRef = new MainApp[1];
+        final SearchWindow[] winRef = new SearchWindow[1];
         FxSupport.runFx(() -> {
             MainApp app = new MainApp();
             app.start(new Stage());
+            appRef[0] = app;
             app.project().openJar(jar);
             String cls = "demo/Test.class";
             EditorPane ed = app.editor();
@@ -41,10 +44,11 @@ class UiSearchReplaceTest {
             int total = ed.visibleRowCount();
             assertTrue(total >= 2, "样本类应有多条字符串");
 
-            // --- Ctrl+F 类内查找：输入即过滤 ---
+            // --- Ctrl+F 类内查找：输入即过滤（输入有 120ms 防抖，测试里同步冲刷） ---
             ed.beginFind();
             assertTrue(ed.findBarShowing());
             ed.findFieldNode().setText("hello");
+            ed.flushFindFilter();
             int matches = ed.visibleRowCount();
             assertTrue(matches >= 1 && matches < total, "查找 hello 应过滤行");
 
@@ -80,6 +84,7 @@ class UiSearchReplaceTest {
             }
             // 清空查找词 → 恢复全部行
             ed.findFieldNode().setText("");
+            ed.flushFindFilter();
             assertEquals(total, ed.visibleRowCount(), "清空查找词应显示全部行");
 
             // --- 快捷键自定义与持久化 ---
@@ -93,9 +98,21 @@ class UiSearchReplaceTest {
             assertEquals("Ctrl+F", new Settings().getString("key_find"));
 
             // --- 全局搜索窗口：预填关键词并即时出结果 ---
+            // 搜索在后台线程执行（结果经 runLater 回 FX 线程），本 FX 块到此结束，
+            // 由测试线程轮询等待后再开下一个 FX 块断言——在 FX 线程上等待会死锁。
             SearchWindow win = new SearchWindow(app, "hello");
             win.show();
             win.setQuery("hello");
+            winRef[0] = win;
+        });
+
+        FxSupport.waitFor(() -> winRef[0].resultCount() == 1);
+
+        FxSupport.runFx(() -> {
+            MainApp app = appRef[0];
+            EditorPane ed = app.editor();
+            String cls = "demo/Test.class";
+            SearchWindow win = winRef[0];
             assertEquals(1, win.resultCount(), "hello 应匹配 1 条结果");
             win.hide();
 
@@ -142,6 +159,11 @@ class UiSearchReplaceTest {
 
             // --- 双击跳源码默认开启 ---
             assertTrue(app.settings().getBool("dblclick_source"), "双击跳转默认应开启");
+
+            // 冲刷防抖写盘并收起主窗，避免延迟写与 JUnit 临时目录清理竞争
+            app.settings().flush();
+            app.project().flushProgress();
+            app.stage().hide();
         });
     }
 }

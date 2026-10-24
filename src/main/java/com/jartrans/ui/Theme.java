@@ -9,9 +9,10 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import javafx.animation.KeyFrame;
-import javafx.animation.Timeline;
+import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.util.Duration;
 
@@ -102,11 +103,17 @@ public final class Theme {
     private Map<String, String> palette = LIGHT;
     private final List<Runnable> listeners = new ArrayList<>();
     private final List<Scene> scenes = new ArrayList<>();
-    private Timeline watcher;
+    /**
+     * 系统主题探测调度（守护后台线程）。探测要 spawn 外部进程（reg/defaults/gsettings）
+     * 并等待结果，绝不能在 FX 线程做——旧实现用 Timeline 每 1.5s 在 FX 线程探测，
+     * 探测卡顿时整个界面周期性冻结（最长 5 秒）。
+     */
+    private ScheduledExecutorService watcher;
 
     public Theme(String mode) {
         this.mode = MODES.contains(mode) ? mode : MODE_SYSTEM;
-        apply();
+        // 初始先按已知状态应用（systemDark 初值 false），后台探测完成后立即纠正
+        applyCurrent();
         startWatch();
     }
 
@@ -135,14 +142,17 @@ public final class Theme {
     public void setMode(String newMode) {
         String m = MODES.contains(newMode) ? newMode : MODE_SYSTEM;
         if (m.equals(mode)) {
-            // system 模式即便没切换，也按当前系统偏好重新探测一次
+            // system 模式即便没切换，也按当前系统偏好重新探测一次（后台）
             if (m.equals(MODE_SYSTEM)) {
-                apply();
+                requestProbe();
             }
             return;
         }
         mode = m;
-        apply();
+        applyCurrent();
+        if (m.equals(MODE_SYSTEM)) {
+            requestProbe();
+        }
     }
 
     // ---------- 注册 ----------
@@ -168,11 +178,8 @@ public final class Theme {
 
     // ---------- 应用 ----------
 
-    private void apply() {
-        // 跟随系统模式：每次都重新探测，不缓存，避免启动时探测失败导致整局卡在错的主题上
-        if (mode.equals(MODE_SYSTEM)) {
-            systemDark = systemPrefersDark();
-        }
+    /** 按已知状态（mode + systemDark）应用主题；不探测，可在任意线程调用者的同步路径上直接执行。 */
+    private void applyCurrent() {
         palette = (mode.equals(MODE_DARK) || (mode.equals(MODE_SYSTEM) && systemDark))
                 ? DARK : LIGHT;
         String url = stylesheetUrl();
@@ -260,25 +267,48 @@ public final class Theme {
     }
 
     private void startWatch() {
-        watcher = new Timeline(new KeyFrame(Duration.millis(1500), e -> tick()));
-        watcher.setCycleCount(Timeline.INDEFINITE);
-        watcher.play();
+        watcher = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "jartrans-theme-watch");
+            t.setDaemon(true);
+            return t;
+        });
+        // 立即探测一次（纠正构造时的 systemDark 初值），之后周期轮询
+        watcher.scheduleWithFixedDelay(this::probeTick, 0, 1500, TimeUnit.MILLISECONDS);
     }
 
-    private void tick() {
+    /** 立即安排一次后台探测（setMode 回到 system 模式时使用）。 */
+    private void requestProbe() {
+        ScheduledExecutorService w = watcher;
+        if (w != null && !w.isShutdown()) {
+            w.execute(this::probeTick);
+        }
+    }
+
+    /** 后台线程：探测系统偏好，变化时回 FX 线程应用。 */
+    private void probeTick() {
         if (!mode.equals(MODE_SYSTEM)) {
             return;
         }
         boolean dark = systemPrefersDark();
         if (dark != systemDark) {
             systemDark = dark;
-            apply();
+            runOnFx(this::applyCurrent);
+        }
+    }
+
+    private static void runOnFx(Runnable action) {
+        try {
+            Platform.runLater(action);
+        } catch (IllegalStateException e) {
+            // FX 工具包未初始化（无界面场景）时直接执行
+            action.run();
         }
     }
 
     public void stop() {
         if (watcher != null) {
-            watcher.stop();
+            watcher.shutdownNow();
+            watcher = null;
         }
     }
 }

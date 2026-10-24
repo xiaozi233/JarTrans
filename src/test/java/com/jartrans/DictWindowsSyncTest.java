@@ -51,6 +51,7 @@ class DictWindowsSyncTest {
             assertEquals("测试词典", app.project().dicts().activeName());
             assertEquals("测试词典", app.settings().getString("dictionary"));
             mgr.close();
+            dispose(app);
         });
     }
 
@@ -94,6 +95,7 @@ class DictWindowsSyncTest {
             dd.close();
             mgr.close();
             assertEquals(0, listenersOf(app).size(), "窗口关闭后应注销词典监听器");
+            dispose(app);
         });
     }
 
@@ -137,10 +139,18 @@ class DictWindowsSyncTest {
             dd.close();
             mgr.close();
             assertEquals(0, listenersOf(app).size(), "窗口关闭后应注销词典监听器");
+            dispose(app);
         });
     }
 
     // ---------- 辅助 ----------
+
+    /** 冲刷防抖写盘并收起主窗：退出后的延迟写不再与 JUnit 临时目录清理竞争。 */
+    private static void dispose(MainApp app) {
+        app.settings().flush();
+        app.project().flushProgress();
+        app.stage().hide();
+    }
 
     private static void createNewDictViaUi(DictManagerDialog mgr) throws Exception {
         AtomicBoolean finished = new AtomicBoolean(false);

@@ -4,6 +4,7 @@ import com.jartrans.core.Settings;
 import com.jartrans.core.Project;
 import com.jartrans.core.log.Log;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javafx.animation.PauseTransition;
@@ -46,6 +47,10 @@ import javafx.util.Duration;
 public class EditorPane extends BorderPane {
 
     private static final System.Logger LOG = Log.get(EditorPane.class);
+
+    /** 状态色缓存（按调色板失效；Color.web 解析不再每行渲染重复执行）。 */
+    private final Map<String, Color> statusColors = new LinkedHashMap<>();
+    private Map<String, String> statusColorsPalette;
 
     /** 表格行模型。 */
     public static final class Row {
@@ -173,6 +178,18 @@ public class EditorPane extends BorderPane {
         setTop(new VBox(head, findBar));
     }
 
+    /** 状态 -> Color（按当前调色板缓存，主题切换后自动重建）。 */
+    private Color statusColor(String statusKey) {
+        Map<String, String> palette = app.theme().palette();
+        if (palette != statusColorsPalette) {
+            statusColors.clear();
+            statusColorsPalette = palette;
+        }
+        return statusColors.computeIfAbsent(statusKey, k -> Color.web(
+                "skipped".equals(k) ? app.theme().color("fg_muted")
+                        : app.theme().statusColor(k)));
+    }
+
     /** 中央翻译表格：列定义、行着色、选择联动与右键菜单。 */
     private void buildTableArea() {
         // ---- 表格 ----
@@ -200,10 +217,7 @@ public class EditorPane extends BorderPane {
                 super.updateItem(item, empty);
                 setTextFill(null);
                 if (item != null && !empty && app != null) {
-                    String color = "skipped".equals(item.statusKey)
-                            ? app.theme().color("fg_muted")
-                            : app.theme().statusColor(item.statusKey);
-                    setTextFill(Color.web(color));
+                    setTextFill(statusColor(item.statusKey));
                 }
             }
         });
@@ -877,6 +891,11 @@ public class EditorPane extends BorderPane {
 
     public TextField findFieldNode() {
         return findBar.findNode();
+    }
+
+    /** 立即应用挂起的查找过滤（查找栏输入有 120ms 防抖；程序化/测试设置后调用可同步生效）。 */
+    public void flushFindFilter() {
+        findBar.flushFilter();
     }
 
     public TextField replaceFieldNode() {

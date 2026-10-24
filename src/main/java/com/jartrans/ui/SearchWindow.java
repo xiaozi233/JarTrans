@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import javafx.animation.PauseTransition;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -37,6 +38,11 @@ public class SearchWindow extends AppWindow {
     private final TextField replaceField = new TextField();
     private final PauseTransition debounce =
             new PauseTransition(Duration.millis(160));
+    /** 异步搜索代际：只显示最新一次请求的结果（旧请求完成即丢弃）。 */
+    private final AtomicInteger searchGeneration = new AtomicInteger();
+    /** 状态色缓存（按调色板失效；Color.web 解析不再每行重复执行）。 */
+    private final Map<String, Color> statusColors = new LinkedHashMap<>();
+    private Map<String, String> statusColorsPalette;
 
     private record SearchRow(String cls, String orig, String trans, String statusKey) {
     }
@@ -99,8 +105,7 @@ public class SearchWindow extends AppWindow {
                 super.updateItem(item, empty);
                 setText(empty ? null : item);
                 if (!empty && getTableRow().getItem() != null) {
-                    setTextFill(Color.web(app.theme().statusColor(
-                            getTableRow().getItem().statusKey())));
+                    setTextFill(statusColor(getTableRow().getItem().statusKey()));
                 }
             }
         });
@@ -108,19 +113,17 @@ public class SearchWindow extends AppWindow {
         table.getColumns().addAll(colCls, colOrig, colTrans, colStatus);
         table.setColumnResizePolicy(
                 TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
-        table.setRowFactory(tv -> new TableRow<>() {
-            @Override
-            protected void updateItem(SearchRow item, boolean empty) {
-                super.updateItem(item, empty);
-                if (!empty && item != null) {
-                    setOnMouseClicked(e -> {
-                        if (e.getClickCount() == 2) {
-                            app.jumpTo(item.cls(), item.orig());
-                            toFront();
-                        }
-                    });
+        // 双击跳转：行工厂里挂一次，避免旧实现在每次 updateItem 里重复设置处理器
+        table.setRowFactory(tv -> {
+            TableRow<SearchRow> row = new TableRow<>();
+            row.setOnMouseClicked(e -> {
+                SearchRow item = row.getItem();
+                if (e.getClickCount() == 2 && item != null) {
+                    app.jumpTo(item.cls(), item.orig());
+                    toFront();
                 }
-            }
+            });
+            return row;
         });
 
         VBox center = new VBox(2, replaceRow, table);
@@ -169,20 +172,44 @@ public class SearchWindow extends AppWindow {
         return table.getItems().size();
     }
 
+    /** 状态 -> Color（按当前调色板缓存，主题切换后自动重建）。 */
+    private Color statusColor(String statusKey) {
+        Map<String, String> palette = app.theme().palette();
+        if (palette != statusColorsPalette) {
+            statusColors.clear();
+            statusColorsPalette = palette;
+        }
+        return statusColors.computeIfAbsent(statusKey,
+                k -> Color.web(app.theme().statusColor(k)));
+    }
+
     private void doSearch() {
         String keyword = queryField.getText().trim();
         if (keyword.isEmpty()) {
+            searchGeneration.incrementAndGet(); // 使在途搜索作废
             table.getItems().clear();
             countLabel.setText("输入关键词开始搜索");
             return;
         }
         String scope = SCOPE_MAP.getOrDefault(scopeBox.getValue(), "both");
-        List<Project.SearchResult> results = app.project().search(keyword, scope);
-        table.getItems().clear();
-        for (Project.SearchResult r : results) {
-            table.getItems().add(new SearchRow(r.cls(), r.orig(), r.trans(), r.status().key));
-        }
-        countLabel.setText(results.isEmpty() ? "没有匹配结果" : results.size() + " 条结果");
+        int generation = searchGeneration.incrementAndGet();
+        countLabel.setText("搜索中…");
+        // 全库线性扫描放后台线程，大 jar 不冻结界面；按代际丢弃过期结果
+        Thread worker = new Thread(() -> {
+            List<SearchRow> rows = new ArrayList<>();
+            for (Project.SearchResult r : app.project().search(keyword, scope)) {
+                rows.add(new SearchRow(r.cls(), r.orig(), r.trans(), r.status().key));
+            }
+            javafx.application.Platform.runLater(() -> {
+                if (generation != searchGeneration.get()) {
+                    return; // 已有更新的搜索在途/完成，丢弃本次结果
+                }
+                table.getItems().setAll(rows);
+                countLabel.setText(rows.isEmpty() ? "没有匹配结果" : rows.size() + " 条结果");
+            });
+        }, "jartrans-search");
+        worker.setDaemon(true);
+        worker.start();
     }
 
     private List<SearchRow> replaceable() {

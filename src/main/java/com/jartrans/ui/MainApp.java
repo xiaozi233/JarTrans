@@ -74,6 +74,8 @@ public class MainApp extends Application {
     private Project project;
     private Stage stage;
     private Scene mainScene;
+    /** 重操作统一后台执行（互斥单飞：进行中拒绝并发触发）。 */
+    private BackgroundOps bgOps;
     /** 输入防抖：过滤框每字符即时过滤、工具栏搜索框即时反馈。 */
     private final PauseTransition filterDebounce =
             new PauseTransition(Duration.millis(120));
@@ -143,6 +145,7 @@ public class MainApp extends Application {
         this.settings = new Settings();
         this.theme = new Theme(settings.getString(Settings.Keys.THEME));
         this.project = new Project();
+        this.bgOps = new BackgroundOps(stage, this::setStatus);
 
         FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/jartrans/ui/main_view.fxml"));
         loader.setController(this);
@@ -875,9 +878,10 @@ public class MainApp extends Application {
         if (!requireJar()) {
             return;
         }
-        int count = project.fillFromDictionary();
-        refreshAfterModelChange(true);
-        Dialogs.info("完成", "词典自动填充了 " + count + " 条未翻译字符串（标记为\"自动）。");
+        bgOps.run("词典批量填充", "正在按词典批量填充 …", () -> project.fillFromDictionary(), count -> {
+            refreshAfterModelChange(true);
+            Dialogs.info("完成", "词典自动填充了 " + count + " 条未翻译字符串（标记为\"自动\"）。");
+        });
     }
 
     private void fillClassFromDictionary() {
@@ -889,9 +893,11 @@ public class MainApp extends Application {
             Dialogs.info("提示", "请先在左侧选择一个类。");
             return;
         }
-        int count = project.fillFromDictionary(List.of(cls));
-        refreshAfterModelChange(true);
-        setStatus("「" + cls + "」：词典填充了 " + count + " 条");
+        bgOps.run("词典填充", "正在按词典填充当前类 …",
+                () -> project.fillFromDictionary(List.of(cls)), count -> {
+                    refreshAfterModelChange(true);
+                    setStatus("「" + cls + "」：词典填充了 " + count + " 条");
+                });
     }
 
     // ---------- 动作 ----------
@@ -925,15 +931,10 @@ public class MainApp extends Application {
         if (path == null) {
             return;
         }
-        setStatus("正在解析 jar …");
-        Task<Boolean> task = new Task<>() {
-            @Override
-            protected Boolean call() throws Exception {
-                project.openJar(path);
-                return true;
-            }
-        };
-        task.setOnSucceeded(ev -> {
+        bgOps.run("打开 jar", "正在解析 jar …", () -> {
+            project.openJar(path);
+            return true;
+        }, ok -> {
             rebuildTree();
             editor.showClass(null);
             // 新 jar：旧 jar 的反编译产物/索引全部失效
@@ -946,15 +947,6 @@ public class MainApp extends Application {
             }
             setStatus(msg);
         });
-        task.setOnFailed(ev -> {
-            Throwable ex = task.getException();
-            String detail = ex == null ? null : ex.getMessage();
-            Dialogs.error("错误", "打开 jar 失败：\n"
-                    + (detail == null || detail.isEmpty()
-                    ? "文件损坏或不是有效的 jar/zip" : detail));
-            setStatus("打开失败");
-        });
-        new Thread(task, "open-jar").start();
     }
 
     private void exportJar() {
@@ -966,12 +958,12 @@ public class MainApp extends Application {
         if (out == null) {
             return;
         }
-        try {
-            int count = project.exportJar(out, true);
-            Dialogs.info("完成", "已写入 " + count + " 个汉化的类：\n" + out);
-        } catch (Exception exc) {
-            Dialogs.error("错误", "导出失败：\n" + exc.getMessage());
-        }
+        // 含全 jar SHA-256、逐类重写（内含写后校验）与整档重压缩，大 jar 耗时明显，必须后台执行
+        bgOps.run("导出汉化 Jar", "正在导出汉化 jar …", () -> project.exportJar(out, true),
+                count -> {
+                    Dialogs.info("完成", "已写入 " + count + " 个汉化的类：\n" + out);
+                    setStatus("已导出 " + count + " 个汉化的类");
+                });
     }
 
     private void importPack() {
@@ -992,26 +984,31 @@ public class MainApp extends Application {
             return;
         }
         String expected = String.valueOf(pack.getOrDefault("target_jar_sha256", ""));
-        try {
-            String actual = project.jarSha256();
-            if (!expected.isEmpty() && !expected.equals(actual)) {
+        bgOps.run("应用语言包", "正在校验并应用语言包 …", () -> {
+            if (!expected.isEmpty() && !expected.equals(project.jarSha256())) {
+                return false;
+            }
+            return true;
+        }, shaMatched -> {
+            if (!shaMatched) {
                 if (!Dialogs.confirm("警告",
                         "语言包的 SHA-256 与当前 jar 不匹配（可能不是同一版本）。\n仍要继续应用吗？")) {
+                    setStatus("已取消应用语言包");
                     return;
                 }
             }
-            long applied = project.applyLanguagePack(pack);
-            refreshAfterModelChange(true);
-            if (!project.lastMissing().isEmpty()) {
-                showMissing();
-                setStatus("语言包已应用：成功 " + applied + " 条，失效 "
-                        + project.lastMissing().size() + " 条");
-            } else {
-                Dialogs.info("完成", "语言包已应用：" + applied + " 条翻译");
-            }
-        } catch (Exception exc) {
-            Dialogs.error("错误", "应用语言包失败：" + exc.getMessage());
-        }
+            bgOps.run("应用语言包", "正在应用语言包 …", () -> project.applyLanguagePack(pack),
+                    applied -> {
+                        refreshAfterModelChange(true);
+                        if (!project.lastMissing().isEmpty()) {
+                            showMissing();
+                            setStatus("语言包已应用：成功 " + applied + " 条，失效 "
+                                    + project.lastMissing().size() + " 条");
+                        } else {
+                            Dialogs.info("完成", "语言包已应用：" + applied + " 条翻译");
+                        }
+                    });
+        });
     }
 
     private void exportPack() {
@@ -1025,14 +1022,15 @@ public class MainApp extends Application {
         }
         // 作者取首选项默认值（settings.pack_author），不再每次弹窗询问
         String author = settings.getString(Settings.Keys.PACK_AUTHOR).trim();
-        try {
+        bgOps.run("导出语言包", "正在导出语言包 …", () -> {
             project.exportPack(file, author);
+            return project.classStatus().size();
+        }, classStatusCount -> {
             Dialogs.info("完成", "语言包已导出到：\n" + file
                     + "\n作者：" + (author.isEmpty() ? "（未设置，可在首选项中填写）" : author)
-                    + "\n（含 " + project.classStatus().size() + " 个类的手动状态标记）");
-        } catch (Exception exc) {
-            Dialogs.error("错误", "导出失败：\n" + exc.getMessage());
-        }
+                    + "\n（含 " + classStatusCount + " 个类的手动状态标记）");
+            setStatus("语言包已导出");
+        });
     }
 
     /** 展示导入语言包时的失效条目列表（独立窗口）。 */

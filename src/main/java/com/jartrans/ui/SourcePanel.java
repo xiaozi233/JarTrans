@@ -9,8 +9,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.IntFunction;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -67,7 +69,8 @@ public class SourcePanel extends BorderPane {
     private final List<String> lines = new ArrayList<>();
     private final Map<Integer, List<Span>> spans = new HashMap<>();
     private final List<Map.Entry<String, Path>> files = new ArrayList<>();
-    private final List<Integer> hitLines = new ArrayList<>();
+    /** 命中行号集合（渲染热路径按行 contains 查询，用 Set 而非 List）。 */
+    private final Set<Integer> hitLines = new HashSet<>();
     private int currentHit = -1;
     private String pendingJump;
     private long loadingStartedAt;

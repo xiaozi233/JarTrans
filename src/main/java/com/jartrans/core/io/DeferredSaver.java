@@ -108,6 +108,7 @@ public final class DeferredSaver {
         } finally {
             synchronized (lock) {
                 running = false;
+                lock.notifyAll(); // 唤醒可能在等待 action 完成的 flush()
             }
         }
     }

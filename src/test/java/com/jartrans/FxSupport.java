@@ -43,6 +43,23 @@ final class FxSupport {
         }
     }
 
+    /**
+     * 轮询等待异步条件成立（条件在 FX 线程求值），超时抛 AssertionError。
+     * 用于防抖输入/后台搜索这类无法同步断言的场景。
+     */
+    static void waitFor(java.util.function.BooleanSupplier condition) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
+        while (System.nanoTime() < deadline) {
+            boolean[] ok = {false};
+            runFx(() -> ok[0] = condition.getAsBoolean());
+            if (ok[0]) {
+                return;
+            }
+            Thread.sleep(25);
+        }
+        throw new AssertionError("等待条件超时（15s）");
+    }
+
     private static void startToolkit() throws Exception {
         synchronized (FxSupport.class) {
             if (initStarted) {
@@ -53,6 +70,9 @@ final class FxSupport {
         }
         Thread t = new Thread(() -> {
             try {
+                // 共享工具包：最后一个 Stage 隐藏/关闭不得隐式退出 FX 线程，
+                // 否则后续测试的 runLater 永远不会执行（表现为全部 FX 测试超时）
+                Platform.setImplicitExit(false);
                 Platform.startup(TOOLKIT_READY::countDown);
             } catch (Throwable e) {
                 TOOLKIT_ERROR.set(e);
