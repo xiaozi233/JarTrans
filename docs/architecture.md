@@ -69,12 +69,21 @@ ui               JavaFX 界面（MainApp 装配 + 各面板/窗口/控制器）
 
 ## 已知技术债（按优先级）
 
-1. MainApp 仍约 1180 行（装配/类树/统计/快捷键/转发），可再拆
-   TreeContextMenu 与词典协调器。
-2. dark.css / light.css 各约 630 行结构重复，可收敛为 base.css + 调色板令牌
-   （JavaFX looked-up colors）；ThemeTokenTest 已守护两份调色板一致性。
-3. checkstyle 的 Gradle Ant 执行器与本机 Gradle 9.1 + JDK 25 组合不兼容，
+1. MainApp 仍约 1120 行（装配/类树/统计/快捷键/转发）；右键菜单与词典协调
+   已抽出（TreeContextMenu / DictCoordinator / ProjectIoActions / BackgroundOps），
+   继续拆分可从「统计/图例/首选项联动」入手。
+2. checkstyle 的 Gradle Ant 执行器与本机 Gradle 9.1 + JDK 25 组合不兼容，
    暂以 `enforceMainHygiene` 门禁替代（控制台输出/制表符禁令）。
-4. ClassFile/CpEntry 的 public final 数组字段仍暴露内部缓冲（约定只读），
-   完整只读视图化待做。
-5. DecompilerManager 为静态门面（缓存根/锁全局），不可注入，多实例场景受限。
+3. ClassFile/CpEntry 的字段已收为包级可见并经访问器对外（约定只读），
+   完整的不可变只读视图（防御性拷贝）待做——当前热路径按约定保证只读。
+4. DecompilerManager 为静态门面（缓存根/锁全局），不可注入，多实例场景受限。
+5. 界面文案未资源化（中文硬编码，状态/筛选文案已集中于 ClassStates）。
+
+## 主题结构
+
+- `base.css`：全部结构规则（约 600 行），**禁止出现颜色字面量**；
+  颜色只引用 `-jr-*` 令牌。
+- `light.css` / `dark.css`：仅 `.root` 调色板令牌（各约 40 行），
+  两套令牌集合必须完全一致（ThemeTokenTest 守护，含「base 引用令牌必须已定义」）。
+- 结构差异（如按钮 hover 的 derive 方向）通过新增差异令牌吸收，
+  不允许在两个主题文件里各写一份结构规则。

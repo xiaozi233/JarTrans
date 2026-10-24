@@ -29,12 +29,12 @@ public final class JarReader {
         }
     }
 
-    /** jar 内条目：名称 + 时间 + 压缩方式 + 原始字节。 */
+    /** jar 内条目：名称 + 时间 + 压缩方式 + 原始字节（字段包内可见，不对外暴露快照内部）。 */
     public static final class EntryInfo {
-        public final String name;
-        public final long timeMillis;
-        public final int method;
-        public final byte[] data;
+        final String name;
+        final long timeMillis;
+        final int method;
+        final byte[] data;
 
         EntryInfo(String name, long timeMillis, int method, byte[] data) {
             this.name = name;
@@ -45,6 +45,23 @@ public final class JarReader {
 
         EntryInfo copy() {
             return new EntryInfo(name, timeMillis, method, data.clone());
+        }
+
+        public String name() {
+            return name;
+        }
+
+        public long timeMillis() {
+            return timeMillis;
+        }
+
+        public int method() {
+            return method;
+        }
+
+        /** 条目解压后的原始字节（快照副本；不得修改）。 */
+        public byte[] data() {
+            return data;
         }
     }
 

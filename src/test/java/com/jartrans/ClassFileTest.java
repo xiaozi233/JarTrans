@@ -34,9 +34,9 @@ class ClassFileTest {
         assertEquals("你好，世界！", lits2.get(0).text);
         assertEquals("Press \0 开始", lits2.get(1).text);
         // 结构条目原样保留：Class 名索引、Long 数据、尾部字节
-        assertEquals(1, ClassFile.u2(cf2.entries.get(2).raw, 0));
-        assertArrayEquals(cf.entries.get(6).raw, cf2.entries.get(6).raw);
-        assertArrayEquals(cf.tail, cf2.tail);
+        assertEquals(1, ClassFile.u2(cf2.entries().get(2).raw(), 0));
+        assertArrayEquals(cf.entries().get(6).raw(), cf2.entries().get(6).raw());
+        assertArrayEquals(cf.tail(), cf2.tail());
     }
 
     @Test
@@ -45,8 +45,8 @@ class ClassFileTest {
         ClassFile cf = ClassFile.parse(data);
         // 译成已有 Utf8 内容时应复用条目 5（"Code"），不追加
         ClassFile cf3 = ClassFile.parse(cf.rewrite(Map.of("Hello, 世界!", "Code")));
-        assertEquals(5, ClassFile.u2(cf3.entries.get(4).raw, 0));
-        assertEquals(cf.count, cf3.count);
+        assertEquals(5, ClassFile.u2(cf3.entries().get(4).raw(), 0));
+        assertEquals(cf.count(), cf3.count());
     }
 
     @Test
@@ -76,9 +76,9 @@ class ClassFileTest {
     @Test
     void twoSlotEntriesOccupyOneKey() throws Exception {
         ClassFile cf = ClassFile.parse(TestClasses.buildSampleClass());
-        CpEntry longEntry = cf.entries.get(6);
-        assertEquals(ClassFile.CONSTANT_Long, longEntry.tag);
-        assertEquals(9, cf.count - 1); // count=10，索引 1..9
+        CpEntry longEntry = cf.entries().get(6);
+        assertEquals(ClassFile.CONSTANT_Long, longEntry.tag());
+        assertEquals(9, cf.count() - 1); // count=10，索引 1..9
     }
 
     @Test

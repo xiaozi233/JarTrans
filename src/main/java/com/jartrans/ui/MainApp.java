@@ -5,7 +5,6 @@ import com.jartrans.core.Project;
 import com.jartrans.core.Settings;
 import com.jartrans.core.java.DecompilerManager;
 import com.jartrans.core.log.Log;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,13 +21,10 @@ import javafx.scene.Scene;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.ComboBox;
-import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
-import javafx.scene.control.MenuItem;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.RadioMenuItem;
 import javafx.scene.control.SelectionMode;
-import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TextField;
@@ -37,8 +33,6 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.control.TreeCell;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
-import javafx.scene.input.Clipboard;
-import javafx.scene.input.DataFormat;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
@@ -81,13 +75,31 @@ public class MainApp extends Application {
         return bgOps;
     }
 
+    /** 类树控件（TreeContextMenu 使用）。 */
+    TreeView<String> classTree() {
+        return classTree;
+    }
+
+    /** 类树模型（TreeContextMenu 使用）。 */
+    ClassTreeModel treeModel() {
+        return treeModel;
+    }
+
+    /** 主窗词典下拉（DictCoordinator 使用）。 */
+    ComboBox<String> dictBox() {
+        return dictBox;
+    }
+
     private final DecompileController decompile = new DecompileController(this);
     /** 撤销/重做：译文修改 · 「不翻译」标记 · 类状态标记。 */
     private final UndoRedo undoRedo = new UndoRedo(this);
     /** jar/语言包文件 IO 动作（含后台执行与完成回调）。 */
     private final ProjectIoActions ioActions = new ProjectIoActions(this);
+    /** 类树右键菜单（标记/填充/复制/展开折叠）。 */
+    private final TreeContextMenu treeMenu = new TreeContextMenu(this);
+    /** 词典监听器与主窗下拉/统计同步。 */
+    private final DictCoordinator dicts = new DictCoordinator(this);
     /** 词典结构/激活词典变化时需要同步的窗口回调（词典条目窗口、词典管理窗口多实例）。 */
-    private final List<Runnable> dictsListeners = new ArrayList<>();
 
     // ---------- FXML 控件 ----------
     @FXML
@@ -155,7 +167,6 @@ public class MainApp extends Application {
 
     // 类树状态与过滤/构建/查询逻辑（纯模型，不碰 TreeView 控件）
     private ClassTreeModel treeModel;
-    private ContextMenu lastTreeMenu; // 最近一次类树右键菜单（左键点其它处时收起）
 
     // 图例控件（圆点走 CSS 状态类，无代码上色）
 
@@ -257,8 +268,8 @@ public class MainApp extends Application {
         classTree.getSelectionModel().selectedItemProperty().addListener((o, ov, nv) -> onTreeSelect(nv));
         // 左键点树任意处即收起右键菜单（修复右键后再左键点同类不关闭）
         classTree.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
-            if (e.getButton() == MouseButton.PRIMARY && lastTreeMenu != null && lastTreeMenu.isShowing()) {
-                lastTreeMenu.hide();
+            if (e.getButton() == MouseButton.PRIMARY) {
+                treeMenu.dismiss();
             }
         });
         classTree.setOnContextMenuRequested(e -> {
@@ -266,7 +277,7 @@ public class MainApp extends Application {
             if (item == null) {
                 return;
             }
-            showTreeMenu(item, e.getScreenX(), e.getScreenY());
+            treeMenu.show(item, e.getScreenX(), e.getScreenY());
         });
 
         editor.setApp(this);
@@ -679,11 +690,11 @@ public class MainApp extends Application {
         classTree.refresh();
     }
 
-    private void expandAll() {
+    void expandAll() {
         ClassTreeModel.expandRecursively(classTree.getRoot());
     }
 
-    private void collapseAll() {
+    void collapseAll() {
         for (TreeItem<String> child : classTree.getRoot().getChildren()) {
             ClassTreeModel.collapseRecursively(child);
         }
@@ -705,68 +716,7 @@ public class MainApp extends Application {
         }
     }
 
-    private void showTreeMenu(TreeItem<String> node, double x, double y) {
-        List<String> targets = menuTargets(node);
-        if (targets.isEmpty()) {
-            return;
-        }
-        if (lastTreeMenu != null && lastTreeMenu.isShowing()) {
-            lastTreeMenu.hide();
-        }
-        ContextMenu menu = new ContextMenu();
-        MenuItem markItem = new MenuItem("标记状态（" + targets.size() + " 个类）");
-        MenuItem autoItem = new MenuItem("自动（按翻译进度）");
-        autoItem.setOnAction(ev -> mark(targets, null));
-        MenuItem todoItem = new MenuItem("未开始");
-        todoItem.setOnAction(ev -> mark(targets, "todo"));
-        MenuItem doingItem = new MenuItem("翻译中");
-        doingItem.setOnAction(ev -> mark(targets, "doing"));
-        MenuItem doneItem = new MenuItem("已完成");
-        doneItem.setOnAction(ev -> mark(targets, "done"));
-        MenuItem ignoreItem = new MenuItem("已忽略");
-        ignoreItem.setOnAction(ev -> mark(targets, "ignore"));
-        MenuItem fillItem = new MenuItem("用词典填充这些类");
-        fillItem.setOnAction(ev -> fillClasses(targets));
-        MenuItem copyItem = new MenuItem("复制类路径");
-        copyItem.setOnAction(ev -> copyPaths(targets));
-        MenuItem expandItem = new MenuItem("展开全部");
-        expandItem.setOnAction(ev -> expandAll());
-        MenuItem collapseItem = new MenuItem("折叠全部");
-        collapseItem.setOnAction(ev -> collapseAll());
-        menu.getItems()
-                .addAll(
-                        markItem,
-                        autoItem,
-                        todoItem,
-                        doingItem,
-                        doneItem,
-                        ignoreItem,
-                        new SeparatorMenuItem(),
-                        fillItem,
-                        copyItem,
-                        new SeparatorMenuItem(),
-                        expandItem,
-                        collapseItem);
-        lastTreeMenu = menu;
-        menu.show(classTree, x, y);
-    }
-
-    /** 右键菜单的目标类集合：多选时取选中的全部类节点，单选按节点类型派生。 */
-    private List<String> menuTargets(TreeItem<String> rightClicked) {
-        List<TreeItem<String>> selected = classTree.getSelectionModel().getSelectedItems();
-        if (selected != null && selected.size() > 1) {
-            List<String> classes = new ArrayList<>();
-            for (TreeItem<String> item : selected) {
-                if (ClassTreeModel.TYPE_CLASS.equals(treeModel.kindOf(item))) {
-                    classes.add(treeModel.targetOf(item));
-                }
-            }
-            return classes;
-        }
-        return treeModel.targetsFor(rightClicked);
-    }
-
-    private void mark(List<String> classes, String state) {
+    void mark(List<String> classes, String state) {
         Map<String, String> olds = new HashMap<>();
         for (String cls : classes) {
             olds.put(cls, project.classStatus().get(cls));
@@ -792,23 +742,6 @@ public class MainApp extends Application {
             return;
         }
         mark(List.of(cls), state);
-    }
-
-    private void fillClasses(List<String> classes) {
-        if (!project.hasJar()) {
-            return;
-        }
-        int count = project.fillFromDictionary(classes);
-        refreshAfterModelChange(editor.currentClass() != null && classes.contains(editor.currentClass()));
-        setStatus("词典填充了 " + count + " 条未翻译字符串");
-    }
-
-    private void copyPaths(List<String> classes) {
-        List<String> sorted = new ArrayList<>(classes);
-        sorted.sort(String::compareTo);
-        String text = String.join("\n", sorted);
-        Clipboard.getSystemClipboard().setContent(Map.of(DataFormat.PLAIN_TEXT, text));
-        setStatus("已复制 " + classes.size() + " 个类路径到剪贴板");
     }
 
     // ---------- 统计 ----------
@@ -839,24 +772,16 @@ public class MainApp extends Application {
     // ---------- 词典 ----------
 
     public void syncDictBox() {
-        if (project.dicts() == null) {
-            dictBox.setDisable(true);
-            dictBox.getItems().clear();
-            dictBox.setValue(project.dictionaryLabel());
-            return;
-        }
-        dictBox.setDisable(false);
-        dictBox.getItems().setAll(project.dicts().names());
-        dictBox.setValue(project.dicts().activeName());
+        dicts.syncBox();
     }
 
     /** 注册词典变化回调（词典条目/管理窗口在构造时调用，窗口隐藏时注销）。 */
     public void addDictsListener(Runnable listener) {
-        dictsListeners.add(listener);
+        dicts.addListener(listener);
     }
 
     public void removeDictsListener(Runnable listener) {
-        dictsListeners.remove(listener);
+        dicts.removeListener(listener);
     }
 
     /**
@@ -864,11 +789,7 @@ public class MainApp extends Application {
      * 主窗下拉与统计 + 所有已打开的词典相关窗口。
      */
     void notifyDictsChanged() {
-        syncDictBox();
-        updateStats();
-        for (Runnable r : new ArrayList<>(dictsListeners)) {
-            r.run();
-        }
+        dicts.notifyChanged();
     }
 
     /**

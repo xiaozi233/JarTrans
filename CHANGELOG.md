@@ -52,7 +52,13 @@
 - 词典切换协议单点化（MainApp.switchDictionary），三处复制实现收敛；
   替换逻辑下沉 core（Project.replaceTranslations）。
 - 设置键常量化（Settings.Keys）；状态文案/顺序唯一来源（ClassStates）。
-- MainApp 拆出 ProjectIoActions 与 BackgroundOps（1321 → 约 1180 行）。
+- MainApp 拆出 ProjectIoActions、BackgroundOps、TreeContextMenu、DictCoordinator
+  （1321 → 约 1120 行）。
+- CSS 双主题去重：结构规则收敛到共用 base.css（禁止颜色字面量），
+  light/dark.css 仅保留调色板令牌（各约 40 行，合计 1265 → 688 行）；
+  ThemeTokenTest 升级为令牌集合一致性 + base 引用完整性守护。
+- ClassFile / CpEntry / EntryInfo 字段收为包级可见并补公共访问器，
+  对外不再暴露可变字段；测试同步改用访问器。
 - 死代码清理：DecompilerManagerDialog（已被首选项取代）。
 
 ## [1.0.0]

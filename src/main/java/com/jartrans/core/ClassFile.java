@@ -67,12 +67,42 @@ public final class ClassFile {
 
     private static final int CP_MAX_COUNT = 0xFFFF; // constant_pool_count 是 u2，最大索引 0xFFFE
 
-    public final byte[] data; // 原始完整字节
-    public final int minor;
-    public final int major;
-    public final Map<Integer, CpEntry> entries; // 常量池索引 -&gt; 条目（Long/Double 只占一个 key）
-    public final int count; // 原 constant_pool_count
-    public final byte[] tail; // 常量池之后的全部字节（原样保留）
+    // 字段包级可见（解析/反汇编热路径内部直读），对外只暴露访问器；
+    // byte[] 一律视为只读，解析后调用方不得修改。
+    final byte[] data; // 原始完整字节
+    final int minor;
+    final int major;
+    final Map<Integer, CpEntry> entries; // 常量池索引 -> 条目（Long/Double 只占一个 key）
+    final int count; // 原 constant_pool_count
+    final byte[] tail; // 常量池之后的全部字节（原样保留）
+
+    /** 原始完整字节（只读视图；调用方不得修改）。 */
+    public byte[] data() {
+        return data;
+    }
+
+    public int minor() {
+        return minor;
+    }
+
+    public int major() {
+        return major;
+    }
+
+    /** 常量池索引 -> 条目（只读；Long/Double 只占一个 key）。 */
+    public Map<Integer, CpEntry> entries() {
+        return entries;
+    }
+
+    /** 原 constant_pool_count。 */
+    public int count() {
+        return count;
+    }
+
+    /** 常量池之后的全部字节（只读视图）。 */
+    public byte[] tail() {
+        return tail;
+    }
 
     private ClassFile(byte[] data, int minor, int major, Map<Integer, CpEntry> entries, int count, byte[] tail) {
         this.data = data;

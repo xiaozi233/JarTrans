@@ -51,17 +51,16 @@ class StateKeyConsistencyTest {
 
     @Test
     void stateTokensAndCssClassesStayInSync() throws IOException {
+        // 调色板令牌在 light/dark.css；结构类（.cell-state-*）在共用的 base.css
         String lightCss = css("light.css");
         String darkCss = css("dark.css");
+        String baseCss = css("base.css");
         for (String k : CLASS_STATES) {
             assertTrue(
                     Theme.LIGHT.containsKey("state_" + k) && Theme.DARK.containsKey("state_" + k), "调色板缺 state_" + k);
-            assertTrue(
-                    lightCss.contains("-jr-state-" + k + ":") && lightCss.contains("cell-state-" + k),
-                    "light.css 缺 -jr-state-" + k + " 或 .cell-state-" + k);
-            assertTrue(
-                    darkCss.contains("-jr-state-" + k + ":") && darkCss.contains("cell-state-" + k),
-                    "dark.css 缺 -jr-state-" + k + " 或 .cell-state-" + k);
+            assertTrue(lightCss.contains("-jr-state-" + k + ":"), "light.css 缺 -jr-state-" + k);
+            assertTrue(darkCss.contains("-jr-state-" + k + ":"), "dark.css 缺 -jr-state-" + k);
+            assertTrue(baseCss.contains("cell-state-" + k), "base.css 缺 .cell-state-" + k);
         }
     }
 }

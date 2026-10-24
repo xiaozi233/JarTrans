@@ -178,7 +178,7 @@ public final class Theme {
 
     public void attach(Scene scene) {
         scenes.add(scene);
-        scene.getStylesheets().setAll(stylesheetUrl(), SCROLLBAR_SKIN_URL);
+        scene.getStylesheets().setAll(stylesheetUrls());
     }
 
     /** 滚动条皮肤样式：.scroll-bar 换用 MinThumbScrollBarSkin（保证滑块最短长度）。 */
@@ -186,8 +186,12 @@ public final class Theme {
             Theme.class.getResource("scrollbar-skin.css").toExternalForm();
 
     private String stylesheetUrl() {
-        String name = dark() ? "dark.css" : "light.css";
-        return Theme.class.getResource(name).toExternalForm();
+        return Theme.class.getResource(dark() ? "dark.css" : "light.css").toExternalForm();
+    }
+
+    /** 结构规则（base.css，两主题共用）+ 当前调色板 + 滚动条皮肤。 */
+    private List<String> stylesheetUrls() {
+        return List.of(Theme.class.getResource("base.css").toExternalForm(), stylesheetUrl(), SCROLLBAR_SKIN_URL);
     }
 
     // ---------- 应用 ----------
@@ -195,9 +199,9 @@ public final class Theme {
     /** 按已知状态（mode + systemDark）应用主题；不探测，可在任意线程调用者的同步路径上直接执行。 */
     private void applyCurrent() {
         palette = (mode.equals(MODE_DARK) || (mode.equals(MODE_SYSTEM) && systemDark)) ? DARK : LIGHT;
-        String url = stylesheetUrl();
+        List<String> urls = stylesheetUrls();
         for (Scene scene : scenes) {
-            scene.getStylesheets().setAll(url, SCROLLBAR_SKIN_URL);
+            scene.getStylesheets().setAll(urls);
             scene.getRoot().applyCss();
         }
         for (Runnable cb : List.copyOf(listeners)) {

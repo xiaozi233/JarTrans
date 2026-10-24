@@ -35,7 +35,7 @@ class JarTest {
 
         JarReader jf2 = new JarReader(out);
         List<String> names = new ArrayList<>();
-        jf2.infos().forEach(i -> names.add(i.name));
+        jf2.infos().forEach(i -> names.add(i.name()));
         assertTrue(names.contains("META-INF/MANIFEST.MF"));
         assertFalse(names.contains("META-INF/sample.sf"));
         ClassFile cf2 = ClassFile.parse(jf2.readClass("demo/Test.class"));
@@ -50,7 +50,7 @@ class JarTest {
         Path out = tmp.resolve("signed.jar");
         JarPacker.save(jf, out, Map.of(), false);
         JarReader jf2 = new JarReader(out);
-        assertTrue(jf2.infos().stream().anyMatch(i -> i.name.equals("META-INF/sample.sf")));
+        assertTrue(jf2.infos().stream().anyMatch(i -> i.name().equals("META-INF/sample.sf")));
     }
 
     @Test

@@ -244,9 +244,13 @@ class DictWindowsSyncTest {
 
     @SuppressWarnings("unchecked")
     private static java.util.List<Runnable> listenersOf(MainApp app) throws Exception {
-        Field f = MainApp.class.getDeclaredField("dictsListeners");
+        // 监听器列表已从 MainApp 移到 DictCoordinator（同包私有成员，反射读取）
+        Field appDicts = MainApp.class.getDeclaredField("dicts");
+        appDicts.setAccessible(true);
+        Object coordinator = appDicts.get(app);
+        Field f = coordinator.getClass().getDeclaredField("listeners");
         f.setAccessible(true);
-        return (java.util.List<Runnable>) f.get(app);
+        return (java.util.List<Runnable>) f.get(coordinator);
     }
 
     private static Button findButton(javafx.stage.Stage win, String text) {
