@@ -1,14 +1,22 @@
 package com.jartrans.core;
 
 import com.jartrans.core.json.Json;
+import com.jartrans.core.log.Log;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 /** settings.json 读写（界面偏好、反编译器选择等）。 */
 public final class Settings {
+
+    private static final System.Logger LOG = Log.get(Settings.class);
+
+    /** 外部进程反编译器时代遗留的设置键，加载时剔除（其余未知键如 key_* 仍保留）。 */
+    private static final Set<String> LEGACY_KEYS =
+            Set.of("java_path", "decompiler_path", "decompiler_version", "legend_compact");
 
     private final Path path;
     private final Map<String, Object> data = defaults();
@@ -53,6 +61,7 @@ public final class Settings {
         // data 已含 defaults 全部默认键：parsed 覆盖同名键，
         // 额外键（如自定义快捷键 key_*）保持解析顺序追加到末尾，保证跨会话生效
         data.putAll(parsed);
+        data.keySet().removeAll(LEGACY_KEYS);
     }
 
     public void save() throws IOException {
@@ -90,8 +99,8 @@ public final class Settings {
         data.put(key, value);
         try {
             save();
-        } catch (IOException ignored) {
-            // 写盘失败不阻断
+        } catch (IOException e) {
+            LOG.log(System.Logger.Level.WARNING, "设置写盘失败（" + key + "）：" + path, e);
         }
     }
 

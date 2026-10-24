@@ -1,0 +1,14 @@
+# 依赖版本唯一来源：build.gradle.kts 与守护测试（EnginesVersionTest）都从这里取值。
+[versions]
+junit = "5.11.4"
+vineflower = "1.12.0"
+cfr = "0.152"
+procyon = "0.6.0"
+
+[libraries]
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
+junit-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+vineflower = { module = "org.vineflower:vineflower", version.ref = "vineflower" }
+cfr = { module = "org.benf:cfr", version.ref = "cfr" }
+procyon = { module = "org.bitbucket.mstrobel:procyon-compilertools", version.ref = "procyon" }

@@ -22,8 +22,14 @@ public final class Bytecode {
     /** 字节码解析错误。 */
     public static class BytecodeException extends Exception {
 
+        private static final long serialVersionUID = 1L;
+
         public BytecodeException(String message) {
             super(message);
+        }
+
+        public BytecodeException(String message, Throwable cause) {
+            super(message, cause);
         }
     }
 
@@ -265,7 +271,7 @@ public final class Bytecode {
             String className = text(cf, thisClass);
             return new Structure(className, fields, methods);
         } catch (BytecodeException e) {
-            throw new BytecodeException("类结构解析失败（数据不完整）");
+            throw new BytecodeException("类结构解析失败（数据不完整）：" + e.getMessage(), e);
         }
     }
 

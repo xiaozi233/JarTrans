@@ -1,6 +1,7 @@
 package com.jartrans.core;
 
 import com.jartrans.core.jar.JarReader;
+import com.jartrans.core.log.Log;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -13,6 +14,8 @@ import java.util.Set;
 
 /** Parsed archive snapshot. Build it completely before installing it in a project. */
 final class ProjectArchive {
+
+    private static final System.Logger LOG = Log.get(ProjectArchive.class);
     private record ClassInfo(ClassFile file, List<Project.TextCount> texts,
                              Set<String> textSet, Map<String, List<String>> usage) {
     }
@@ -44,19 +47,14 @@ final class ProjectArchive {
         return new ProjectArchive(null, Map.of(), List.of());
     }
 
-    static ProjectArchive load(Path path) throws IOException {
-        JarReader reader;
-        try {
-            reader = new JarReader(path);
-        } catch (JarReader.JarFileException failure) {
-            throw new IOException(failure.getMessage(), failure);
-        }
+    static ProjectArchive load(Path path) throws IOException, JarReader.JarFileException {
+        JarReader reader = new JarReader(path);
         Map<String, ClassInfo> index = new LinkedHashMap<>();
         List<Project.FailedClass> failures = new ArrayList<>();
         for (String name : reader.classNames()) {
             try {
                 ClassFile file = ClassFile.parse(reader.readClass(name));
-                index.put(name, collect(file));
+                index.put(name, collect(name, file));
             } catch (ClassFileException failure) {
                 failures.add(new Project.FailedClass(name, failure.getMessage()));
             }
@@ -64,7 +62,7 @@ final class ProjectArchive {
         return new ProjectArchive(reader, index, failures);
     }
 
-    private static ClassInfo collect(ClassFile file) {
+    private static ClassInfo collect(String name, ClassFile file) {
         Map<String, Integer> counts = new LinkedHashMap<>();
         for (Literal literal : file.literals()) {
             if (literal.text != null) {
@@ -76,8 +74,9 @@ final class ProjectArchive {
         Map<String, List<String>> usage = new LinkedHashMap<>();
         try {
             Bytecode.stringUsage(file).forEach((text, names) -> usage.put(text, List.copyOf(names)));
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException e) {
             // Method usage is optional; a malformed method must not hide valid literals.
+            LOG.log(System.Logger.Level.DEBUG, "方法引用统计降级（类结构异常）：" + name, e);
         }
         return new ClassInfo(file, texts,
                 Collections.unmodifiableSet(new LinkedHashSet<>(counts.keySet())),

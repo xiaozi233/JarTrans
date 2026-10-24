@@ -25,13 +25,15 @@ javafx {
 }
 
 dependencies {
-    testImplementation(platform("org.junit:junit-bom:5.11.4"))
-    testImplementation("org.junit.jupiter:junit-jupiter")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    testImplementation(platform(libs.junit.bom))
+    testImplementation(libs.junit.jupiter)
+    testRuntimeOnly(libs.junit.launcher)
     // Recaf-style: decompilers are regular runtime libraries and are invoked in-process.
-    implementation("org.vineflower:vineflower:1.12.0")
-    implementation("org.benf:cfr:0.152")
-    implementation("org.bitbucket.mstrobel:procyon-compilertools:0.6.0")
+    // 版本号唯一来源为 gradle/libs.versions.toml；EnginesVersionTest 守护其与
+    // DecompilerManager.engines() 展示版本一致。
+    implementation(libs.vineflower)
+    implementation(libs.cfr)
+    implementation(libs.procyon)
 }
 
 application {

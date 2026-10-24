@@ -1,6 +1,7 @@
 package com.jartrans.ui;
 
 import com.jartrans.core.Dictionary;
+import com.jartrans.core.log.Log;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +23,8 @@ import javafx.stage.Modality;
 
 /** 词典条目编辑对话框（可切换当前编辑的词典）。对应 gui/dict_dialog.py。 */
 public class DictDialog extends AppWindow {
+
+    private static final System.Logger LOG = Log.get(DictDialog.class);
 
     private final ComboBox<String> dictBox = new ComboBox<>();
     private final TextField queryField = new TextField();
@@ -130,8 +133,8 @@ public class DictDialog extends AppWindow {
         }
         try {
             app.project().useDictionary(name);
-        } catch (Exception ignored) {
-            // 切换失败不阻断：下拉已切换，界面照常刷新
+        } catch (Exception e) {
+            LOG.log(System.Logger.Level.WARNING, "词典切换失败：" + name, e);
         }
         app.settings().setOrIgnore("dictionary", name);
         if (app.editor().currentClass() != null) {

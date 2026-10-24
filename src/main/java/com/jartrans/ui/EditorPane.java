@@ -1,6 +1,7 @@
 package com.jartrans.ui;
 
 import com.jartrans.core.Project;
+import com.jartrans.core.log.Log;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +43,8 @@ import javafx.util.Duration;
 
 /** 中间的字符串表格 + 底部多行编辑区（对应 gui/editor.py）。 */
 public class EditorPane extends BorderPane {
+
+    private static final System.Logger LOG = Log.get(EditorPane.class);
 
     /** 表格行模型。 */
     public static final class Row {
@@ -521,8 +524,8 @@ public class EditorPane extends BorderPane {
         app.recordClassMark(currentClass, app.project().classStatus().get(currentClass), state);
         try {
             app.project().setClassStatus(currentClass, state);
-        } catch (Exception ignored) {
-            // 状态写盘失败不阻断
+        } catch (Exception e) {
+            LOG.log(System.Logger.Level.WARNING, "类状态写盘失败：" + currentClass, e);
         }
         app.refreshClassNodes();
         app.updateStats();
@@ -687,7 +690,8 @@ public class EditorPane extends BorderPane {
         }
         try {
             app.project().setTranslation(currentClass, editingOrig, trans);
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            LOG.log(System.Logger.Level.WARNING, "译文写库失败：" + currentClass, e);
             // 写盘失败保留脏标记，等待下次尝试
             return;
         }
@@ -822,8 +826,8 @@ public class EditorPane extends BorderPane {
             app.recordSkip(r.orig, cur, skip);
             try {
                 app.project().setTextSkipped(r.orig, skip);
-            } catch (Exception ignored) {
-                // 写盘失败不阻断
+            } catch (Exception e) {
+                LOG.log(System.Logger.Level.WARNING, "「不翻译」名单写盘失败", e);
             }
             n++;
         }

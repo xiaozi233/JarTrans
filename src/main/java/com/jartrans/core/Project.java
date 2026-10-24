@@ -3,6 +3,7 @@ package com.jartrans.core;
 import com.jartrans.core.jar.JarPacker;
 import com.jartrans.core.jar.JarReader;
 import com.jartrans.core.json.Json;
+import com.jartrans.core.log.Log;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -26,6 +27,8 @@ import java.util.Set;
  * 用户在界面上手动标记后以手动值为准（存于 class_status）。
  */
 public final class Project {
+
+    private static final System.Logger LOG = Log.get(Project.class);
 
     /** 类的状态：无字符串 / 未开始 / 翻译中 / 已完成 / 已忽略。 */
     public static final List<String> CLASS_STATES =
@@ -126,7 +129,7 @@ public final class Project {
 
     // ---------- 打开 ----------
 
-    public void openJar(Path path) throws IOException {
+    public void openJar(Path path) throws IOException, JarReader.JarFileException {
         ProjectArchive loaded = ProjectArchive.load(path);
         archive = loaded;
         sha256 = null;
@@ -498,8 +501,8 @@ public final class Project {
     private void saveProgress() {
         try {
             new ProgressStore(AppDirs.progressFile()).save(progressKey(), classStatus, skipTexts);
-        } catch (IOException ignored) {
-            // 进度写入失败不影响主流程。
+        } catch (IOException e) {
+            LOG.log(System.Logger.Level.WARNING, "翻译进度写盘失败", e);
         }
     }
 

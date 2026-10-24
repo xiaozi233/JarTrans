@@ -1,5 +1,6 @@
 package com.jartrans.ui;
 
+import com.jartrans.core.log.Log;
 import java.nio.charset.MalformedInputException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -250,8 +251,9 @@ public final class Theme {
                         StandardCharsets.UTF_8).toLowerCase();
                 return text.contains("dark");
             }
-        } catch (Exception ignored) {
-            // 探测失败一律当作浅色
+        } catch (Exception e) {
+            // 探测失败一律当作浅色；轮询周期内重复失败只记调试级，避免刷爆日志
+            Log.get(Theme.class).log(System.Logger.Level.DEBUG, "系统深色探测失败", e);
             return false;
         }
         return false;

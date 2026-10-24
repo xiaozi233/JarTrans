@@ -321,7 +321,15 @@ public final class Json {
                             if (pos + 4 > s.length()) {
                                 throw new IOException("JSON 解析出错：\\u 转义不完整");
                             }
-                            sb.append((char) Integer.parseInt(s.substring(pos, pos + 4), 16));
+                            String hex = s.substring(pos, pos + 4);
+                            int code;
+                            try {
+                                code = Integer.parseInt(hex, 16);
+                            } catch (NumberFormatException nfe) {
+                                throw new IOException("JSON 解析出错：\\u 转义含非十六进制字符 "
+                                        + hex + "（位置 " + (pos - 2) + "）", nfe);
+                            }
+                            sb.append((char) code);
                             pos += 4;
                         }
                         default -> throw new IOException("JSON 解析出错：未知转义 \\" + e);
@@ -358,9 +366,15 @@ public final class Json {
                     return Long.parseLong(num);
                 } catch (NumberFormatException ignored) {
                     // 超出 long 范围则按 double
+                    isFloat = true;
                 }
             }
-            return Double.parseDouble(num);
+            try {
+                return Double.parseDouble(num);
+            } catch (NumberFormatException e) {
+                // 如 "1e"、"1-"、"1.2.3"：token 化阶段放行、parseDouble 拒绝的输入
+                throw new IOException("JSON 解析出错：位置 " + start + " 处不是合法的数字：" + num, e);
+            }
         }
     }
 

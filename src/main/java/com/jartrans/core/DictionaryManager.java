@@ -1,6 +1,7 @@
 package com.jartrans.core;
 
 import com.jartrans.core.json.Json;
+import com.jartrans.core.log.Log;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -24,6 +25,8 @@ import java.util.stream.Stream;
  * 会在首次启动时迁移为「默认词典」。
  */
 public final class DictionaryManager {
+
+    private static final System.Logger LOG = Log.get(DictionaryManager.class);
 
     public static final String INDEX_FILE = "index.json";
     public static final String DEFAULT_NAME = "默认词典";
@@ -125,8 +128,8 @@ public final class DictionaryManager {
         if (!Files.exists(target)) {
             try {
                 Json.writeFile(target, data);
-            } catch (IOException ignored) {
-                // 迁移失败不影响启动
+            } catch (IOException e) {
+                LOG.log(System.Logger.Level.WARNING, "旧版单词典迁移失败：" + legacy, e);
             }
         }
     }
@@ -230,13 +233,13 @@ public final class DictionaryManager {
         return candidate;
     }
 
-    public String create(String name) throws IOException {
+    public String create(String name) throws IOException, DictionaryException {
         name = name == null ? "" : name.trim();
         if (name.isEmpty()) {
-            throw new IllegalArgumentException("词典名称不能为空。");
+            throw new DictionaryException("词典名称不能为空。");
         }
         if (exists(name)) {
-            throw new IllegalArgumentException("已存在名为「" + name + "」的词典。");
+            throw new DictionaryException("已存在名为「" + name + "」的词典。");
         }
         String filename = uniqueFilename(name);
         Json.writeFile(dir.resolve(filename), new LinkedHashMap<>());
@@ -246,13 +249,13 @@ public final class DictionaryManager {
         return name;
     }
 
-    public String rename(String name, String newName) throws IOException {
+    public String rename(String name, String newName) throws IOException, DictionaryException {
         newName = newName == null ? "" : newName.trim();
         if (newName.isEmpty()) {
-            throw new IllegalArgumentException("词典名称不能为空。");
+            throw new DictionaryException("词典名称不能为空。");
         }
         if (!newName.equals(name) && exists(newName)) {
-            throw new IllegalArgumentException("已存在名为「" + newName + "」的词典。");
+            throw new DictionaryException("已存在名为「" + newName + "」的词典。");
         }
         boolean found = false;
         for (int i = 0; i < items.size(); i++) {
@@ -264,7 +267,7 @@ public final class DictionaryManager {
             }
         }
         if (!found) {
-            throw new IllegalArgumentException("词典不存在。");
+            throw new DictionaryException("词典不存在。");
         }
         Dictionary moved = cache.remove(name);
         if (moved != null) {
@@ -277,9 +280,9 @@ public final class DictionaryManager {
         return newName;
     }
 
-    public void remove(String name) throws IOException {
+    public void remove(String name) throws IOException, DictionaryException {
         if (items.size() <= 1) {
-            throw new IllegalArgumentException("至少需要保留一个词典。");
+            throw new DictionaryException("至少需要保留一个词典。");
         }
         Item target = null;
         for (Item it : items) {
@@ -289,12 +292,14 @@ public final class DictionaryManager {
             }
         }
         if (target == null) {
-            throw new IllegalArgumentException("词典不存在。");
+            throw new DictionaryException("词典不存在。");
         }
         try {
             Files.deleteIfExists(dir.resolve(target.file()));
-        } catch (IOException ignored) {
-            // 删除失败则保留文件，但索引中仍移除
+        } catch (IOException e) {
+            // 删除失败则保留文件，但索引中仍移除（下次启动扫描自愈）
+            LOG.log(System.Logger.Level.WARNING, "词典文件删除失败，仅从索引移除："
+                    + dir.resolve(target.file()), e);
         }
         items.remove(target);
         cache.remove(name);
@@ -308,10 +313,11 @@ public final class DictionaryManager {
     public record ImportResult(String name, int count, boolean merged) {
     }
 
-    public ImportResult importFile(Path src, String name, boolean merge) throws IOException {
+    public ImportResult importFile(Path src, String name, boolean merge)
+            throws IOException, DictionaryException {
         Map<String, Object> data = Json.object(Json.readFileQuiet(src));
         if (data == null) {
-            throw new IllegalArgumentException("不是有效的词典 JSON（应为 原字符串->译文 对象）。");
+            throw new DictionaryException("不是有效的词典 JSON（应为 原字符串->译文 对象）。");
         }
         String base = name != null && !name.isEmpty()
                 ? name : stripExt(src.getFileName().toString());
@@ -341,10 +347,10 @@ public final class DictionaryManager {
         return new ImportResult(newName, data.size(), false);
     }
 
-    public int exportFile(String name, Path dest) throws IOException {
+    public int exportFile(String name, Path dest) throws IOException, DictionaryException {
         Dictionary dic = get(name);
         if (dic == null) {
-            throw new IllegalArgumentException("词典不存在。");
+            throw new DictionaryException("词典不存在。");
         }
         dic.save();
         // 导出按码点排序（与 Python 版 sort_keys=True 一致）

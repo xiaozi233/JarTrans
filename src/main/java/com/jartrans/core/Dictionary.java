@@ -1,6 +1,7 @@
 package com.jartrans.core;
 
 import com.jartrans.core.json.Json;
+import com.jartrans.core.log.Log;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -11,6 +12,8 @@ import java.util.TreeMap;
 
 /** 全局翻译词典（翻译记忆），JSON 文件存储。 */
 public final class Dictionary {
+
+    private static final System.Logger LOG = Log.get(Dictionary.class);
 
     private final Path path;
     private final Map<String, String> data = new LinkedHashMap<>(); // 原字符串 -&gt; 译文
@@ -28,9 +31,19 @@ public final class Dictionary {
         if (!Files.exists(path)) {
             return;
         }
-        Object parsed = Json.readFileQuiet(path);
+        Object parsed;
+        try {
+            parsed = Json.readFile(path);
+        } catch (IOException | RuntimeException e) {
+            // 损坏文件先备份再按空词典继续：否则后续 save 会把用户数据悄悄覆盖成空表
+            backupCorrupt(e);
+            data.clear();
+            return;
+        }
         Map<String, Object> map = Json.object(parsed);
         if (map == null) {
+            backupCorrupt(new IOException("根节点不是 JSON 对象"));
+            data.clear();
             return;
         }
         data.clear();
@@ -42,6 +55,22 @@ public final class Dictionary {
         }
     }
 
+    /** 把损坏的词典文件复制为同级 .corrupt 备份（已存在则追加序号），原文件保留待覆盖。 */
+    private void backupCorrupt(Exception cause) {
+        LOG.log(System.Logger.Level.ERROR, "词典文件损坏，已备份并按空词典加载：" + path, cause);
+        try {
+            Path backup = path.resolveSibling(path.getFileName() + ".corrupt");
+            int suffix = 0;
+            while (Files.exists(backup)) {
+                suffix += 1;
+                backup = path.resolveSibling(path.getFileName() + ".corrupt." + suffix);
+            }
+            Files.copy(path, backup);
+        } catch (IOException e) {
+            LOG.log(System.Logger.Level.WARNING, "词典损坏备份失败：" + path, e);
+        }
+    }
+
     public void save() throws IOException {
         // sort_keys=True：按码点排序
         Map<String, Object> sorted = new TreeMap<>(Json.CODE_POINT_ORDER);
@@ -49,12 +78,12 @@ public final class Dictionary {
         Json.writeFile(path, sorted);
     }
 
-    /** 落盘但忽略失败：词典写盘失败不应打断界面操作。 */
+    /** 落盘但只记录失败：词典写盘失败不应打断界面操作。 */
     public void saveQuietly() {
         try {
             save();
-        } catch (IOException ignored) {
-            // 写盘失败不阻断
+        } catch (IOException e) {
+            LOG.log(System.Logger.Level.WARNING, "词典写盘失败：" + path, e);
         }
     }
 

@@ -1,15 +1,17 @@
 package com.jartrans;
 
+import com.jartrans.core.log.LogConfig;
 import com.jartrans.ui.MainApp;
 import javafx.application.Application;
 
 /**
  * 入口：不直接继承 Application（避免平台启动器类加载问题），
- * 只负责转发到 JavaFX 的 MainApp。
+ * 只负责装配日志与转发到 JavaFX 的 MainApp。
  */
 public final class Main {
 
     public static void main(String[] args) {
+        LogConfig.init();
         Application.launch(MainApp.class, args);
     }
 

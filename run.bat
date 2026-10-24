@@ -9,8 +9,14 @@ if not "%JAVA_HOME%"=="" (
     if exist "%JAVA_HOME%\bin\java.exe" set "JAVA_EXE=%JAVA_HOME%\bin\java.exe"
 )
 
-if not exist "build\libs\jartrans-1.0.0.jar" (
-    echo [JarTrans] 未找到 build\libs\jartrans-1.0.0.jar，请先执行:
+rem 定位最新构建的可执行 jar（jartrans-<version>.jar），避免脚本与版本号双重维护
+set "APP_JAR="
+for /f "delims=" %%f in ('dir /b /o-d "build\libs\jartrans-*.jar" 2^>nul') do (
+    if not defined APP_JAR set "APP_JAR=build\libs\%%f"
+)
+
+if not defined APP_JAR (
+    echo [JarTrans] 未找到 build\libs\jartrans-*.jar，请先执行:
     echo   gradlew shadowJar
     pause
     exit /b 1
@@ -19,5 +25,5 @@ if not exist "build\libs\jartrans-1.0.0.jar" (
 echo [JarTrans] 启动中...
 "%JAVA_EXE%" --enable-native-access=ALL-UNNAMED -Dfile.encoding=UTF-8 ^
     -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8 ^
-    -jar "build\libs\jartrans-1.0.0.jar"
+    -jar "%APP_JAR%"
 endlocal

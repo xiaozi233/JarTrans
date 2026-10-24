@@ -71,6 +71,12 @@ class JsonTest {
         assertThrows(IOException.class, () -> Json.parse("\"abc"));
         assertThrows(IOException.class, () -> Json.parse("{\"a\":1} extra"));
         assertThrows(IOException.class, () -> Json.parse("truee"));
+        // 契约：畸形数字/转义必须抛 IOException，而不是让 NumberFormatException 逃逸
+        assertThrows(IOException.class, () -> Json.parse("1e"));
+        assertThrows(IOException.class, () -> Json.parse("[1.2.3]"));
+        assertThrows(IOException.class, () -> Json.parse("-"));
+        assertThrows(IOException.class, () -> Json.parse("\"\\uZZZZ\""));
+        assertThrows(IOException.class, () -> Json.parse("\"\\u12\""));
     }
 
     @Test

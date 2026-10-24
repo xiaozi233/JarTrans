@@ -53,12 +53,15 @@ import javafx.scene.shape.Circle;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.util.Duration;
+import com.jartrans.core.log.Log;
 
 /**
  * JavaFX 主应用与控制器（对应 Python gui/app.py）。
  * 界面骨架在 main_view.fxml 中，本类通过 FXMLLoader.setController 注入。
  */
 public class MainApp extends Application {
+
+    private static final System.Logger LOG = Log.get(MainApp.class);
 
     // 类状态文案与筛选项的唯一来源在 ClassStates；这里保留别名，供既有调用与守护测试使用。
     static final Map<String, String> STATE_LABEL = ClassStates.LABELS;
@@ -847,8 +850,9 @@ public class MainApp extends Application {
         }
         try {
             project.useDictionary(name);
-        } catch (Exception ignored) {
+        } catch (Exception e) {
             // 切换失败不阻断：下拉已切换，界面照常刷新
+            LOG.log(System.Logger.Level.WARNING, "词典切换失败：" + name, e);
         }
         settings.setOrIgnore("dictionary", name);
         setStatus("已切换到词典「" + name + "」（" + project.dictionary().size() + " 条）");
@@ -1311,8 +1315,8 @@ public class MainApp extends Application {
         // 译文自动保存：退出前冲刷编辑区未落库内容
         try {
             editor.flushEdit();
-        } catch (Exception ignored) {
-            // 忽略
+        } catch (Exception e) {
+            LOG.log(System.Logger.Level.WARNING, "退出前冲刷译文失败", e);
         }
         cancelDecompile();
         DecompilerManager.cleanupOnExit();

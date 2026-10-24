@@ -24,8 +24,14 @@ public final class LangPack {
     /** 语言包格式错误。 */
     public static class LangPackException extends Exception {
 
+        private static final long serialVersionUID = 1L;
+
         public LangPackException(String message) {
             super(message);
+        }
+
+        public LangPackException(String message, Throwable cause) {
+            super(message, cause);
         }
     }
 
@@ -80,7 +86,7 @@ public final class LangPack {
         try {
             data = Json.readFile(path);
         } catch (IOException exc) {
-            throw new LangPackException("无法读取语言包：" + exc.getMessage());
+            throw new LangPackException("无法读取语言包：" + exc.getMessage(), exc);
         }
         Map<String, Object> map = Json.object(data);
         if (map == null || !(map.get("entries") instanceof Map)) {

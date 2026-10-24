@@ -2,6 +2,7 @@ package com.jartrans.core.java;
 
 import com.jartrans.core.Settings;
 import com.jartrans.core.io.AtomicFiles;
+import com.jartrans.core.log.Log;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -19,6 +20,9 @@ import java.util.zip.ZipFile;
 
 /** 反编译器门面：注册进程内引擎、协调缓存，并隔离并发输出。 */
 public final class DecompilerManager {
+
+    private static final System.Logger LOG = Log.get(DecompilerManager.class);
+
     public static final Path CACHE_ROOT =
             Paths.get(System.getProperty("java.io.tmpdir"), "jartrans_decomp");
     private static final Map<DecompilerType, DecompilerEngine> ENGINES = Map.of(
@@ -30,7 +34,10 @@ public final class DecompilerManager {
     private DecompilerManager() { }
 
     public static class DecompileException extends Exception {
+        private static final long serialVersionUID = 1L;
+
         public DecompileException(String message) { super(message); }
+
         public DecompileException(String message, Throwable cause) { super(message, cause); }
     }
 
@@ -70,12 +77,14 @@ public final class DecompilerManager {
             walk.sorted(Comparator.reverseOrder()).forEach(p -> {
                 try {
                     Files.deleteIfExists(p);
-                } catch (IOException ignored) {
+                } catch (IOException e) {
                     // 占用中的文件交由下次清理。
+                    LOG.log(System.Logger.Level.DEBUG, "缓存文件删除失败（占用中）：" + p, e);
                 }
             });
-        } catch (IOException ignored) {
+        } catch (IOException e) {
             // 遍历失败时保留缓存。
+            LOG.log(System.Logger.Level.WARNING, "缓存目录遍历失败，保留：" + target, e);
         }
     }
 
@@ -156,8 +165,9 @@ public final class DecompilerManager {
             walk.filter(p -> p.getFileName().toString().endsWith(".java")).sorted()
                     .forEach(p -> index.put(outDir.relativize(p).toString().replace('\\', '/'),
                             p.toAbsolutePath()));
-        } catch (IOException ignored) {
+        } catch (IOException e) {
             // 返回已建立的索引。
+            LOG.log(System.Logger.Level.WARNING, "反编译产物索引构建失败：" + outDir, e);
         }
         return index;
     }

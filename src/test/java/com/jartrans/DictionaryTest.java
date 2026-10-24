@@ -91,4 +91,31 @@ class DictionaryTest {
         copy.put("b", "2");
         assertFalse(dict.entries().containsKey("b"), "entries() 应返回副本");
     }
+
+    @Test
+    void corruptFileIsBackedUpNotSilentlyOverwritten() throws IOException {
+        Path file = newFile();
+        Files.writeString(file, "{ broken json !!");
+        Dictionary dict = new Dictionary(file);
+        assertEquals(0, dict.size(), "损坏词典按空词典加载");
+
+        Path backup = file.resolveSibling(file.getFileName() + ".corrupt");
+        assertTrue(Files.exists(backup), "损坏文件应保留 .corrupt 备份");
+        assertEquals("{ broken json !!", Files.readString(backup));
+
+        // 后续保存只写新内容，原数据仍可从备份找回
+        dict.add("k", "v");
+        dict.save();
+        assertTrue(Files.exists(backup));
+        assertEquals(Map.of("k", "v"), dict.entries());
+    }
+
+    @Test
+    void nonObjectRootIsBackedUp() throws IOException {
+        Path file = newFile();
+        Files.writeString(file, "[1, 2]");
+        Dictionary dict = new Dictionary(file);
+        assertEquals(0, dict.size(), "根不是对象按空词典加载");
+        assertTrue(Files.exists(file.resolveSibling(file.getFileName() + ".corrupt")));
+    }
 }

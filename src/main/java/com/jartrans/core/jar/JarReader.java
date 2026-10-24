@@ -18,6 +18,12 @@ public final class JarReader {
     /** jar 读取错误。 */
     public static class JarFileException extends Exception {
 
+        private static final long serialVersionUID = 1L;
+
+        public JarFileException(String message) {
+            super(message);
+        }
+
         public JarFileException(String message, Throwable cause) {
             super(message, cause);
         }
@@ -48,7 +54,7 @@ public final class JarReader {
 
     public JarReader(Path path) throws JarFileException {
         if (path == null) {
-            throw new JarFileException("jar 路径不能为空", null);
+            throw new JarFileException("jar 路径不能为空");
         }
         this.path = path;
         try (ZipFile zf = new ZipFile(path.toFile())) {
